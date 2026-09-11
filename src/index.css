@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+/*
+ * Tokens del proyecto. Ver "Dirección visual" en CLAUDE.md.
+ * @theme los emite como variables CSS en :root y genera las utilidades
+ * correspondientes (bg-marino, text-riesgo, border-advertencia, ...).
+ * Es el UNICO lugar del proyecto con colores en hexadecimal.
+ */
+@theme {
+  --color-marino: #1F3864;        /* azul institucional */
+  --color-positivo: #1E8449;      /* verde: resultado favorable */
+  --color-riesgo: #C0392B;        /* rojo: alerta */
+  --color-advertencia: #B7791F;   /* ámbar: advertencia */
+  --color-papel: #FFFFFF;         /* fondo de reporte */
+  --color-tinta: #111827;         /* texto de cuerpo */
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, Consolas, monospace;
+}
+
+/*
+ * Números tabulares. Sin esto las columnas de importes no alinean.
+ * Aplicar en toda tabla o celda que contenga cifras.
+ */
+@utility cifras {
+  font-variant-numeric: tabular-nums;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: var(--color-papel);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+}
+
+/*
+ * ─────────────────────────── Impresión ───────────────────────────
+ *
+ * La vista imprimible (VistaImpresion.tsx) arma el contenido; aquí solo se
+ * decide cómo cae en la hoja. Tamaño carta, que es el de uso en México.
+ */
+@page {
+  size: letter;
+  margin: 12mm 12mm 10mm;
+}
+
+/* El estado de resultados mensual tiene doce columnas: no cabe a lo alto. */
+@page apaisada {
+  size: letter landscape;
+}
+
+@media print {
+  /*
+   * Escala de impresión: todo el tamaño tipográfico y los espacios están en rem,
+   * así que bajar la raíz a 12px reduce el reporte al 75% de la pantalla sin
+   * tocar un solo componente. Las tablas de cifras caben en la hoja carta.
+   */
+  html {
+    font-size: 12px;
+  }
+
+  /*
+   * Las notas usan tamaños fijos en píxeles (text-[11px] y compañía), que la
+   * escala de arriba no alcanza: sin esto quedarían MÁS grandes que el cuerpo.
+   * Se pasan a su equivalente en rem para que escalen igual que todo lo demás.
+   */
+  .text-\[11px\] {
+    font-size: 0.6875rem;
+  }
+
+  .text-\[10px\] {
+    font-size: 0.625rem;
+  }
+
+  .text-\[9px\] {
+    font-size: 0.5625rem;
+  }
+
+  html,
+  body {
+    background: var(--color-papel) !important;
+  }
+
+  /*
+   * Colores que SÍ son información (tonos de riesgo, advertencia y positivo;
+   * segmentos de la barra de antigüedad; filas marcadas): se piden exactos para
+   * que el navegador no los descarte. Aun así, algunos navegadores obedecen
+   * primero la casilla "Gráficos de fondo"; por eso la interfaz lo recuerda
+   * junto al botón. El texto y los bordes de color se imprimen siempre.
+   */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Fondos grises de encabezados y paneles: no informan, van en blanco. */
+  [class*="bg-slate-"] {
+    background-color: transparent !important;
+  }
+
+  /*
+   * Texto gris de apoyo: en papel, negro. Se conservan los grises tenues
+   * (slate-300 y 400): marcan ceros y meses sin actividad, y eso sí informa.
+   */
+  [class*="text-slate-5"],
+  [class*="text-slate-6"],
+  [class*="text-slate-7"],
+  [class*="text-slate-8"],
+  [class*="text-slate-9"] {
+    color: var(--color-tinta) !important;
+  }
+
+  /* Sin sombras: en papel parecen manchas. */
+  [class*="shadow"] {
+    box-shadow: none !important;
+  }
+
+  /* ── Saltos de página ── */
+
+  /* Cada módulo del reporte completo empieza en hoja nueva. */
+  .imp-salto {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .imp-apaisada {
+    page: apaisada;
+  }
+
+  /* Encabezado y pie del módulo, repetidos en cada hoja. */
+  .imp-pagina > thead {
+    display: table-header-group;
+  }
+
+  .imp-pagina > tfoot {
+    display: table-footer-group;
+  }
+
+  /*
+   * Tablas cortas, tarjetas, avisos, barras y gráficas no se parten entre
+   * hojas. Las tablas largas (imp-tabla-larga, más de 12 renglones o con detalle
+   * desplegado) sí se parten, porque pedirles que no lo hagan las empuja enteras
+   * a la hoja siguiente y deja media hoja en blanco; pero se parten entre
+   * renglones, nunca a media fila, y repiten su encabezado.
+   */
+  .imp-bloque {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .imp-bloque thead,
+  .imp-tabla-larga thead {
+    display: table-header-group;
+  }
+
+  .imp-bloque tr,
+  .imp-tabla-larga tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Una fila desplegada no se separa de su detalle. */
+  .imp-con-detalle {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* Un título de sección nunca queda solo al pie de una hoja. */
+  .imp-titulo,
+  h1,
+  h2 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* La portada ocupa su propia hoja. */
+  .imp-portada {
+    min-height: 240mm;
+  }
+}

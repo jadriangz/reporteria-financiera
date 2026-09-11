@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Reportería financiera">
+  <!-- Azul marino institucional #1F3864: el mismo de la aplicación. -->
+  <rect width="32" height="32" rx="5" fill="#1F3864"/>
+  <!-- Tres barras ascendentes: la última en verde, el color de lo positivo. -->
+  <rect x="7"  y="18" width="4.5" height="7"  rx="1" fill="#FFFFFF" opacity="0.7"/>
+  <rect x="13.75" y="13" width="4.5" height="12" rx="1" fill="#FFFFFF" opacity="0.85"/>
+  <rect x="20.5" y="7"  width="4.5" height="18" rx="1" fill="#1E8449"/>
+</svg>
