@@ -61,7 +61,7 @@ export function Cifra({
           positivo: "text-positivo",
           riesgo: "text-riesgo",
           advertencia: "text-advertencia",
-          tenue: "text-slate-400",
+          tenue: "text-slate-500",
         }[tono],
         className,
       )}
@@ -114,9 +114,9 @@ export function Boton({
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marino",
         "disabled:cursor-not-allowed disabled:opacity-40",
         {
-          normal: "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
-          primario: "bg-marino text-white hover:bg-marino/90",
-          peligro: "border border-slate-300 bg-white text-riesgo hover:bg-red-50",
+          normal: "border border-slate-300 bg-superficie text-slate-700 hover:bg-slate-50",
+          primario: "bg-marino text-sobre-color hover:bg-marino/90",
+          peligro: "border border-slate-300 bg-superficie text-riesgo hover:bg-red-50",
         }[variante],
       )}
     >

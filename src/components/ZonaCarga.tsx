@@ -57,7 +57,7 @@ export function ZonaCarga() {
           "mt-8 flex cursor-pointer flex-col items-center justify-center",
           "border-2 border-dashed p-12 text-center transition-colors",
           "focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-marino",
-          arrastrando ? "border-marino bg-marino/5" : "border-slate-300 bg-white hover:bg-slate-50",
+          arrastrando ? "border-marino bg-marino/5" : "border-slate-300 bg-superficie hover:bg-slate-50",
           cargando ? "pointer-events-none opacity-60" : "",
         ].join(" ")}
       >

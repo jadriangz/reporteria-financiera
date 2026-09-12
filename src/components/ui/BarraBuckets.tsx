@@ -103,7 +103,7 @@ export function BarraBuckets({
               <span
                 className={clsx(
                   "cifras block text-xs font-medium tabular-nums",
-                  s.valor > 0 ? "text-slate-900" : "text-slate-400",
+                  s.valor > 0 ? "text-slate-900" : "text-slate-500",
                 )}
               >
                 {s.texto}

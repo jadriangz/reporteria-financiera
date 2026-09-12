@@ -63,6 +63,27 @@ describe("empezar sin archivo", () => {
     expect(s().calculos?.capacidades.resumen).toBe(false);
   });
 
+  /**
+   * El estado LIMPIO existe y se puede alcanzar.
+   *
+   * El panel de validacion muestra un mensaje en positivo cuando no hay una
+   * sola incidencia. Si ese estado fuera inalcanzable, el mensaje seria codigo
+   * muerto y nadie se enteraria: de ahi esta prueba.
+   */
+  it("un archivo capturado completo y sin incidencias deja el panel en limpio", () => {
+    const completa = (folio: string, costo: string, precio: string, dia: string) =>
+      venta({ folio, costo_unitario: costo, precio_venta: precio, fecha: `2026-03-${dia}`, dias_credito: "90", condicion: "Credito", comision_pct: "5", comision_base: "Venta" });
+
+    // Margenes distintos a proposito: con uno solo, o con todos iguales, salta
+    // la advertencia de "el costo parece derivado del precio".
+    s().guardarFila("ventas", completa("V-1", "190000", "265000", "10"), null);
+    s().guardarFila("ventas", completa("V-2", "295000", "385000", "11"), null);
+    s().guardarFila("ventas", completa("V-3", "128000", "178000", "12"), null);
+
+    expect(s().hallazgos).toEqual([]);
+    expect(s().dataset?.ventas).toHaveLength(3);
+  });
+
   it("un abono capturado a la venta capturada habilita cobranza", () => {
     s().guardarFila("ventas", venta({}), null);
     s().guardarFila(

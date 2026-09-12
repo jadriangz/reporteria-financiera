@@ -354,7 +354,7 @@ function Listado({
 /** Distingue a simple vista lo capturado a mano de lo que vino del archivo. */
 function MarcaOrigen({ origen }: { origen: FilaListado["origen"] }) {
   return origen === "captura" ? (
-    <span className="inline-block rounded-sm bg-marino px-1.5 py-0.5 text-[10px] font-semibold text-white">
+    <span className="inline-block rounded-sm bg-marino px-1.5 py-0.5 text-[10px] font-semibold text-sobre-color">
       A mano
     </span>
   ) : (

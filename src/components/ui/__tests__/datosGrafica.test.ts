@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   type SerieGrafica,
-  VARIABLE_COLOR,
   dataKeyDe,
   esCategorica,
   etiquetasEje,
   filasRecharts,
 } from "../datosGrafica";
+import type { ColorSerie } from "../datosGrafica";
+import { PALETA_VAR, TOKENS_GRAFICA } from "../../../lib/tema/paleta";
 
 const SERIES: readonly SerieGrafica[] = [
   { clave: "facturado", etiqueta: "Facturado", color: "marino" },
@@ -94,9 +95,17 @@ describe("etiquetas del eje", () => {
 });
 
 describe("colores", () => {
-  it("todos salen de variables del @theme, ninguno es un hexadecimal suelto", () => {
-    for (const valor of Object.values(VARIABLE_COLOR)) {
+  it("todos salen de tokens del tema, ninguno es un hexadecimal suelto", () => {
+    for (const variable of Object.values(TOKENS_GRAFICA)) {
+      expect(variable).toMatch(/^--color-[a-z0-9-]+$/);
+    }
+    for (const valor of Object.values(PALETA_VAR)) {
       expect(valor).toMatch(/^var\(--color-[a-z0-9-]+\)$/);
     }
+  });
+
+  it("los colores de serie son un subconjunto de los tokens de la grafica", () => {
+    const series: readonly ColorSerie[] = ["marino", "positivo", "riesgo", "advertencia", "tenue"];
+    for (const s of series) expect(Object.keys(TOKENS_GRAFICA)).toContain(s);
   });
 });

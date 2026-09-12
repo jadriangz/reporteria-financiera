@@ -3,6 +3,7 @@ import { type ReactNode, useEffect } from "react";
 
 import { etiquetaOrigen, totalCapturas } from "../lib/captura";
 import { fecha } from "../lib/format";
+import { TEMA_IMPRESION, atributosTema } from "../lib/tema";
 import { ListaAlcance } from "../modules/resumen";
 import { alcanceDelReporte, periodoDelReporte, textoPeriodo } from "../modules/resumen/selectores";
 import { type Calculos, type ModoImpresion, useAppStore } from "../store/useAppStore";
@@ -26,6 +27,13 @@ import { ContextoImpresion } from "./ui/contextoImpresion";
  * Cada modulo va en una tabla con `thead` y `tfoot`: es la unica forma
  * portable de repetir encabezado y pie en cada hoja impresa sin que se encimen
  * con el contenido.
+ *
+ * EL REPORTE SIEMPRE SALE EN CLARO. La raiz de esta vista lleva
+ * `data-tema="claro"`, que vuelve a declarar los tokens claros para todo su
+ * subarbol aunque la pantalla este en oscuro (ver `index.css`). Un PDF con
+ * fondo negro no se lee en papel y vacia un cartucho por ejemplar; y las
+ * graficas, que resuelven su paleta contra el elemento donde se pintan, heredan
+ * de aqui los colores claros sin saber nada del tema de la pantalla.
  */
 export function VistaImpresion({ modo, calculos }: { modo: ModoImpresion; calculos: Calculos }) {
   const dataset = useAppStore((s) => s.dataset);
@@ -47,7 +55,10 @@ export function VistaImpresion({ modo, calculos }: { modo: ModoImpresion; calcul
 
   return (
     <ContextoImpresion value={true}>
-      <div className="vista-impresion hidden bg-papel text-tinta print:block">
+      <div
+        {...atributosTema(TEMA_IMPRESION)}
+        className="vista-impresion hidden bg-papel text-tinta print:block"
+      >
         {completo && (
           <Portada calculos={calculos} archivo={archivo} textoDePeriodo={textoPeriodo(periodo)} />
         )}

@@ -52,7 +52,7 @@ export const TONO_FILA: Readonly<Record<Tono, string>> = {
   positivo: "bg-emerald-50/60",
   riesgo: "bg-red-50/70",
   advertencia: "bg-amber-50/60",
-  tenue: "text-slate-400",
+  tenue: "text-slate-500",
 };
 
 /** Color del texto de la fila segun su tono. */
@@ -61,7 +61,7 @@ export const TONO_TEXTO: Readonly<Record<Tono, string>> = {
   positivo: "text-positivo",
   riesgo: "text-riesgo",
   advertencia: "text-advertencia",
-  tenue: "text-slate-400",
+  tenue: "text-slate-500",
 };
 
 /**

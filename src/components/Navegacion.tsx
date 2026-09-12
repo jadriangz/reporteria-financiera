@@ -19,7 +19,7 @@ export function Navegacion({ capacidades }: { capacidades: Capacidades }) {
   const irACaptura = useAppStore((s) => s.irACaptura);
 
   return (
-    <nav aria-label="Módulos del reporte" className="border-b border-slate-200 bg-white">
+    <nav aria-label="Módulos del reporte" className="border-b border-slate-200 bg-superficie">
       <ul className="flex flex-wrap items-stretch gap-px px-2">
         {MODULOS.map((m) => {
           const habilitado = capacidades[m.requiere];

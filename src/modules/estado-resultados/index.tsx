@@ -125,7 +125,7 @@ function CascadaPeriodo({ calculos }: { calculos: Calculos }) {
 /** Un cero se atenua: en una rejilla mensual, el ojo debe ir a las cifras reales. */
 function Importe({ valor, sinFecha = false }: { valor: number; sinFecha?: boolean }) {
   return (
-    <span className={clsx(valor === 0 ? "text-slate-400" : sinFecha && "text-advertencia")}>
+    <span className={clsx(valor === 0 ? "text-slate-500" : sinFecha && "text-advertencia")}>
       {moneda(valor)}
     </span>
   );

@@ -5,6 +5,7 @@ import { COMISION_BASE } from "../lib/schema";
 import { etiquetaOrigen, totalCapturas } from "../lib/captura";
 import { MODULOS, type ModoImpresion, useAppStore } from "../store/useAppStore";
 import { BotonExcel } from "./captura/BotonExcel";
+import { SelectorTema } from "./SelectorTema";
 import { Boton } from "./ui/primitivas";
 
 /** Date a "aaaa-mm-dd" para el input nativo, siempre en UTC. */
@@ -38,7 +39,7 @@ export function BarraSuperior() {
   const [ajustesAbiertos, setAjustesAbiertos] = useState(false);
 
   return (
-    <header className="sticky top-0 z-10 border-b border-slate-200 bg-white">
+    <header className="sticky top-0 z-10 border-b border-slate-200 bg-superficie">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-marino">Reportería financiera</p>
@@ -60,6 +61,7 @@ export function BarraSuperior() {
           />
         </label>
 
+        <SelectorTema />
         <BotonExcel />
         <MenuPdf />
         <Boton onClick={() => setAjustesAbiertos((v) => !v)}>
@@ -142,7 +144,7 @@ function MenuPdf() {
         <div
           role="dialog"
           aria-label="Descargar PDF"
-          className="absolute right-0 top-full z-20 mt-1 w-80 border border-slate-200 bg-white p-3 shadow-md"
+          className="absolute right-0 top-full z-20 mt-1 w-80 border border-slate-200 bg-superficie p-3 shadow-md"
         >
           <p className="text-xs font-semibold text-marino">¿Qué quiere descargar?</p>
           <div className="mt-2 space-y-2">
@@ -203,7 +205,7 @@ function CampoTasa({
           }}
           className="cifras w-16 rounded-sm border border-slate-300 px-1.5 py-0.5 text-right text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-marino"
         />
-        <span className="text-slate-400">%</span>
+        <span className="text-slate-500">%</span>
       </span>
     </label>
   );

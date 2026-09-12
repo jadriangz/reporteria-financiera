@@ -9,6 +9,42 @@
       name="description"
       content="Genere reportes financieros y operativos —resultados, cobranza, productos y clientes— a partir de su archivo de Excel. Todo el procesamiento ocurre en su navegador: ningún dato sale de su computadora."
     />
+    <!--
+      EL ÚNICO SCRIPT EN LÍNEA DEL PROYECTO, y la única razón que lo justifica:
+      evitar el destello de tema incorrecto.
+
+      El bundle de React se carga como módulo, o sea diferido: entre que el
+      navegador pinta el <body> y que React monta pasan decenas de milisegundos.
+      Con el tema oscuro elegido, ese hueco es un fogonazo blanco a pantalla
+      completa. Cualquier solución "limpia" —fijar el tema en un efecto, en el
+      store, en el primer render— ocurre necesariamente después de ese primer
+      pintado, así que ninguna lo resuelve.
+
+      Es deliberadamente mínimo y solo escribe en <html>. Los valores que usa
+      —la clave "rf.tema", el atributo "data-tema", la consulta del sistema—
+      están en src/lib/tema y src/lib/preferencias; una prueba compara este
+      archivo contra esas constantes para que un cambio de nombre allá no deje
+      este script apuntando a una clave que ya no existe.
+
+      Va envuelto en try/catch porque leer localStorage lanza en ventana privada
+      con almacenamiento bloqueado: si falla, se queda en claro, que es el valor
+      por omisión, y la aplicación arranca igual.
+    -->
+    <script>
+      (function () {
+        try {
+          var guardado = localStorage.getItem("rf.tema");
+          var tema = guardado === "claro" || guardado === "oscuro" ? guardado : null;
+          if (tema === null) {
+            tema = window.matchMedia("(prefers-color-scheme: dark)").matches ? "oscuro" : "claro";
+          }
+          document.documentElement.setAttribute("data-tema", tema);
+          document.documentElement.style.colorScheme = tema === "oscuro" ? "dark" : "light";
+        } catch (e) {
+          document.documentElement.setAttribute("data-tema", "claro");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

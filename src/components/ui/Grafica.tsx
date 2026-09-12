@@ -1,13 +1,29 @@
 import clsx from "clsx";
-import { Component, type ReactNode, Suspense, lazy, useMemo } from "react";
+import {
+  Component,
+  type ReactNode,
+  type RefObject,
+  Suspense,
+  lazy,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
+import {
+  type PaletaGrafica,
+  PALETA_VAR,
+  mismaPaleta,
+  paletaDelElemento,
+} from "../../lib/tema/paleta";
+import { useTema } from "../../store/useTema";
 import { useImprimiendo } from "./contextoImpresion";
 import { cargarGraficas } from "./cargaGraficas";
 import {
   type PuntosGrafica,
   type SerieGrafica,
   type TipoGrafica,
-  VARIABLE_COLOR,
   esCategorica,
   etiquetasEje,
   filasRecharts,
@@ -46,6 +62,7 @@ export function Grafica({
   const filas = useMemo(() => filasRecharts(puntos, series), [puntos, series]);
   const etiquetas = useMemo(() => etiquetasEje(puntos), [puntos]);
   const imprimiendo = useImprimiendo();
+  const [figura, paleta] = usePaleta();
 
   if (filas.length === 0) {
     return (
@@ -56,8 +73,8 @@ export function Grafica({
   }
 
   return (
-    <figure className="imp-bloque m-0" aria-label={etiqueta}>
-      <Leyenda series={series} linea={tipo === "linea"} />
+    <figure ref={figura} className="imp-bloque m-0" aria-label={etiqueta}>
+      <Leyenda series={series} linea={tipo === "linea"} paleta={paleta} />
       <BarreraGrafica alto={alto}>
         <Suspense fallback={<Reserva alto={alto} texto="Cargando la gráfica…" />}>
           <Lienzo
@@ -68,11 +85,52 @@ export function Grafica({
             categorica={esCategorica(puntos)}
             imprimiendo={imprimiendo}
             alto={alto}
+            paleta={paleta}
           />
         </Suspense>
       </BarreraGrafica>
     </figure>
   );
+}
+
+/**
+ * La paleta del tema que rige DONDE ESTA LA GRAFICA, no la del documento.
+ *
+ * Se recalcula cuando cambia el tema resuelto y cuando la figura entra o sale
+ * de la vista imprimible: esa vista fuerza claro en su subarbol, asi que la
+ * misma grafica tiene colores distintos en pantalla y en papel, y los dos
+ * salen de leer el elemento real.
+ *
+ * `useLayoutEffect` y no `useEffect` para que la paleta correcta este puesta
+ * antes del primer pintado y no se vea un parpadeo de color al cambiar de tema.
+ *
+ * Se llama `usePaleta` y no `usarPaleta`, unico anglicismo del proyecto: la
+ * regla `rules-of-hooks` identifica los hooks por el prefijo "use", y un nombre
+ * en español la deja sin poder vigilar este archivo.
+ */
+function usePaleta(): [RefObject<HTMLElement | null>, PaletaGrafica] {
+  const figura = useRef<HTMLElement | null>(null);
+  const resuelto = useTema((s) => s.resuelto);
+  const imprimiendo = useImprimiendo();
+  const [estado, setEstado] = useState<{ clave: string; paleta: PaletaGrafica }>({
+    clave: "",
+    paleta: PALETA_VAR,
+  });
+
+  useLayoutEffect(() => {
+    // La clave nombra el CONTEXTO de color en el que esta la figura. Son las
+    // dos unicas cosas que pueden cambiar los tokens que hereda: el tema de la
+    // pantalla, y si esta o no dentro de la vista imprimible, que fuerza claro.
+    // Guardarla evita releer el DOM en cada pintado sin perderse un cambio.
+    const clave = `${imprimiendo ? "impresion" : "pantalla"}:${resuelto}`;
+    setEstado((previo) => {
+      if (previo.clave === clave) return previo;
+      const paleta = paletaDelElemento(figura.current);
+      return mismaPaleta(previo.paleta, paleta) ? { clave, paleta: previo.paleta } : { clave, paleta };
+    });
+  }, [resuelto, imprimiendo]);
+
+  return [figura, estado.paleta];
 }
 
 /** Espacio del mismo alto que la grafica, mientras llega o si no llego. */
@@ -82,7 +140,7 @@ function Reserva({ alto, texto, error = false }: { alto: number; texto: string; 
       style={{ height: alto }}
       className={clsx(
         "flex items-center justify-center border border-dashed text-[11px]",
-        error ? "border-riesgo/40 text-riesgo" : "border-slate-200 text-slate-400",
+        error ? "border-riesgo/40 text-riesgo" : "border-slate-200 text-slate-500",
       )}
     >
       {texto}
@@ -117,7 +175,15 @@ class BarreraGrafica extends Component<{ alto: number; children: ReactNode }, { 
 }
 
 /** Leyenda fija. Muestra una raya para las lineas y un cuadro para las barras. */
-function Leyenda({ series, linea }: { series: readonly SerieGrafica[]; linea: boolean }) {
+function Leyenda({
+  series,
+  linea,
+  paleta,
+}: {
+  series: readonly SerieGrafica[];
+  linea: boolean;
+  paleta: PaletaGrafica;
+}) {
   return (
     <ul className="mb-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600">
       {series.map((s) => (
@@ -125,7 +191,7 @@ function Leyenda({ series, linea }: { series: readonly SerieGrafica[]; linea: bo
           <span
             aria-hidden="true"
             className={clsx("inline-block shrink-0", linea ? "h-0.5 w-4" : "h-2.5 w-2.5")}
-            style={{ backgroundColor: VARIABLE_COLOR[s.color] }}
+            style={{ backgroundColor: paleta[s.color] }}
           />
           {s.etiqueta}
         </li>

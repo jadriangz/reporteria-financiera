@@ -30,7 +30,7 @@ export function TarjetaKPI({
   const ausente = valor === null || valor === SIN_DATO;
 
   return (
-    <div className="imp-bloque flex min-w-0 flex-col border border-slate-200 bg-white px-3 py-2">
+    <div className="imp-bloque flex min-w-0 flex-col border border-slate-200 bg-superficie px-3 py-2">
       <span className="text-[11px] leading-tight text-slate-500">{etiqueta}</span>
       <span
         className={clsx(
@@ -42,7 +42,7 @@ export function TarjetaKPI({
                 positivo: "text-positivo",
                 riesgo: "text-riesgo",
                 advertencia: "text-advertencia",
-                tenue: "text-slate-400",
+                tenue: "text-slate-500",
               }[tono],
         )}
       >

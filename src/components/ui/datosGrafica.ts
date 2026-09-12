@@ -1,4 +1,5 @@
 import { fechaCorta } from "../../lib/format";
+import type { ClaveGrafica } from "../../lib/tema/paleta";
 
 /**
  * Tipos y logica pura de las graficas.
@@ -14,19 +15,16 @@ import { fechaCorta } from "../../lib/format";
 export type TipoGrafica = "barras" | "barras-apiladas" | "linea";
 
 /**
- * Color de una serie, por token del @theme. Se nombra igual que el token para
- * que el modulo elija "positivo" y no un hexadecimal suelto.
+ * Color de una serie, por token del tema. Se nombra igual que el token para que
+ * el modulo elija "positivo" y no un hexadecimal suelto.
+ *
+ * El valor concreto sale de `lib/tema/paleta`, resuelto contra el tema que esté
+ * activo donde se pinta la grafica. Ningun modulo ve un color nunca.
  */
-export type ColorSerie = "marino" | "positivo" | "riesgo" | "advertencia" | "tenue";
-
-/** Variable CSS del @theme detras de cada color. Una sola fuente de verdad. */
-export const VARIABLE_COLOR: Readonly<Record<ColorSerie, string>> = {
-  marino: "var(--color-marino)",
-  positivo: "var(--color-positivo)",
-  riesgo: "var(--color-riesgo)",
-  advertencia: "var(--color-advertencia)",
-  tenue: "var(--color-slate-400)",
-};
+export type ColorSerie = Extract<
+  ClaveGrafica,
+  "marino" | "positivo" | "riesgo" | "advertencia" | "tenue"
+>;
 
 export interface SerieGrafica {
   /** Llave de la serie dentro de `valores`. */

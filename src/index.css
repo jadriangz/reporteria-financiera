@@ -7,12 +7,15 @@
  * Es el UNICO lugar del proyecto con colores en hexadecimal.
  */
 @theme {
+  /* Semánticos. Los valores de aquí son los del TEMA CLARO. */
   --color-marino: #1F3864;        /* azul institucional */
-  --color-positivo: #1E8449;      /* verde: resultado favorable */
+  --color-positivo: #1B7A42;      /* verde: resultado favorable */
   --color-riesgo: #C0392B;        /* rojo: alerta */
-  --color-advertencia: #B7791F;   /* ámbar: advertencia */
-  --color-papel: #FFFFFF;         /* fondo de reporte */
+  --color-advertencia: #A15F07;   /* ámbar: advertencia */
+  --color-papel: #FFFFFF;         /* fondo de la página */
+  --color-superficie: #FFFFFF;    /* fondo de tarjetas, barras y menús */
   --color-tinta: #111827;         /* texto de cuerpo */
+  --color-sobre-color: #FFFFFF;   /* texto encima de un fondo de color sólido */
 
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, Consolas, monospace;
@@ -26,8 +29,111 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * ─────────────────────────── Temas ───────────────────────────
+ *
+ * Tres estados de PREFERENCIA (claro / oscuro / sistema) y dos de PINTADO. El
+ * atributo `data-tema` del <html> lleva siempre el resuelto, nunca "sistema":
+ * quien traduce la preferencia del sistema a un tema concreto es `lib/tema`,
+ * y el CSS no sabe que existe `prefers-color-scheme`. Un solo par de bloques
+ * en vez de duplicar cada regla dentro de una media query.
+ *
+ * CÓMO FUNCIONA EL TEMA OSCURO, porque no es evidente:
+ *
+ *   Tailwind v4 compila `bg-slate-50` a `background-color: var(--color-slate-50)`.
+ *   Redefinir esa variable bajo `html[data-tema="oscuro"]` voltea las ~170
+ *   utilidades de la paleta neutra de golpe, sin tocar un solo componente. Por
+ *   eso este archivo sigue siendo el ÚNICO lugar del proyecto con hexadecimales:
+ *   un tema oscuro hecho a base de `dark:` en cada className habría que
+ *   mantenerlo en treinta archivos y se desincronizaría al primer descuido.
+ *
+ *   La rampa neutra se invierte: en oscuro, `slate-50` es una superficie casi
+ *   negra y `slate-900` es el texto más claro. La semántica de cada peldaño
+ *   —50 fondo, 500 texto secundario, 900 texto fuerte— se conserva; lo que
+ *   cambia es el color, que es justo lo que se espera al cambiar de tema.
+ *
+ * LOS TONOS SEMÁNTICOS TIENEN VARIANTES PROPIAS EN OSCURO. El #C0392B de la
+ * alarma sobre un fondo casi negro baja de 5.4:1 a 3.8:1 y deja de leerse como
+ * alarma: se ve apagado, no urgente. Cada tono se aclara hasta recuperar el
+ * contraste, y `sobre-color` —el texto que va ENCIMA de esos tonos— se invierte
+ * de blanco a casi negro, porque blanco sobre un rojo claro tampoco se lee.
+ *
+ * El contraste WCAG AA de cada par token-texto / token-fondo, en los dos temas,
+ * lo verifica `src/lib/tema/__tests__/contraste.test.ts` leyendo este archivo.
+ * Si alguien ajusta un hexadecimal a ojo y rompe un par, la suite se pone roja.
+ */
+
 :root {
   color-scheme: light;
+}
+
+/*
+ * Los valores claros, otra vez y de forma explícita.
+ *
+ * No es redundante: `@theme` los emite en `:root`, y `:root` solo existe una
+ * vez por documento. La vista imprimible necesita volver a claro DENTRO de una
+ * página en oscuro, y para eso el bloque claro tiene que poder aplicarse a un
+ * elemento cualquiera. Las propiedades personalizadas se heredan del ancestro
+ * más cercano que las declare, así que basta con marcar la raíz de la vista.
+ */
+[data-tema="claro"] {
+  color-scheme: light;
+
+  --color-marino: #1F3864;
+  --color-positivo: #1B7A42;
+  --color-riesgo: #C0392B;
+  --color-advertencia: #A15F07;
+  --color-papel: #FFFFFF;
+  --color-superficie: #FFFFFF;
+  --color-tinta: #111827;
+  --color-sobre-color: #FFFFFF;
+
+  --color-slate-50: #F8FAFC;
+  --color-slate-100: #F1F5F9;
+  --color-slate-200: #E2E8F0;
+  --color-slate-300: #CBD5E1;
+  --color-slate-400: #94A3B8;
+  --color-slate-500: #64748B;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1E293B;
+  --color-slate-900: #0F172A;
+
+  --color-red-50: #FEF2F2;
+  --color-amber-50: #FFFBEB;
+  --color-emerald-50: #ECFDF5;
+}
+
+html[data-tema="oscuro"] {
+  color-scheme: dark;
+
+  /* Tonos semánticos aclarados: ver la nota de arriba. */
+  --color-marino: #8FB3E0;
+  --color-positivo: #4FBE7B;
+  --color-riesgo: #F07167;
+  --color-advertencia: #E0A93B;
+
+  --color-papel: #0D141F;        /* fondo de la página */
+  --color-superficie: #161F2E;   /* tarjetas y barras, un peldaño por encima */
+  --color-tinta: #E6EAF2;
+  --color-sobre-color: #0D141F;  /* se invierte: casi negro sobre tono claro */
+
+  /* Rampa neutra invertida: 50 es superficie, 900 es el texto más fuerte. */
+  --color-slate-50: #18202D;
+  --color-slate-100: #1E2838;
+  --color-slate-200: #2A3648;
+  --color-slate-300: #3A4860;
+  --color-slate-400: #8592A8;
+  --color-slate-500: #9FACC2;
+  --color-slate-600: #B8C2D4;
+  --color-slate-700: #CDD6E4;
+  --color-slate-800: #DFE6F0;
+  --color-slate-900: #EFF3F9;
+
+  /* Fondos teñidos de los avisos: oscuros, no pasteles. */
+  --color-red-50: #2A1518;
+  --color-amber-50: #2A2010;
+  --color-emerald-50: #0F2419;
 }
 
 body {
@@ -54,6 +160,49 @@ body {
 }
 
 @media print {
+  /*
+   * LA IMPRESIÓN SIEMPRE VA EN CLARO, sea cual sea el tema de la pantalla.
+   *
+   * Un reporte con fondo negro no se lee en papel y vacía un cartucho por
+   * ejemplar. `VistaImpresion` ya marca su raíz con data-tema="claro", lo que
+   * cubre el botón «Descargar PDF»; este bloque cubre el otro camino, el
+   * Ctrl+P directo del navegador, donde la raíz sigue siendo el <html> oscuro.
+   *
+   * Los selectores están elegidos para ganarle en especificidad y en orden a
+   * `html[data-tema="oscuro"]`. Los valores son, literalmente, los del bloque
+   * [data-tema="claro"] de arriba, y una prueba compara los dos bloques carácter
+   * por carácter: duplicarlos a mano sin red sería cuestión de tiempo.
+   */
+  :root,
+  [data-tema],
+  html[data-tema="oscuro"] {
+    color-scheme: light;
+
+    --color-marino: #1F3864;
+    --color-positivo: #1B7A42;
+    --color-riesgo: #C0392B;
+    --color-advertencia: #A15F07;
+    --color-papel: #FFFFFF;
+    --color-superficie: #FFFFFF;
+    --color-tinta: #111827;
+    --color-sobre-color: #FFFFFF;
+
+    --color-slate-50: #F8FAFC;
+    --color-slate-100: #F1F5F9;
+    --color-slate-200: #E2E8F0;
+    --color-slate-300: #CBD5E1;
+    --color-slate-400: #94A3B8;
+    --color-slate-500: #64748B;
+    --color-slate-600: #475569;
+    --color-slate-700: #334155;
+    --color-slate-800: #1E293B;
+    --color-slate-900: #0F172A;
+
+    --color-red-50: #FEF2F2;
+    --color-amber-50: #FFFBEB;
+    --color-emerald-50: #ECFDF5;
+  }
+
   /*
    * Escala de impresión: todo el tamaño tipográfico y los espacios están en rem,
    * así que bajar la raíz a 12px reduce el reporte al 75% de la pantalla sin
