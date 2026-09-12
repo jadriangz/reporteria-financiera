@@ -11,7 +11,7 @@ import { type Calculos, type IdModulo, useAppStore } from "../../store/useAppSto
 import { BarraAntiguedad } from "../cobranza/BarraAntiguedad";
 import { ETIQUETA_BUCKET } from "../cobranza/selectores";
 import { TablaCascada } from "../estado-resultados/TablaCascada";
-import { SERIES_PRODUCTO } from "../producto/selectores";
+import { RECORTE_MODELOS, SERIES_PRODUCTO } from "../producto/selectores";
 import { NotaFueraDelEje } from "../ventas-flujo/NotaFueraDelEje";
 import { SERIES_MENSUALES } from "../ventas-flujo/selectores";
 import {
@@ -190,13 +190,8 @@ function GraficaDelResumen({ calculos }: { calculos: Calculos }) {
         puntos={g.puntos}
         etiqueta="Ingreso y utilidad bruta por modelo"
         vacio="No hay ventas computables que graficar."
+        recorte={{ ...RECORTE_MODELOS, dondeVerElResto: "en Rendimiento por producto" }}
       />
-      {g.omitidos > 0 && (
-        <Nota>
-          Se muestran los modelos de mayor ingreso; {g.omitidos} más están en Rendimiento por
-          producto.
-        </Nota>
-      )}
     </Seccion>
   );
 }

@@ -93,31 +93,35 @@ export function totalProducto(total: Cascada): FilaProducto {
 
 // --------------------------- Grafica ---------------------------
 
+/**
+ * Como se nombra el recorte de la grafica de modelos. Vive junto a las series
+ * para que el Resumen y el modulo de Producto digan exactamente lo mismo: la
+ * unica diferencia entre los dos es donde esta el resto.
+ */
+export const RECORTE_MODELOS = {
+  por: "ingreso",
+  unidad: ["modelo", "modelos"],
+  magnitud: "ingreso",
+} as const;
+
 export const SERIES_PRODUCTO: readonly SerieGrafica[] = [
   { clave: "ingreso", etiqueta: "Ingreso", color: "marino" },
   { clave: "utilidad", etiqueta: "Utilidad bruta", color: "positivo" },
 ];
 
 /**
- * Mas modelos que estos no caben legibles en el eje: las etiquetas se
- * encimarian. El resto sigue en la tabla, que es donde se comparan cifras.
+ * Ingreso y utilidad bruta por modelo, de mayor a menor ingreso.
+ *
+ * Devuelve TODOS los modelos. Cuantos caben legibles en el eje no lo sabe este
+ * archivo: depende del ancho que tenga la grafica alli donde se pinte, y eso
+ * solo se sabe midiendo. El recorte, y la nota que declara lo omitido, los hace
+ * `Grafica` con `recorteCategorias`. Aqui solo se garantiza el ORDEN, que es lo
+ * que vuelve correcto ese recorte: quedarse con los primeros es quedarse con
+ * los de mayor ingreso.
  */
-export const MAX_MODELOS_GRAFICA = 12;
-
-export interface PuntosProducto {
-  readonly puntos: readonly PuntoCategoria[];
-  /** Modelos que no entraron a la grafica, para decirlo bajo ella. */
-  readonly omitidos: number;
-}
-
-/** Ingreso y utilidad bruta por modelo, de mayor a menor ingreso. */
-export function puntosProducto(producto: Producto, max = MAX_MODELOS_GRAFICA): PuntosProducto {
-  const visibles = producto.porModelo.slice(0, max);
-  return {
-    puntos: visibles.map((m) => ({
-      categoria: m.etiqueta,
-      valores: { ingreso: m.ingreso, utilidad: m.utilidadBruta },
-    })),
-    omitidos: producto.porModelo.length - visibles.length,
-  };
+export function puntosProducto(producto: Producto): readonly PuntoCategoria[] {
+  return producto.porModelo.map((m) => ({
+    categoria: m.etiqueta,
+    valores: { ingreso: m.ingreso, utilidad: m.utilidadBruta },
+  }));
 }

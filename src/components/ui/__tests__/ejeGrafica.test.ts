@@ -99,9 +99,10 @@ describe("casos límite", () => {
   });
 
   it("el ancho útil nunca es negativo aunque el eje Y no quepa", () => {
+    // Se descuentan el eje Y (60) y los márgenes del dibujo (16).
     expect(anchoUtil(0)).toBe(0);
     expect(anchoUtil(30)).toBe(0);
-    expect(anchoUtil(200)).toBe(140);
+    expect(anchoUtil(200)).toBe(124);
   });
 
   it("hay un alto mínimo por debajo del cual la gráfica deja de comunicar", () => {

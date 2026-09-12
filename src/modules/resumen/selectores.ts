@@ -166,8 +166,11 @@ export type GraficaResumen =
     }
   | {
       readonly tipo: "producto";
+      /**
+       * TODOS los modelos, de mayor a menor ingreso. Cuantos caben lo decide la
+       * grafica midiendo su propio ancho, no este selector.
+       */
       readonly puntos: readonly PuntoCategoria[];
-      readonly omitidos: number;
       /** Por que no se muestra el flujo. Siempre se dice. */
       readonly motivo: string;
     };
@@ -182,11 +185,9 @@ export function graficaResumen(calculos: Calculos): GraficaResumen {
     const { puntos, fueraDelEje } = puntosMensuales(calculos.flujo);
     return { tipo: "flujo", puntos, fueraDelEje };
   }
-  const { puntos, omitidos } = puntosProducto(calculos.producto);
   return {
     tipo: "producto",
-    puntos,
-    omitidos,
+    puntos: puntosProducto(calculos.producto),
     motivo: calculos.capacidades.cobranza
       ? "Los abonos no traen fecha de pago, así que no hay flujo de efectivo que graficar. Se muestra el ingreso por modelo."
       : "Sin hoja cobranza no hay flujo de efectivo que graficar. Se muestra el ingreso por modelo.",

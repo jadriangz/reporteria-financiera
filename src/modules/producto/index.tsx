@@ -12,6 +12,7 @@ import {
   type FilaProducto,
   SERIES_PRODUCTO,
   filasProducto,
+  RECORTE_MODELOS,
   puntosProducto,
   totalProducto,
 } from "./selectores";
@@ -25,7 +26,7 @@ import {
 export function ModuloProducto({ calculos }: { calculos: Calculos }) {
   const { producto, resultados } = calculos;
   const margenUniforme = calculos.insights.find((i) => i.id === "margen-derivado");
-  const grafica = useMemo(() => puntosProducto(producto), [producto]);
+  const puntos = useMemo(() => puntosProducto(producto), [producto]);
 
   return (
     <div>
@@ -50,16 +51,11 @@ export function ModuloProducto({ calculos }: { calculos: Calculos }) {
         <Grafica
           tipo="barras"
           series={SERIES_PRODUCTO}
-          puntos={grafica.puntos}
+          puntos={puntos}
           etiqueta="Ingreso y utilidad bruta por modelo"
           vacio="No hay ventas computables que graficar."
+          recorte={{ ...RECORTE_MODELOS, dondeVerElResto: "en la tabla de arriba" }}
         />
-        {grafica.omitidos > 0 && (
-          <Nota>
-            La gráfica muestra los {entero(grafica.puntos.length)} modelos de mayor ingreso;{" "}
-            {entero(grafica.omitidos)} más están en la tabla.
-          </Nota>
-        )}
         {resultados.excluidas.length > 0 && (
           <Nota>
             No incluye{" "}

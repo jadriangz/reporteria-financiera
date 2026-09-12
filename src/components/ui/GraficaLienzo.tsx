@@ -12,7 +12,7 @@ import {
 
 import { moneda, monedaCompacta } from "../../lib/format";
 import type { PaletaGrafica } from "../../lib/tema/paleta";
-import { ANCHO_EJE_Y, abreviar, rotuloEje } from "./ejeGrafica";
+import { ANCHO_EJE_Y, ANCHO_IMPRESION, abreviar, rotuloEje } from "./ejeGrafica";
 import {
   type FilaRecharts,
   type SerieGrafica,
@@ -53,17 +53,13 @@ function tick(paleta: PaletaGrafica, imprimiendo: boolean) {
   return { fontSize: imprimiendo ? 9 : 11, fill: paleta.rotulo } as const;
 }
 
-/**
- * Ancho de la grafica al imprimir, en pixeles CSS. Cabe en una hoja carta con
- * los margenes de `@page` y la escala de impresion de `index.css`.
- *
+/*
  * TRAMPA DE window.print(): `ResponsiveContainer` mide su caja con un
  * ResizeObserver. La vista de impresion esta oculta en pantalla, asi que mide
  * cero y el SVG sale vacio; y aunque midiera, el observador no se dispara en el
  * contexto de impresion. Por eso, imprimiendo, no hay contenedor responsivo:
- * el grafico recibe ancho y alto fijos.
+ * el grafico recibe ancho y alto fijos. El valor vive en `ejeGrafica.ts`.
  */
-const ANCHO_IMPRESION = 680;
 
 const formatoEjeY = (centavos: number): string => monedaCompacta(centavos);
 

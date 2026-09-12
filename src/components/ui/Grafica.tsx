@@ -17,7 +17,18 @@ import {
   mismaPaleta,
   paletaDelElemento,
 } from "../../lib/tema/paleta";
-import { ALTO_EJE_INCLINADO, ALTO_MINIMO, rotuloEje } from "./ejeGrafica";
+import {
+  ALTO_EJE_INCLINADO,
+  ALTO_MINIMO,
+  ANCHO_IMPRESION,
+  anchoUtil,
+  rotuloEje,
+} from "./ejeGrafica";
+import {
+  type NombresRecorte,
+  recortarCategorias,
+  textoRecorte,
+} from "./recorteCategorias";
 import { useTema } from "../../store/useTema";
 import { useImprimiendo } from "./contextoImpresion";
 import { cargarGraficas } from "./cargaGraficas";
@@ -49,6 +60,7 @@ export function Grafica({
   etiqueta,
   alto = 240,
   vacio = "Sin datos que graficar.",
+  recorte,
 }: {
   readonly tipo: TipoGrafica;
   readonly series: readonly SerieGrafica[];
@@ -59,17 +71,48 @@ export function Grafica({
   /** Alto en px del area de la grafica, sin contar la leyenda. */
   readonly alto?: number;
   readonly vacio?: ReactNode;
+  /**
+   * Solo para ejes de CATEGORIAS. Cuando se pasa, la grafica recorta a las
+   * categorias que caben legibles y escribe al pie cuantas quedaron fuera y
+   * que proporcion pesan. Los puntos deben llegar ya ordenados por `por`.
+   *
+   * Sin esta prop no se recorta nada: un eje de tiempo no se recorta nunca, y
+   * una grafica de pocas categorias tampoco lo necesita.
+   */
+  readonly recorte?: NombresRecorte & {
+    /** Clave de la serie que ordena y que se mide. */
+    readonly por: string;
+  };
 }) {
-  const filas = useMemo(() => filasRecharts(puntos, series), [puntos, series]);
-  const etiquetas = useMemo(() => etiquetasEje(puntos), [puntos]);
   const imprimiendo = useImprimiendo();
   const [figura, paleta] = usePaleta();
   const ancho = useAncho(figura);
 
+  // El recorte va ANTES de traducir a filas: lo que no se dibuja tampoco se
+  // calcula, y las etiquetas del eje tienen que corresponder con las barras.
+  const recortado = useMemo(() => {
+    if (recorte === undefined || !esCategorica(puntos)) {
+      return { visibles: puntos, nota: null };
+    }
+    const r = recortarCategorias(puntos, {
+      anchoDisponible: anchoUtil(imprimiendo ? ANCHO_IMPRESION : ancho),
+      series: series.length,
+      clave: recorte.por,
+      // En papel nunca se recorta: el ancho es fijo y conocido, y el reporte
+      // impreso no debe depender del ancho que tuviera la ventana al imprimir.
+      sinRecorte: imprimiendo,
+    });
+    return { visibles: r.visibles, nota: textoRecorte(r, recorte) };
+  }, [puntos, series.length, recorte, ancho, imprimiendo]);
+
+  const visibles = recortado.visibles;
+  const filas = useMemo(() => filasRecharts(visibles, series), [visibles, series]);
+  const etiquetas = useMemo(() => etiquetasEje(visibles), [visibles]);
+
   // Con las etiquetas inclinadas hay que dar mas alto, o el eje se come el area
   // de dibujo y las barras quedan aplastadas justo cuando menos espacio hay.
   const inclinado =
-    rotuloEje({ ancho, categorias: filas.length, categorica: esCategorica(puntos) }).angulo !== 0;
+    rotuloEje({ ancho, categorias: filas.length, categorica: esCategorica(visibles) }).angulo !== 0;
   const altoUtil = Math.max(ALTO_MINIMO, alto) + (inclinado && !imprimiendo ? ALTO_EJE_INCLINADO - 30 : 0);
 
   if (filas.length === 0) {
@@ -90,7 +133,7 @@ export function Grafica({
             series={series}
             filas={filas}
             etiquetas={etiquetas}
-            categorica={esCategorica(puntos)}
+            categorica={esCategorica(visibles)}
             imprimiendo={imprimiendo}
             alto={altoUtil}
             ancho={ancho}
@@ -98,6 +141,11 @@ export function Grafica({
           />
         </Suspense>
       </BarreraGrafica>
+      {recortado.nota !== null && (
+        <figcaption className="mt-1 text-[11px] leading-snug text-slate-500">
+          {recortado.nota}
+        </figcaption>
+      )}
     </figure>
   );
 }

@@ -252,3 +252,46 @@ una ventana angosta en un escritorio conserva la densidad, y una tableta ancha
 recibe objetivos grandes. La columna crece junto con el control
 (`th:has(.toque-denso)`), porque si solo crece el botón, sobresale del encabezado
 y el vecino —que se pinta después— se lleva el toque del borde.
+
+---
+
+## 2026-09-12 — La gráfica de categorías recorta por ancho de barra y declara lo omitido
+
+**Contexto.** `rotuloEje` resolvió que las ETIQUETAS quepan: rota y abrevia
+hasta que entran. Las BARRAS no se pueden rotar ni abreviar. Con doce modelos y
+dos series en 296 px cada barra medía diez píxeles: los rótulos se leían
+perfectamente y la gráfica no decía nada, porque comparar dos franjas de diez
+píxeles no es comparar.
+
+**Decisión.** La gráfica se queda con las categorías que caben legibles y
+escribe al pie cuántas quedaron fuera **y qué proporción del ingreso
+representan**: «Se muestran los 4 modelos de mayor ingreso. Quedan fuera 8
+modelos más, 4% del ingreso, en la tabla de arriba.» El criterio es el **ancho
+disponible por barra** —13 px, medido, no supuesto—, nunca un número fijo de
+categorías ni un umbral de pantalla: la misma gráfica puede estar en media
+pantalla de escritorio o en un teléfono. El selector entrega **todos** los
+modelos ordenados por ingreso; cuántos caben lo decide la gráfica midiéndose.
+
+**Alternativa descartada: una barra «Otros».** Se descartó por tres razones.
+(1) **No es comparable con las demás**: cada barra es un modelo, «Otros» sería
+la suma de varios, y su altura no diría «este modelo vende más» sino «hay muchos
+de estos» —dos afirmaciones distintas leídas en el mismo eje—. (2) **Suele ser
+la barra más alta y aplasta al resto**, justo lo contrario de lo que se buscaba
+al recortar. (3) **No tiene nombre**: el eje es de categorías y cada marca
+identifica un producto. La nota, en cambio, no distorsiona nada y contesta la
+única pregunta que importa: si lo que no se ve pesa o no.
+
+**Consecuencia.** La proporción es la del **ingreso**, no la del número de
+modelos: ocho modelos omitidos que valen el 4% se pueden ignorar; dos que valen
+el 40% no. Cuando el total es cero la proporción se calla en vez de decir «0%»,
+que sería afirmar que lo omitido no pesa. **La impresión nunca recorta**: el
+papel es de ancho fijo y conocido, y el reporte impreso no debe depender del
+ancho que tuviera la ventana al imprimir. El eje de TIEMPO tampoco se recorta
+nunca —quitar meses rompería la serie—; ahí se bajan las marcas, que es otra
+cosa.
+
+**Defecto que encontró la medición.** La primera versión del cálculo suponía un
+hueco por categoría y predecía barras de 14 px donde el navegador dibujaba 10:
+`barCategoryGap` se aplica a **cada lado** del grupo. El modelo ahora descuenta
+los dos huecos y los márgenes del área de dibujo, y sus predicciones coinciden
+con lo medido en el navegador.

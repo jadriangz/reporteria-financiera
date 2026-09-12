@@ -122,18 +122,23 @@ describe("tabla por linea y modelo", () => {
 
 describe("grafica por modelo", () => {
   it("un punto por modelo, de mayor a menor ingreso, con ingreso y utilidad", () => {
-    const { puntos, omitidos } = puntosProducto(calcularProducto(fixture));
-    expect(omitidos).toBe(0);
+    const puntos = puntosProducto(calcularProducto(fixture));
     expect(puntos.map((p) => p.categoria).slice(0, 4)).toEqual(["AX-100", "AX-70", "AX-55", "AX-25"]);
     expect(puntos[0]?.valores).toEqual({ ingreso: 156_000_000, utilidad: 42_000_000 });
   });
 
-  it("recorta a los de mayor ingreso y dice cuantos quedaron fuera", () => {
+  it("entrega TODOS los modelos: cuantos caben lo decide la grafica midiendose", () => {
+    // El selector no recorta. Si recortara aqui, el recorte dependeria de una
+    // constante y no del ancho real, que es justo lo que se quiso evitar.
+    const producto = calcularProducto(fixture);
+    expect(puntosProducto(producto)).toHaveLength(producto.porModelo.length);
+  });
+
+  it("el orden es el contrato: quedarse con los primeros es quedarse con los mayores", () => {
     const ventas = Array.from({ length: 5 }, (_, n) =>
       venta({ folio: `V-${n}`, modelo: `M${n}`, precio_venta: (n + 1) * 10_000_000 }),
     );
-    const { puntos, omitidos } = puntosProducto(calcularProducto(dataset(ventas)), 3);
-    expect(puntos.map((p) => p.categoria)).toEqual(["M4", "M3", "M2"]);
-    expect(omitidos).toBe(2);
+    const puntos = puntosProducto(calcularProducto(dataset(ventas)));
+    expect(puntos.map((p) => p.categoria)).toEqual(["M4", "M3", "M2", "M1", "M0"]);
   });
 });

@@ -21,6 +21,16 @@
 /** Ancho que hay que dejarle al eje Y para las cifras compactas ("$1.2M"). */
 export const ANCHO_EJE_Y = 60;
 
+/**
+ * Ancho de la gráfica al imprimir, en píxeles CSS. Cabe en una hoja carta con
+ * los márgenes de `@page` y la escala de impresión de `index.css`.
+ *
+ * Vive aquí, y no en el componente que dibuja, porque hay dos decisiones que
+ * dependen de él: cómo se rotulan los ejes y cuántas categorías caben. En papel
+ * el ancho no se mide, se sabe.
+ */
+export const ANCHO_IMPRESION = 680;
+
 /** Píxeles por categoría por debajo de los cuales el texto horizontal se encima. */
 const HOLGADO = 64;
 
@@ -53,11 +63,19 @@ export interface RotuloEje {
 }
 
 /**
- * Cuánto ancho tiene de verdad el área de categorías, descontando el eje Y.
- * Nunca negativo: con la gráfica aún sin medir, `ancho` llega en 0.
+ * Márgenes izquierdo y derecho del área de dibujo, sumados. Tienen que
+ * coincidir con `MARGEN` en `GraficaLienzo`: son píxeles que el eje Y no ocupa
+ * y las barras tampoco.
+ */
+export const MARGEN_HORIZONTAL = 16;
+
+/**
+ * Cuánto ancho tiene de verdad el área de categorías: el total menos el eje Y
+ * y menos los márgenes del dibujo. Nunca negativo: con la gráfica aún sin
+ * medir, `ancho` llega en 0.
  */
 export function anchoUtil(ancho: number): number {
-  return Math.max(0, ancho - ANCHO_EJE_Y);
+  return Math.max(0, ancho - ANCHO_EJE_Y - MARGEN_HORIZONTAL);
 }
 
 export function rotuloEje({

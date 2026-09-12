@@ -193,6 +193,29 @@ siempre el **resuelto**, nunca "sistema". Con "sistema" elegido la aplicación s
   del `<html>`—, incluidos ejes, rejilla, rótulos y tooltip. Es lo que hace que el PDF salga
   claro aunque la pantalla esté en oscuro.
 
+### Layout (v1.1)
+
+**El layout responde al CONTENIDO, no al dispositivo.** Nada de puntos de corte por ancho de
+pantalla: rejillas con `auto-fit` y `minmax()`, y consultas de **contenedor** donde hace falta
+decidir. La misma tabla puede vivir en una columna de 480 px dentro de una pantalla de 1440, y
+lo que manda es el espacio que tiene, no el que tiene la ventana.
+
+- **Cada bloque declara su mínimo** (`Seccion minimo=…`) y la rejilla decide quién comparte
+  renglón. No hay una lista de parejas escrita a mano.
+- **En poco ancho, dos estrategias de tabla, y el módulo elige** (`TablaCifras enEstrecho`):
+  las de **resumen** —pocas columnas, un renglón por concepto— se vuelven tarjetas; las de
+  **detalle** —una fila por operación— conservan la tabla, se desplazan a lo ancho y fijan la
+  primera columna. **Apilar una tabla de detalle destruye la comparación de cifras, que es el
+  contenido.**
+- **Una gráfica de categorías recorta a las que caben legibles y declara lo omitido** con su
+  número y su proporción del ingreso. El eje de tiempo no se recorta nunca: se bajan las
+  marcas. Ver `docs/decisiones.md`.
+- **Objetivo táctil**: 44 px reales en barra de herramientas y navegación; dentro de las
+  tablas, 44 px solo con `pointer: coarse`, porque con renglones de 26 px dos áreas de 44 se
+  pisan y el toque abre la fila equivocada.
+- **La impresión es un contexto de ancho fijo**: ninguna regla responsiva la alcanza. En
+  `@media print` el layout es el de escritorio y la gráfica no recorta.
+
 ## Pruebas
 
 `src/lib/calc/__tests__/` con el **archivo de demostración ficticio** como fixture
