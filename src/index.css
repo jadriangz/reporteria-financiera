@@ -30,6 +30,79 @@
 }
 
 /*
+ * ──────────────────── Área táctil sin engordar el control ────────────────────
+ *
+ * Un dedo necesita 44x44 px; un encabezado ordenable de tabla mide 30 px de
+ * alto y agrandarlo a 44 destruiría la densidad, que es la razón de ser de este
+ * reporte: quien lo lee compara cifras y necesita verlas juntas.
+ *
+ * La solución es separar el área VISIBLE del área que RECIBE EL PUNTERO. El
+ * pseudo-elemento no pinta nada, se extiende por encima y por debajo del
+ * control y es hijo suyo, así que el clic le llega al botón igual. El control
+ * se ve igual de compacto y se toca igual de fácil.
+ *
+ * Se usa donde agrandar la caja rompería el layout —encabezados de tabla,
+ * flechas de desplegar—. En la barra superior, que es una barra de
+ * herramientas, los botones sí miden 44 px de verdad.
+ */
+.toque {
+  position: relative;
+}
+
+.toque::after {
+  content: "";
+  position: absolute;
+  /* Centrado sobre el control: crece por igual hacia los cuatro lados. */
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+}
+
+/* En papel no hay dedos, y un pseudo-elemento invisible solo estorba al motor. */
+@media print {
+  .toque::after {
+    display: none;
+  }
+}
+
+/*
+ * Controles DENTRO de una tabla: encabezados ordenables y flechas de desplegar.
+ *
+ * Aqui `toque` no sirve, y el motivo es geometrico: los renglones miden 26 px,
+ * asi que dos areas de 44 px de filas contiguas se solapan 18 px y un toque
+ * cerca del borde puede abrir la fila equivocada. Un objetivo grande que acierta
+ * la fila de al lado es peor que uno pequeno.
+ *
+ * La salida no es elegir entre densidad y dedo, es preguntar QUE HAY DEL OTRO
+ * LADO. `pointer: coarse` no mide la pantalla: dice que el puntero principal es
+ * impreciso, o sea un dedo. Con raton los renglones siguen midiendo 26 px y el
+ * reporte conserva su densidad, que es su razon de ser; con dedo, los controles
+ * de tabla crecen a 44 px y el renglon crece con ellos. La tabla ya se desplaza
+ * a lo ancho en esos anchos, asi que el alto extra no rompe nada.
+ */
+@media (pointer: coarse) {
+  .toque-denso {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /*
+   * La COLUMNA crece con el control, no solo el control.
+   *
+   * Sin esto el boton llega a 44 px dentro de un `<th>` de 40 y sobresale; el
+   * encabezado vecino se pinta despues, queda encima de ese sobrante y se lleva
+   * el toque del borde. El resultado es un objetivo que mide 44 y ordena por
+   * otra columna, que es peor que uno pequeno. La tabla se ensancha unos
+   * pixeles, y a estos anchos ya se desplaza de todos modos.
+   */
+  th:has(.toque-denso) {
+    min-width: 44px;
+  }
+}
+
+/*
  * ─────────────────────────── Temas ───────────────────────────
  *
  * Tres estados de PREFERENCIA (claro / oscuro / sistema) y dos de PINTADO. El

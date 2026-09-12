@@ -4,7 +4,7 @@ import { Callout } from "../../components/ui/Callout";
 import { Grafica } from "../../components/ui/Grafica";
 import { TablaCifras } from "../../components/ui/TablaCifras";
 import { RejillaKPI, TarjetaKPI } from "../../components/ui/TarjetaKPI";
-import { Cifra, Seccion } from "../../components/ui/primitivas";
+import { Cifra, RejillaSecciones, Seccion } from "../../components/ui/primitivas";
 import type { ColumnaTabla } from "../../components/ui/tabla";
 import type { Flujo } from "../../lib/calc";
 import { entero, fechaCorta, mes as fmtMes, moneda, porcentaje } from "../../lib/format";
@@ -75,13 +75,25 @@ export function ModuloVentasFlujo({ calculos }: { calculos: Calculos }) {
         <NotaFueraDelEje fuera={mensuales.fueraDelEje} />
       </Seccion>
 
-      <Seccion titulo="Detalle mensual" descripcion="Una fila por mes del periodo, con los meses sin actividad.">
-        <TablaMensual calculos={calculos} />
-      </Seccion>
+      {/*
+        El segundo par que la medicion encontro: la tabla mensual pide 535 px y
+        el bloque de estacionalidad 582. Comparten renglon donde quepan los dos
+        enteros; si no, se apilan. El minimo de la tabla es mayor para que al
+        compartir siga cabiendo completa y no tenga que desplazarse.
+      */}
+      <RejillaSecciones>
+        <Seccion
+          titulo="Detalle mensual"
+          descripcion="Una fila por mes del periodo, con los meses sin actividad."
+          minimo="32rem"
+        >
+          <TablaMensual calculos={calculos} />
+        </Seccion>
 
-      <Seccion titulo="Estacionalidad">
-        <Estacionalidad calculos={calculos} />
-      </Seccion>
+        <Seccion titulo="Estacionalidad" minimo="30rem">
+          <Estacionalidad calculos={calculos} />
+        </Seccion>
+      </RejillaSecciones>
 
       <Seccion
         titulo="Cobranza en el tiempo"

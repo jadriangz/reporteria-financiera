@@ -9,19 +9,70 @@ import type { ReactNode } from "react";
  * gigantes con un solo numero.
  */
 
+/**
+ * Cuanto ancho pide un bloque para hacer su trabajo.
+ *
+ * No es "cuanto quiero ocupar", es "por debajo de esto dejo de servir". Una
+ * cascada de tres columnas necesita 24rem; una tabla de doce meses necesita la
+ * hoja entera. El bloque declara su minimo y la rejilla decide quien comparte
+ * renglon con quien: no hay una lista de parejas escrita a mano que se caiga en
+ * cuanto alguien agregue una seccion nueva.
+ */
+export type MinimoSeccion = "24rem" | "30rem" | "32rem" | "48rem" | "completo";
+
+/** Clase de `flex-basis` por minimo. Literales: Tailwind lee el texto. */
+const BASE_SECCION: Readonly<Record<MinimoSeccion, string>> = {
+  "24rem": "basis-96",
+  "30rem": "basis-[30rem]",
+  "32rem": "basis-[32rem]",
+  "48rem": "basis-[48rem]",
+  completo: "basis-full",
+};
+
+/**
+ * Contenedor de secciones. Renglones que se llenan, no una pila.
+ *
+ * Es `flex-wrap` y no `grid` a proposito: con `grid` todas las pistas miden lo
+ * mismo, asi que el minimo tendria que ser el de la seccion mas exigente y las
+ * angostas quedarian igual de desperdiciadas. Con `flex-wrap`, CADA bloque
+ * lleva su propio `flex-basis` y crece para llenar el renglon; dos bloques
+ * angostos comparten renglon y uno ancho se lo queda entero, sin que nadie haya
+ * enumerado anchos de pantalla.
+ *
+ * En papel vuelve a ser una pila: `print:block` desactiva el flex y cada
+ * seccion ocupa el ancho de la hoja, como en la version impresa de siempre.
+ */
+export function RejillaSecciones({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap items-start gap-x-4 print:block">{children}</div>;
+}
+
 export function Seccion({
   titulo,
   descripcion,
   acciones,
+  minimo = "completo",
   children,
 }: {
   titulo: string;
   descripcion?: string;
   acciones?: ReactNode;
+  /**
+   * Ancho minimo que el bloque necesita. Solo tiene efecto dentro de
+   * `RejillaSecciones`; suelto, la seccion ocupa el ancho que tenga.
+   */
+  minimo?: MinimoSeccion;
   children: ReactNode;
 }) {
   return (
-    <section className="mb-6 border border-slate-200">
+    <section
+      className={clsx(
+        "mb-6 border border-slate-200",
+        // `min-w-0` es obligatorio: sin el, un hijo ancho (una tabla) le fija a
+        // la seccion un minimo intrinseco enorme y el renglon desborda.
+        "min-w-0 grow print:w-auto",
+        BASE_SECCION[minimo],
+      )}
+    >
       <header className="imp-titulo flex items-baseline justify-between gap-4 border-b border-slate-200 bg-slate-50 px-3 py-2">
         <div>
           <h2 className="text-sm font-semibold text-marino">{titulo}</h2>
@@ -97,12 +148,23 @@ export function Boton({
   variante = "normal",
   type = "button",
   disabled,
+  barra = false,
 }: {
   children: ReactNode;
   onClick?: () => void;
   variante?: "normal" | "primario" | "peligro";
   type?: "button" | "submit";
   disabled?: boolean;
+  /**
+   * Boton de barra de herramientas: mide 44 px de alto de verdad.
+   *
+   * En la barra superior el espacio vertical sobra y el control es de uso
+   * frecuente, asi que ahi el objetivo tactil se consigue agrandando la caja.
+   * En cambio un "Ver detalle" dentro del encabezado de una seccion no puede
+   * medir 44 px sin inflar la seccion entera: ese usa `toque`, que agranda solo
+   * el area que recibe el dedo. Ver `index.css`.
+   */
+  barra?: boolean;
 }) {
   return (
     <button
@@ -110,7 +172,10 @@ export function Boton({
       onClick={onClick}
       disabled={disabled}
       className={clsx(
-        "rounded-sm px-2.5 py-1 text-xs font-medium transition-colors print:hidden",
+        "rounded-sm text-xs font-medium transition-colors print:hidden",
+        barra
+          ? "inline-flex min-h-11 items-center justify-center px-3"
+          : "toque px-2.5 py-1",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marino",
         "disabled:cursor-not-allowed disabled:opacity-40",
         {

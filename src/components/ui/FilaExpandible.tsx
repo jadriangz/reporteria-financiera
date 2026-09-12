@@ -27,6 +27,7 @@ export function FilaExpandible({
   abiertaInicial = false,
   abierta: abiertaControlada,
   onAlternar,
+  celdaControl,
 }: {
   /** Las celdas `<td>` de la fila, sin incluir la del control. */
   readonly celdas: ReactNode;
@@ -41,6 +42,14 @@ export function FilaExpandible({
   /** Si se pasa, la apertura la controla el padre. */
   readonly abierta?: boolean;
   readonly onAlternar?: () => void;
+  /**
+   * Clases extra para la celda del control.
+   *
+   * Las pone `TablaCifras` cuando la tabla se desplaza a lo ancho: la flecha
+   * tiene que quedarse fija junto con la primera columna, o al desplazarse se
+   * separa de su propia fila.
+   */
+  readonly celdaControl?: string;
 }) {
   const [abiertaLocal, setAbiertaLocal] = useState(abiertaInicial);
   const idDetalle = useId();
@@ -62,7 +71,7 @@ export function FilaExpandible({
           enfasis === "subtotal" && "font-medium",
         )}
       >
-        <td className="align-top">
+        <td className={clsx("align-top", celdaControl)}>
           {detalle === null || imprimiendo ? null : (
             <button
               type="button"
@@ -70,7 +79,8 @@ export function FilaExpandible({
               aria-expanded={abierta}
               aria-controls={idDetalle}
               className={clsx(
-                "flex h-full w-6 items-center justify-center text-slate-400",
+                // `toque-denso`: 24 px con raton, 44 con dedo. Ver index.css.
+                "toque-denso flex h-full w-6 items-center justify-center text-slate-400",
                 "hover:text-marino focus-visible:outline focus-visible:outline-2",
                 "focus-visible:-outline-offset-2 focus-visible:outline-marino",
               )}

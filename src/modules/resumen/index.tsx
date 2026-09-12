@@ -4,7 +4,7 @@ import { NombreCliente } from "../../components/NombreCliente";
 import { Callout, TodoEnOrden } from "../../components/ui/Callout";
 import { Grafica } from "../../components/ui/Grafica";
 import { RejillaKPI, TarjetaKPI } from "../../components/ui/TarjetaKPI";
-import { Boton, Cifra, Seccion } from "../../components/ui/primitivas";
+import { Boton, Cifra, RejillaSecciones, Seccion } from "../../components/ui/primitivas";
 import { etiquetaOrigen, totalCapturas } from "../../lib/captura";
 import { fecha, moneda } from "../../lib/format";
 import { type Calculos, type IdModulo, useAppStore } from "../../store/useAppStore";
@@ -45,26 +45,38 @@ export function ModuloResumen({ calculos }: { calculos: Calculos }) {
         <Hallazgos calculos={calculos} />
       </Seccion>
 
-      <Seccion
-        titulo="Estado de resultados"
-        descripcion="La cascada del periodo, sin desglose mensual."
-        acciones={<EnlaceModulo id="resultados">Ver detalle</EnlaceModulo>}
-      >
-        <div className="max-w-2xl">
+      {/*
+        Estos dos bloques comparten renglon cuando hay ancho, y es el caso que
+        motivo la rejilla: la cascada pide 440 px y la barra de antiguedad 890,
+        asi que apilados dejaban casi mil pixeles vacios a la derecha de la
+        cascada en cualquier pantalla de escritorio. Ninguno de los dos gana
+        nada con mas ancho; el reporte si gana con menos desplazamiento.
+
+        Quien decide si comparten renglon es el ancho disponible, no una
+        consulta de dispositivo: por debajo de unos 1000 px se apilan solos.
+      */}
+      <RejillaSecciones>
+        <Seccion
+          titulo="Estado de resultados"
+          descripcion="La cascada del periodo, sin desglose mensual."
+          minimo="30rem"
+          acciones={<EnlaceModulo id="resultados">Ver detalle</EnlaceModulo>}
+        >
           <TablaCascada cascada={calculos.resultados.total} />
           {!calculos.capacidades.estadoResultados && (
             <Nota>Sin hoja gastos: el resultado no resta gastos operativos.</Nota>
           )}
-        </div>
-      </Seccion>
+        </Seccion>
 
-      <Seccion
-        titulo="Antigüedad de cartera"
-        descripcion={`Saldo por cobrar al ${fecha(calculos.cartera.fechaCorte)}.`}
-        acciones={<EnlaceModulo id="cobranza">Ver detalle</EnlaceModulo>}
-      >
-        <Antiguedad calculos={calculos} />
-      </Seccion>
+        <Seccion
+          titulo="Antigüedad de cartera"
+          descripcion={`Saldo por cobrar al ${fecha(calculos.cartera.fechaCorte)}.`}
+          minimo="30rem"
+          acciones={<EnlaceModulo id="cobranza">Ver detalle</EnlaceModulo>}
+        >
+          <Antiguedad calculos={calculos} />
+        </Seccion>
+      </RejillaSecciones>
 
       <GraficaDelResumen calculos={calculos} />
 

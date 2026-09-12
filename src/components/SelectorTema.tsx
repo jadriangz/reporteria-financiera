@@ -24,7 +24,7 @@ export function SelectorTema() {
 
   return (
     <fieldset
-      className="print:hidden flex items-center gap-1 border-0 p-0"
+      className="print:hidden flex min-w-0 items-center gap-1 border-0 p-0"
       aria-label={`Tema de la interfaz. Ahora en ${ETIQUETA_TEMA[tema].toLowerCase()}${
         tema === "sistema" ? `, que se está mostrando en ${resuelto}` : ""
       }.`}
@@ -65,7 +65,9 @@ function OpcionTema({
   return (
     <label
       className={clsx(
-        "cursor-pointer px-2 py-0.5 text-xs",
+        // 44 px de alto de verdad: es un control de barra de herramientas, de
+        // los que se tocan con el pulgar, y ahi el espacio vertical sobra.
+        "inline-flex min-h-11 cursor-pointer items-center px-3 text-xs",
         "focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-marino",
         elegido
           ? "bg-marino font-medium text-sobre-color"

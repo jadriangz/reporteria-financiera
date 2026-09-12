@@ -46,6 +46,29 @@ export interface OrdenTabla {
   readonly direccion: "asc" | "desc";
 }
 
+/**
+ * Que hace una tabla cuando no cabe a lo ancho.
+ *
+ * NO ES "apilar en movil". Un reporte financiero se lee comparando cifras entre
+ * si, y apilar una tabla de operaciones en tarjetas destruye justo eso: deja de
+ * poder recorrerse una columna de importes hacia abajo. Por eso hay dos
+ * estrategias distintas y cada modulo elige, en vez de una regla automatica.
+ *
+ * - `"tarjetas"`: para tablas de RESUMEN —pocas columnas, un renglon por
+ *   concepto, sin comparacion entre renglones—. La cascada del estado de
+ *   resultados y los escenarios de provision se leen concepto por concepto, asi
+ *   que en poco ancho cada renglon se vuelve una tarjeta etiqueta/valor y no se
+ *   pierde nada.
+ * - `"scroll"`: para tablas de DETALLE —muchas columnas, un renglon por
+ *   operacion—. Aqui la comparacion ES el contenido: se conserva la tabla, se
+ *   desplaza a lo ancho y se fija la primera columna para no perder de vista de
+ *   que fila se esta leyendo.
+ *
+ * El valor por omision es `"scroll"` porque conservar la tabla nunca pierde
+ * informacion; lo que se pierde es comodidad.
+ */
+export type EstrategiaEstrecha = "scroll" | "tarjetas";
+
 /** Fondo de la fila segun su tono. */
 export const TONO_FILA: Readonly<Record<Tono, string>> = {
   neutro: "",
@@ -53,6 +76,21 @@ export const TONO_FILA: Readonly<Record<Tono, string>> = {
   riesgo: "bg-red-50/70",
   advertencia: "bg-amber-50/60",
   tenue: "text-slate-500",
+};
+
+/**
+ * El mismo tono, SIN transparencia.
+ *
+ * Es para la columna fija de las tablas con desplazamiento horizontal: por
+ * detras de esa celda pasa el resto de la tabla, y un fondo al 70% dejaria ver
+ * las cifras de otras columnas corriendo por debajo del nombre del cliente.
+ */
+export const TONO_FILA_OPACO: Readonly<Record<Tono, string>> = {
+  neutro: "bg-superficie",
+  positivo: "bg-emerald-50",
+  riesgo: "bg-red-50",
+  advertencia: "bg-amber-50",
+  tenue: "bg-superficie",
 };
 
 /** Color del texto de la fila segun su tono. */

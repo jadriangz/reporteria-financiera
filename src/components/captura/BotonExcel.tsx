@@ -30,7 +30,7 @@ export function BotonExcel() {
 
   return (
     <span className="flex items-center gap-2">
-      <Boton onClick={() => void descargar()} disabled={dataset === null || estado === "generando"}>
+      <Boton barra onClick={() => void descargar()} disabled={dataset === null || estado === "generando"}>
         {estado === "generando" ? "Generando…" : "Descargar Excel"}
       </Boton>
       {estado === "error" && (

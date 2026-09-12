@@ -164,3 +164,91 @@ imposible distinguir "nadie compró equipo" de "no hay accesorios que comprar".
 **ausencia de dato no es dato en cero**. Un cero medido —hay accesorios y nadie
 los combinó con su equipo— sigue disparando la oportunidad, que es real. Hay
 prueba de los dos casos.
+
+---
+
+## 2026-09-12 — `localStorage` se permite, y solo, para preferencias de interfaz
+
+**Contexto.** La regla 1 de `CLAUDE.md` prohíbe `localStorage`, `sessionStorage`
+e `IndexedDB` sin excepciones. El tema claro/oscuro no sirve de nada si se
+olvida en cada recarga, y lo mismo pasará con el idioma y la disposición.
+
+**Decisión.** Se relaja la regla **exclusivamente para preferencias de
+interfaz** —tema, y más adelante idioma y disposición—. **Nunca para datos
+financieros, datasets, parámetros de cálculo ni nada derivado de un archivo
+cargado.** La excepción vive encapsulada en `src/lib/preferencias/`, con una
+lista blanca de claves: `guardarPreferencia` solo acepta claves de esa lista y
+valores de esa clave, así que guardar cualquier otra cosa **no compila**.
+
+**Alternativa descartada.** Confiar en la disciplina y una nota en la
+documentación. Se descartó porque una excepción que solo existe en prosa se
+ensancha sola: en seis meses alguien guarda "el último archivo cargado" para
+ahorrarle un clic al usuario y la promesa de que nada sale del navegador deja de
+ser cierta sin que nadie lo note.
+
+**Consecuencia.** Ampliar la excepción obliga a editar un archivo que empieza
+explicando por qué existe. Además, una prueba recorre `src/`, ignora los
+comentarios y exige que ningún otro archivo mencione `localStorage`: quien
+intente saltarse el módulo pone la suite en rojo antes de llegar a producción.
+Lo que se guarda es un valor de tres opciones; nada que identifique a nadie.
+
+---
+
+## 2026-09-12 — En poco ancho, las tablas de resumen se vuelven tarjetas y las de detalle se desplazan
+
+**Contexto.** En un teléfono ninguna tabla del reporte cabe a lo ancho. La
+respuesta habitual —apilar cada fila en una tarjeta— se aplica a todas por
+igual.
+
+**Decisión.** Dos estrategias, y **el módulo elige**, no se deduce del número de
+columnas (`EstrategiaEstrecha` en `tabla.ts`):
+
+- **Tablas de resumen** —pocas columnas, un renglón por concepto: la cascada del
+  estado de resultados y los escenarios de provisión— se vuelven tarjetas
+  etiqueta/valor.
+- **Tablas de detalle** —muchas columnas, un renglón por operación: saldos
+  pendientes, concentración de clientes, rendimiento por modelo, desglose
+  mensual— conservan la tabla, se desplazan a lo ancho y **fijan la primera
+  columna**, con un degradado en el borde **y** una nota que dice cuántas
+  columnas hay y hacia dónde deslizar.
+
+**Alternativa descartada.** Apilar todas las tablas en tarjetas. Se descartó
+porque **destruye la comparación de cifras, que es el contenido**: un estado de
+resultados se lee concepto por concepto y no pierde nada apilado, pero una lista
+de veinticuatro operaciones se lee recorriendo la columna de saldos hacia abajo
+para ver cuál es el grande. En tarjetas esa columna deja de existir y el lector
+tiene que recordar veinticuatro números en vez de compararlos de un vistazo.
+
+**Consecuencia.** El corte lo decide una **consulta de contenedor**, no el ancho
+de la ventana: la misma tabla puede estar en una columna de 480 px dentro de una
+pantalla de 1440, y lo que importa es el espacio que tiene. La columna fija usa
+una variante opaca del tono de fila (`TONO_FILA_OPACO`), porque por detrás de esa
+celda pasa el resto de la tabla y un fondo translúcido dejaría ver las cifras de
+otras columnas corriendo bajo el nombre del cliente.
+
+---
+
+## 2026-09-12 — El objetivo táctil crece con el dedo, no con la pantalla
+
+**Contexto.** Los objetivos táctiles deben medir 44×44 px. Los renglones de las
+tablas miden 26 px, y la densidad alta es un principio del producto: quien lee
+esto compara cifras y necesita verlas juntas.
+
+**Decisión.** Se separan dos casos. En la **barra superior y la navegación** los
+controles miden 44 px de verdad, siempre: es una barra de herramientas y ahí el
+espacio vertical sobra. En los **controles dentro de una tabla** —encabezados
+ordenables, flechas de desplegar— el tamaño depende de `pointer: coarse`: con
+ratón siguen midiendo 26 px, con dedo crecen a 44 y el renglón con ellos.
+
+**Alternativa descartada.** Ampliar el área táctil con un pseudo-elemento de
+44 px sin agrandar el control. Se probó y se descartó por geometría: con
+renglones de 26 px, las áreas de dos filas contiguas se solapan 18 px, y un
+toque cerca del borde abre **la fila equivocada**. Un objetivo grande que acierta
+al vecino es peor que uno pequeño. El pseudo-elemento (`.toque`) se conserva solo
+para controles aislados, donde no tiene vecinos que pisar.
+
+**Consecuencia.** `pointer: coarse` pregunta por el aparato, no por el ancho:
+una ventana angosta en un escritorio conserva la densidad, y una tableta ancha
+recibe objetivos grandes. La columna crece junto con el control
+(`th:has(.toque-denso)`), porque si solo crece el botón, sobresale del encabezado
+y el vecino —que se pinta después— se lleva el toque del borde.

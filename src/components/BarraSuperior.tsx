@@ -1,3 +1,4 @@
+import clsx from "clsx";
 import { useState } from "react";
 
 import { fecha as formatearFecha } from "../lib/format";
@@ -37,39 +38,71 @@ export function BarraSuperior() {
   const actualizarParametro = useAppStore((s) => s.actualizarParametro);
   const limpiar = useAppStore((s) => s.limpiar);
   const [ajustesAbiertos, setAjustesAbiertos] = useState(false);
+  const [menuAbierto, setMenuAbierto] = useState(false);
 
   return (
-    <header className="sticky top-0 z-10 border-b border-slate-200 bg-superficie">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2">
-        <div className="min-w-0">
+    <header className="@container sticky top-0 z-10 border-b border-slate-200 bg-superficie">
+      <div className="relative flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-marino">Reportería financiera</p>
           <p className="truncate text-xs text-slate-500" title={origen}>
             {origen}
           </p>
         </div>
 
-        <label className="ml-auto flex items-center gap-2 text-xs text-slate-600">
-          <span>Fecha de corte</span>
-          <input
-            type="date"
-            value={aValorInput(parametros.fechaCorte)}
-            onChange={(e) => {
-              const d = deValorInput(e.target.value);
-              if (d !== null) actualizarParametro("fechaCorte", d);
-            }}
-            className="cifras rounded-sm border border-slate-300 px-1.5 py-0.5 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-marino"
-          />
-        </label>
+        {/*
+          El boton de menu solo existe cuando los controles no caben. No encoge
+          nada: o estan todos en la barra, o estan todos en el panel.
+        */}
+        <div className="@4xl:hidden">
+          <Boton barra onClick={() => setMenuAbierto((v) => !v)}>
+            {menuAbierto ? "Cerrar ✕" : "Menú ☰"}
+          </Boton>
+        </div>
 
-        <SelectorTema />
-        <BotonExcel />
-        <MenuPdf />
-        <Boton onClick={() => setAjustesAbiertos((v) => !v)}>
-          {ajustesAbiertos ? "Ocultar parámetros" : "Parámetros"}
-        </Boton>
-        <Boton variante="peligro" onClick={limpiar}>
-          Limpiar
-        </Boton>
+        {/*
+          UN SOLO ARBOL DE CONTROLES, dos disposiciones.
+
+          Con ancho suficiente el contenedor es `display: contents`: desaparece
+          como caja y sus hijos se acomodan directamente en la barra. Sin ancho,
+          el mismo elemento se vuelve un panel desplegable debajo.
+
+          Es `contents` y no dos copias con `hidden` porque duplicar el arbol
+          duplicaria tambien el grupo de radios del tema (dos grupos con el
+          mismo `name` peleandose) y el estado del menu del PDF.
+        */}
+        <div
+          className={clsx(
+            "@4xl:contents",
+            "@max-4xl:absolute @max-4xl:inset-x-0 @max-4xl:top-full @max-4xl:z-20",
+            "@max-4xl:flex @max-4xl:flex-col @max-4xl:items-stretch @max-4xl:gap-2",
+            "@max-4xl:border-b @max-4xl:border-slate-200 @max-4xl:bg-superficie @max-4xl:p-3 @max-4xl:shadow-md",
+            !menuAbierto && "@max-4xl:hidden",
+          )}
+        >
+          <label className="flex min-h-11 items-center gap-2 text-xs text-slate-600">
+            <span>Fecha de corte</span>
+            <input
+              type="date"
+              value={aValorInput(parametros.fechaCorte)}
+              onChange={(e) => {
+                const d = deValorInput(e.target.value);
+                if (d !== null) actualizarParametro("fechaCorte", d);
+              }}
+              className="cifras min-h-11 rounded-sm border border-slate-300 px-2 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-marino"
+            />
+          </label>
+
+          <SelectorTema />
+          <BotonExcel />
+          <MenuPdf />
+          <Boton barra onClick={() => setAjustesAbiertos((v) => !v)}>
+            {ajustesAbiertos ? "Ocultar parámetros" : "Parámetros"}
+          </Boton>
+          <Boton barra variante="peligro" onClick={limpiar}>
+            Limpiar
+          </Boton>
+        </div>
       </div>
 
       {ajustesAbiertos && (
@@ -137,7 +170,7 @@ function MenuPdf() {
         if (e.key === "Escape") setAbierto(false);
       }}
     >
-      <Boton variante="primario" onClick={() => setAbierto((v) => !v)}>
+      <Boton barra variante="primario" onClick={() => setAbierto((v) => !v)}>
         Descargar PDF
       </Boton>
       {abierto && (

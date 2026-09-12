@@ -27,7 +27,17 @@ Es un argumento de venta explícito y una restricción de arquitectura, no una p
 
 ## Reglas duras
 
-1. **Nunca usar `localStorage`, `sessionStorage` ni `IndexedDB`** en v1. Estado en memoria.
+1. **Nunca usar `localStorage`, `sessionStorage` ni `IndexedDB`** para datos. Estado en memoria.
+
+   **Única excepción, desde v1.1 — preferencias de interfaz.** Se permite persistir
+   **preferencias de interfaz** —tema, y más adelante idioma y disposición—. **Nunca datos
+   financieros, datasets, parámetros de cálculo ni nada derivado de un archivo cargado.**
+
+   La excepción vive encapsulada en `src/lib/preferencias/`, con una **lista blanca de claves**:
+   `guardarPreferencia` solo acepta claves de esa lista y valores de esa clave, así que guardar
+   cualquier otra cosa **no compila**. Una prueba recorre `src/` y exige que ningún otro archivo
+   mencione `localStorage`, para que nadie pueda saltarse el módulo. Ampliar la excepción
+   obliga a editar ese archivo y a leer por qué existe.
 2. **El motor de cálculo vive en `src/lib/calc/` y son funciones puras.** Reciben `Dataset`,
    devuelven objetos de resultado. Sin React, sin fetch, sin efectos secundarios. Es lo que
    permite migrar la fuente de datos a la API de Odoo sin tocar la UI.
@@ -155,44 +165,81 @@ pesadas. El PDF de referencia (11 páginas) define la estructura y el orden de s
 ## Dirección visual
 
 Sobrio y financiero, no dashboard de startup. Fondo blanco, azul marino `#1F3864` como color
-institucional, verde `#1E8449` para positivo, rojo `#C0392B` para riesgo, ámbar `#B7791F` para
+institucional, verde `#1B7A42` para positivo, rojo `#C0392B` para riesgo, ámbar `#A15F07` para
 advertencia. Tipografía de sistema. Números tabulares (`font-variant-numeric: tabular-nums`)
 en todas las tablas — sin eso las columnas de importes no alinean.
 
 Densidad alta: quien lee esto compara cifras, no explora. Evitar tarjetas gigantes con un solo
 número y mucho aire.
 
+### Temas (v1.1)
+
+Tres estados de preferencia —**claro, oscuro, sistema**—; `data-tema` en el `<html>` lleva
+siempre el **resuelto**, nunca "sistema". Con "sistema" elegido la aplicación sigue a
+`prefers-color-scheme` **en vivo**, no solo al cargar.
+
+- **`src/index.css` es el único lugar del proyecto con hexadecimales.** El tema oscuro se hace
+  redefiniendo los mismos tokens bajo `html[data-tema="oscuro"]`, incluida la rampa neutra de
+  Tailwind, no con `dark:` repartido por los componentes.
+- **Los tonos semánticos tienen variantes propias en oscuro.** Reusar `#C0392B` sobre fondo
+  oscuro lo baja a 3.8:1 y deja de leerse como alarma. El texto que va **encima** de un tono
+  sólido (`sobre-color`) se invierte de blanco a casi negro.
+- **Contraste WCAG AA obligatorio** (4.5:1 texto, 3:1 objetos gráficos) en **los dos temas**,
+  verificado por prueba sobre `index.css`. La tabla vive en `docs/contraste.md` y la regenera
+  `npm run test`.
+- **La impresión siempre sale en claro**, sea cual sea el tema de la pantalla. `VistaImpresion`
+  marca su raíz con `data-tema="claro"` y `@media print` fuerza los tokens claros.
+- **Las gráficas reciben los tokens resueltos** del tema que rige **donde se pintan** —no los
+  del `<html>`—, incluidos ejes, rejilla, rótulos y tooltip. Es lo que hace que el PDF salga
+  claro aunque la pantalla esté en oscuro.
+
 ## Pruebas
 
-`src/lib/calc/__tests__/` con el dataset real de 21 operaciones como fixture.
+`src/lib/calc/__tests__/` con el **archivo de demostración ficticio** como fixture
+(`docs/DEMO_Agrodrones_Bajio_FICTICIO.xlsx`). Ningún archivo con datos reales de un cliente
+entra al repositorio, ni siquiera como fixture (GOBERNANZA.md, sección 10).
 
-**Todos los valores de esta tabla son EXCLUYENDO la fila Demo (V-005).** El parser
-entrega 21 ventas; el motor excluye la Demo y calcula sobre 20. Están en pesos:
-el motor trabaja en centavos, así que multiplique por 100 al compararlos.
+**Todos los valores de esta tabla son EXCLUYENDO la fila Demo (V-006), al corte
+`2026-09-09`.** El parser entrega 25 ventas; el motor excluye la Demo y calcula sobre 24. Están
+en pesos: el motor trabaja en centavos, así que multiplique por 100 al compararlos. La fuente
+es `src/lib/calc/__tests__/fixture.ts`; esta tabla es su copia legible.
 
 ```
-venta_total       = 5_498_800
-costo_total       = 4_398_569
-utilidad_bruta    = 1_100_231
-margen            = 0.20
-comision (s/venta)=   130_060
-cobrado           = 3_717_600
-saldo             = 1_781_200
-operaciones       = 20
-ticket_promedio   =   274_940
-aging["+180"]     = 1_022_000
-aging["31-60"]    =   721_200
-aging["61-90"]    =    38_000
-attach_rate       = 3/14
+operaciones             =    24
+venta_total             = 4_496_900
+costo_total             = 3_278_000
+utilidad_bruta          = 1_218_900
+margen                  = 0.2711
+comisiones              =   146_150
+utilidad_contribucion   = 1_072_750
+cobrado                 = 2_541_100
+saldo                   = 1_955_800
+gastos_fijos            =   640_800
+gastos_variables        =   360_100
+resultado_operativo     =    71_850
+ticket_promedio         =   187_370.83
+punto_equilibrio / mes  =   298_465.89   // el del periodo entre los 9 meses del eje
+aging["0-30"]           =   683_000
+aging["31-60"]          =    94_800
+aging["61-90"]          =   390_000
+aging["91-180"]         =   118_000
+aging["+180"]           =   670_000
+aging["sin-fecha"]      =         0
+attach_rate             = 3/10 = 0.30
 ```
 
-Referencia para no confundirse al depurar: **con la fila Demo incluida** el cobrado
-sube a 4_112_800 (= 3_717_600 + 395_200 abonados a V-005) y el costo a 4_793_769
-(= 4_398_569 + 395_200). Si obtiene esas cifras, el motor no está excluyendo la Demo.
+**El corte es obligatorio y fijo.** El aging depende de él: con "hoy" la suite empezaría a
+fallar sola con el paso de los días. Las pruebas pasan `2026-09-09` explícitamente.
 
-No es un error de copiado que 395_200 aparezca dos veces: el costo unitario de V-005
-y lo abonado contra ese folio coinciden. V-005 no tiene `precio_venta`, por eso
-`venta_total` no cambia al incluirla — pero `costo_total` y `cobrado` sí.
+Referencia para no confundirse al depurar: **con la fila Demo incluida** el costo sube a
+3_573_000 y el cobrado a 2_836_100. Si obtiene esas cifras, el motor no está excluyendo la
+Demo. `venta_total` no cambia al incluirla porque V-006 no tiene `precio_venta` — solo el
+costo y lo abonado contra ese folio.
+
+Este archivo ejercita a propósito los casos límite que el archivo del cliente nunca tocó:
+los **cinco tramos de antigüedad con saldo**, base de medición **mixta** (ventas con
+`dias_credito` y sin él), las **seis líneas** de producto incluida la Demo, un **sobrecobro**
+(V-018, saldo negativo) y una **venta sin fecha** (V-025).
 
 Si un cambio rompe estos números, el cambio está mal.
 

@@ -35,7 +35,7 @@ export function Navegacion({ capacidades }: { capacidades: Capacidades }) {
                 aria-current={activo ? "page" : undefined}
                 title={habilitado ? undefined : motivo}
                 className={clsx(
-                  "flex h-full flex-col justify-center border-b-2 px-3 py-1.5 text-left text-xs transition-colors",
+                  "flex h-full min-h-11 flex-col justify-center border-b-2 px-3 py-1.5 text-left text-xs transition-colors",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-marino",
                   activo
                     ? "border-marino font-semibold text-marino"
@@ -59,7 +59,7 @@ export function Navegacion({ capacidades }: { capacidades: Capacidades }) {
             onClick={irACaptura}
             aria-current={pantalla === "captura" ? "page" : undefined}
             className={clsx(
-              "flex h-full flex-col justify-center border-b-2 px-3 py-1.5 text-left text-xs transition-colors",
+              "flex h-full min-h-11 flex-col justify-center border-b-2 px-3 py-1.5 text-left text-xs transition-colors",
               "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-marino",
               pantalla === "captura"
                 ? "border-marino font-semibold text-marino"

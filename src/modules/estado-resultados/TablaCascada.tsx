@@ -33,6 +33,10 @@ export function TablaCascada({ cascada }: { readonly cascada: Cascada }) {
   return (
     <TablaCifras
       etiquetaTabla="Estado de resultados del periodo"
+      // Tabla de RESUMEN: cada renglon es un concepto que se lee solo, no una
+      // operacion que se compare con la de al lado. En poco ancho cada concepto
+      // se vuelve una tarjeta etiqueta/valor sin perder nada.
+      enEstrecho="tarjetas"
       columnas={COLUMNAS_CASCADA}
       filas={construirCascada(cascada).map((f) => ({
         id: f.clave,

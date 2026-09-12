@@ -153,7 +153,7 @@ export function PanelValidacion({
           onClick={() => setAbierto((v) => !v)}
           aria-expanded={abierto}
           aria-controls="detalle-validacion"
-          className="border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-superficie focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-marino"
+          className="toque border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-superficie focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-marino"
         >
           {abierto ? "Ocultar detalle" : "Ver detalle"}
         </button>
@@ -173,7 +173,7 @@ export function PanelValidacion({
           <button
             type="button"
             onClick={verErrores}
-            className="border border-riesgo/40 px-2 py-0.5 text-xs font-medium text-riesgo hover:bg-superficie focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-marino"
+            className="toque border border-riesgo/40 px-2 py-0.5 text-xs font-medium text-riesgo hover:bg-superficie focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-marino"
           >
             Ver errores
           </button>
@@ -243,7 +243,7 @@ function GrupoHallazgos({
         onClick={onAlternar}
         aria-expanded={abierto}
         className={clsx(
-          "flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-medium",
+          "toque flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-medium",
           estilo.fondo,
           estilo.texto,
           "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-marino",

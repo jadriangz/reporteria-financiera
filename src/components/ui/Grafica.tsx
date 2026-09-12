@@ -17,6 +17,7 @@ import {
   mismaPaleta,
   paletaDelElemento,
 } from "../../lib/tema/paleta";
+import { ALTO_EJE_INCLINADO, ALTO_MINIMO, rotuloEje } from "./ejeGrafica";
 import { useTema } from "../../store/useTema";
 import { useImprimiendo } from "./contextoImpresion";
 import { cargarGraficas } from "./cargaGraficas";
@@ -63,6 +64,13 @@ export function Grafica({
   const etiquetas = useMemo(() => etiquetasEje(puntos), [puntos]);
   const imprimiendo = useImprimiendo();
   const [figura, paleta] = usePaleta();
+  const ancho = useAncho(figura);
+
+  // Con las etiquetas inclinadas hay que dar mas alto, o el eje se come el area
+  // de dibujo y las barras quedan aplastadas justo cuando menos espacio hay.
+  const inclinado =
+    rotuloEje({ ancho, categorias: filas.length, categorica: esCategorica(puntos) }).angulo !== 0;
+  const altoUtil = Math.max(ALTO_MINIMO, alto) + (inclinado && !imprimiendo ? ALTO_EJE_INCLINADO - 30 : 0);
 
   if (filas.length === 0) {
     return (
@@ -75,8 +83,8 @@ export function Grafica({
   return (
     <figure ref={figura} className="imp-bloque m-0" aria-label={etiqueta}>
       <Leyenda series={series} linea={tipo === "linea"} paleta={paleta} />
-      <BarreraGrafica alto={alto}>
-        <Suspense fallback={<Reserva alto={alto} texto="Cargando la gráfica…" />}>
+      <BarreraGrafica alto={altoUtil}>
+        <Suspense fallback={<Reserva alto={altoUtil} texto="Cargando la gráfica…" />}>
           <Lienzo
             tipo={tipo}
             series={series}
@@ -84,7 +92,8 @@ export function Grafica({
             etiquetas={etiquetas}
             categorica={esCategorica(puntos)}
             imprimiendo={imprimiendo}
-            alto={alto}
+            alto={altoUtil}
+            ancho={ancho}
             paleta={paleta}
           />
         </Suspense>
@@ -131,6 +140,32 @@ function usePaleta(): [RefObject<HTMLElement | null>, PaletaGrafica] {
   }, [resuelto, imprimiendo]);
 
   return [figura, estado.paleta];
+}
+
+/**
+ * Ancho real de la figura, en pixeles.
+ *
+ * Hace falta para decidir como se rotula el eje X, y no se puede deducir del
+ * ancho de la ventana: la misma grafica puede estar en media pantalla, en una
+ * columna compartida o en la hoja impresa. Se mide el elemento.
+ */
+function useAncho(figura: RefObject<HTMLElement | null>): number {
+  const [ancho, setAncho] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = figura.current;
+    if (el === null || typeof ResizeObserver !== "function") return;
+    const observador = new ResizeObserver(() => {
+      const medido = Math.round(el.getBoundingClientRect().width);
+      setAncho((previo) => (previo === medido ? previo : medido));
+    });
+    observador.observe(el);
+    return () => {
+      observador.disconnect();
+    };
+  }, [figura]);
+
+  return ancho;
 }
 
 /** Espacio del mismo alto que la grafica, mientras llega o si no llego. */

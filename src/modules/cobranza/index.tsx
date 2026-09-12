@@ -317,8 +317,12 @@ function PanelProvision({ calculos }: { calculos: Calculos }) {
   const variacion = utilidad === 0 ? null : -provision / utilidad;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
-      <div>
+    // Controles y tabla comparten renglon si caben; si no, se apilan. Antes era
+    // `lg:`, que mira el ancho de la VENTANA: con la seccion metida en media
+    // pantalla, una ventana grande seguia pidiendo dos columnas de 20rem y la
+    // tabla de escenarios quedaba estrangulada.
+    <div className="flex flex-wrap gap-4">
+      <div className="min-w-0 grow basis-80">
         <Control
           etiqueta="Tasa 91 a 180 días"
           valor={parametros.provision91180}
@@ -348,7 +352,7 @@ function PanelProvision({ calculos }: { calculos: Calculos }) {
         </div>
       </div>
 
-      <div>
+      <div className="min-w-0 grow basis-[28rem]">
         <TablaEscenarios porBucket={porBucket} utilidadContribucion={utilidad} />
         <p className="mt-2 text-[11px] leading-snug text-slate-500">
           Los cuatro escenarios son referencias fijas: muestran el rango de la exposición y no

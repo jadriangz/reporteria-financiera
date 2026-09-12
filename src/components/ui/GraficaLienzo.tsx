@@ -12,6 +12,7 @@ import {
 
 import { moneda, monedaCompacta } from "../../lib/format";
 import type { PaletaGrafica } from "../../lib/tema/paleta";
+import { ANCHO_EJE_Y, abreviar, rotuloEje } from "./ejeGrafica";
 import {
   type FilaRecharts,
   type SerieGrafica,
@@ -39,12 +40,6 @@ import {
  */
 
 const MARGEN = { top: 8, right: 12, bottom: 0, left: 4 } as const;
-/**
- * Espacio para etiquetas de categoria inclinadas al imprimir: en 680px, nueve
- * nombres de modelo horizontales se enciman.
- */
-const ALTO_EJE_INCLINADO = 48;
-const ANCHO_EJE_Y = 60;
 
 /**
  * TODO color de esta grafica sale de `paleta`, que viene resuelta contra el
@@ -80,6 +75,7 @@ export function GraficaLienzo({
   categorica,
   imprimiendo,
   alto,
+  ancho,
   paleta,
 }: {
   readonly tipo: TipoGrafica;
@@ -89,10 +85,18 @@ export function GraficaLienzo({
   readonly categorica: boolean;
   readonly imprimiendo: boolean;
   readonly alto: number;
+  /** Ancho medido del contenedor. Decide como se rotula el eje X. */
+  readonly ancho: number;
   readonly paleta: PaletaGrafica;
 }) {
   const esLinea = tipo === "linea";
   const marca = tick(paleta, imprimiendo);
+  // En papel el ancho es fijo y conocido; en pantalla, el que se midio.
+  const rotulo = rotuloEje({
+    ancho: imprimiendo ? ANCHO_IMPRESION : ancho,
+    categorias: filas.length,
+    categorica,
+  });
 
   return (
     <Contenedor imprimiendo={imprimiendo} alto={alto}>
@@ -106,14 +110,19 @@ export function GraficaLienzo({
         <CartesianGrid vertical={false} stroke={paleta.rejilla} />
         <XAxis
           dataKey="x"
-          tickFormatter={(indice: number) => etiquetas[indice] ?? ""}
+          tickFormatter={(indice: number) =>
+            abreviar(etiquetas[indice] ?? "", rotulo.maximoCaracteres)
+          }
           tick={marca}
           tickLine={false}
           axisLine={{ stroke: paleta.eje }}
-          {...(categorica ? { interval: 0 } : { minTickGap: 8 })}
-          {...(categorica && imprimiendo
-            ? { angle: -30, textAnchor: "end", height: ALTO_EJE_INCLINADO }
-            : {})}
+          height={rotulo.alto}
+          {...(rotulo.todasLasMarcas
+            ? { interval: 0 }
+            : { minTickGap: rotulo.separacionMinima })}
+          {...(rotulo.angulo === 0
+            ? {}
+            : { angle: rotulo.angulo, textAnchor: "end" as const })}
         />
         <YAxis
           tickFormatter={formatoEjeY}

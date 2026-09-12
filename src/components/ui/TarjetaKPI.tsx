@@ -56,9 +56,47 @@ export function TarjetaKPI({
   );
 }
 
-/** Rejilla de tarjetas. Se adapta sin dejar huecos raros con 3 o 5 tarjetas. */
+/**
+ * Ancho minimo de una tarjeta para que siga siendo legible.
+ *
+ * 14rem = 224 px. Es lo que ocupan una etiqueta como "Cartera +180 dias", una
+ * cifra de nueve digitos a `text-xl` y una nota al pie sin que ninguna de las
+ * tres se parta en dos renglones. Por debajo de eso la tarjeta deja de
+ * cumplir su trabajo, que es que la cifra se lea de un vistazo.
+ */
+export const MINIMO_TARJETA = "14rem";
+
+/*
+ * El valor va escrito COMPLETO en el className de abajo, no interpolado desde
+ * la constante: Tailwind genera las utilidades leyendo el texto del archivo, y
+ * una clase armada con `${...}` no existe para el. La constante se queda como
+ * documentacion del numero y para que una prueba pueda comprobar que los dos
+ * coinciden.
+ */
+
+/**
+ * Rejilla de tarjetas. El NUMERO DE COLUMNAS LO DECIDE EL ANCHO, no el
+ * dispositivo.
+ *
+ * `auto-fit` con `minmax()` mete tantas columnas como quepan respetando el
+ * minimo legible, y reparte el sobrante entre ellas. No hay una lista de
+ * anchos de dispositivo que enumerar: a 360 px sale una columna, a 768 tres, a
+ * 1440 seis, y en un ancho intermedio que nadie previo, el que toque.
+ *
+ * El `min(100%, ...)` no es decorativo: sin el, en un contenedor mas angosto
+ * que el minimo la pista seguiria midiendo 14rem y la tarjeta desbordaria la
+ * pantalla en vez de encogerse.
+ *
+ * En papel la rejilla vuelve a cuatro columnas fijas: la hoja carta siempre
+ * mide lo mismo y el reporte impreso no debe cambiar de forma segun el ancho
+ * que tuviera la ventana al momento de imprimir.
+ */
 export function RejillaKPI({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4 print:grid-cols-4">{children}</div>
+    <div
+      className="mb-4 grid gap-2 grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))] print:grid-cols-4"
+    >
+      {children}
+    </div>
   );
 }

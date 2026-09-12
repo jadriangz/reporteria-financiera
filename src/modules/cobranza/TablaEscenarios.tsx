@@ -67,6 +67,9 @@ export function TablaEscenarios({
   return (
     <TablaCifras
       etiquetaTabla="Escenarios de provisión"
+      // Tabla de RESUMEN: cuatro escenarios de referencia, cada uno con su
+      // lectura propia. Ver `EstrategiaEstrecha`.
+      enEstrecho="tarjetas"
       columnas={COLUMNAS_ESCENARIOS}
       filas={filasEscenarios(porBucket, utilidadContribucion, pct91180, pctMas180).map(
         (e) => ({

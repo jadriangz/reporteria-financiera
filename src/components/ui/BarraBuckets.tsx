@@ -89,7 +89,13 @@ export function BarraBuckets({
         </div>
       )}
 
-      <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3 lg:grid-cols-6">
+      {/*
+        Las columnas salen del ancho DISPONIBLE, no del de la ventana. Con
+        `sm:`/`lg:` esta leyenda se partia en seis columnas de 80 px en cuanto
+        la barra compartia renglon con otro bloque en una pantalla grande, y los
+        tramos quedaban truncados. 7rem es lo que mide "Mas de 180 dias".
+      */}
+      <ul className="mt-2 grid gap-x-4 gap-y-1 grid-cols-[repeat(auto-fit,minmax(min(100%,7rem),1fr))]">
         {segmentos.map((s) => (
           <li key={s.clave} className="min-w-0">
             <div className="flex items-center gap-1.5">

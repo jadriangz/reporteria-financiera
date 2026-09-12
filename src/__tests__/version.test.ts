@@ -23,8 +23,11 @@ describe("version de la aplicacion", () => {
     expect(VERSION).toBe(paquete.version);
   });
 
-  it("hoy es la 1.0.0: la primera version que ve el cliente", () => {
-    expect(VERSION).toBe("1.0.0");
+  it("hoy es la 1.1.0: interfaz, sin cambios de contrato ni de cifras", () => {
+    // MENOR y no PARCHE porque v1.1 agrega capacidades compatibles hacia atras
+    // —temas, layout responsivo—; MENOR y no MAYOR porque ninguna definicion de
+    // calculo cambio y ninguna cifra reportada se mueve (GOBERNANZA.md §3).
+    expect(VERSION).toBe("1.1.0");
   });
 
   it("es un semver de tres numeros, sin sufijos", () => {
