@@ -34,9 +34,17 @@ modifica la cifra esperada para que pase la prueba.
 
 ## 2. Estado actual
 
-**v1.0 — MVP funcional.** Seis módulos de reporte, carga de Excel/CSV, captura manual,
-exportación a Excel, exportación a PDF por impresión del navegador, validación en tres
-niveles de severidad.
+**v1.1.0.** Sobre el MVP de v1.0 —seis módulos de reporte, carga de Excel/CSV, captura
+manual, exportación a Excel, exportación a PDF por impresión del navegador, validación en
+tres niveles de severidad—, v1.1 sumó:
+
+- **Temas claro, oscuro y sistema**, con contraste AA verificado por prueba en los dos y la
+  impresión siempre en claro.
+- **Layout responsivo por contenido**, no por dispositivo: rejillas `auto-fit`, consultas de
+  contenedor, y tablas que eligen entre volverse tarjetas o desplazarse a lo ancho.
+- **Panel de validación con semáforo**: el tono del encabezado resume la severidad antes de
+  abrir el detalle.
+- **Tres comandos de proyecto** —`/verificar`, `/terminado` y `/preparar`— (sección 6).
 
 Fuera de alcance en v1, por decisión: autenticación, multiusuario, persistencia,
 histórico entre cortes, conexión a Odoo, multimoneda, consolidación de varias empresas.
@@ -291,8 +299,6 @@ posterior: hay que reescribir el historial y rotar lo que se haya expuesto.
 Priorizado. Lo de arriba entra primero.
 
 **Correcciones y deuda**
-- Regla `attach-rate-bajo`: no debe dispararse si el negocio no vende accesorios en
-  absoluto. Mismo error que ya se corrigió en cartera: ausencia de línea ≠ attach bajo.
 - Plantilla v2 con hojas como tablas de Excel, para eliminar las filas de relleno con
   fórmulas y el renglón de nota que el lector tiene que descartar.
 - Gastos por categoría en el motor, hoy solo agregados.
@@ -307,8 +313,12 @@ Priorizado. Lo de arriba entra primero.
 
 **Arquitectura**
 - Persistencia con Supabase y autenticación, requisito de todo lo histórico.
-- **Conexión a Odoo por XML-RPC**, sustituyendo la carga de Excel. Es el destino del
-  proyecto: el motor de cálculo ya está preparado y solo cambia la fuente.
+- **Conexión a Odoo**, sustituyendo la carga de Excel. Es el destino del proyecto: el motor
+  de cálculo ya está preparado y solo cambia la fuente. El transporte va aislado del negocio
+  (ROADMAP.md, AD-02): un adaptador por protocolo detrás de una interfaz común, que soporte
+  XML-RPC/JSON-RPC y el API JSON-2 según la versión del ERP del cliente. XML-RPC y JSON-RPC
+  están programados para eliminarse en Odoo 22 y el JSON-2 es su reemplazo, así que habrá que
+  convivir con ambos durante años.
 - Web Worker para el parseo, si aparecen archivos grandes.
 
 ---

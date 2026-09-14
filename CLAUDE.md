@@ -136,7 +136,9 @@ punto_equilibrio_mxn  = gastos_fijos / margen_contribucion_pct
 
 **Filas con `linea = "Demo"` se excluyen de todo cálculo de venta**, pero se listan aparte.
 
-`fecha_corte` = hoy por defecto, configurable por el usuario en la barra superior.
+`fecha_corte` **no tiene valor por omisión en el cálculo**: toda función de `calc/` la recibe
+explícita. El "hoy" por defecto lo pone la UI al arrancar (`fechaCorte: hoyUTC()` en el store) y
+el usuario lo cambia en la barra superior. Ver «Restricciones aprendidas».
 
 ## Módulos de reporte
 
