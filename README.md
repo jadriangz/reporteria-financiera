@@ -53,7 +53,7 @@ src/
     producto/            5. Rendimiento por producto
     clientes/            6. Clientes
   components/ui/       primitivas compartidas
-docs/                  plantilla Excel, PDF de referencia, contrato
+docs/                  plantilla Excel, demo ficticio, línea base del PDF, decisiones
 ```
 
 Reglas de arquitectura, definiciones de cálculo y orden de construcción: ver `CLAUDE.md`.

@@ -295,3 +295,63 @@ hueco por categoría y predecía barras de 14 px donde el navegador dibujaba 10:
 `barCategoryGap` se aplica a **cada lado** del grupo. El modelo ahora descuenta
 los dos huecos y los márgenes del área de dibujo, y sus predicciones coinciden
 con lo medido en el navegador.
+
+---
+
+## 2026-09-12 — La línea base del PDF es un manifiesto, no el PDF
+
+**Contexto.** `CLAUDE.md` y `README.md` citaban un «PDF de referencia (11
+páginas)» como definición de la estructura y el orden de secciones del reporte.
+Ese archivo no está en el repositorio ni lo estuvo nunca: cero resultados en
+disco y cero en el historial de Git. Era una referencia muerta, y `/verificar`
+necesitaba algo real contra lo que comparar el PDF que genera.
+
+**Decisión.** La línea base vive en `docs/linea-base-pdf.md`: orden y títulos de
+sección, orientación de cada página, invariantes del papel, las cifras que deben
+leerse en él, y las casillas que la primera corrida rellena. Las dos referencias
+muertas ahora apuntan ahí.
+
+**Alternativa descartada.** Commitear un PDF de referencia y comparar página por
+página. Un binario no se revisa en un diff: nadie ve en un pull request qué
+cambió, así que el archivo envejece sin que nadie lo note —que es exactamente lo
+que le pasó al de 11 páginas—. Además obligaría a regenerarlo entero por mover
+un corte de página.
+
+**Consecuencia.** La comparación es de estructura e invariantes, no de píxeles, y
+eso es lo que había que vigilar: que el orden del reporte no se mueva, que el
+Estado de resultados siga apaisado, que la página «Módulos no incluidos» no
+aparezca con el archivo de demostración —que habilita los seis módulos—, y que el
+papel salga en claro aunque la pantalla esté en oscuro. Actualizar la línea base
+exige editar texto y registrar la decisión, no sobrescribir un binario en
+silencio.
+
+---
+
+## 2026-09-12 — El recorrido de verificación carga el fixture con un parámetro de desarrollo
+
+**Contexto.** `/verificar` recorre seis módulos en cuatro anchos y dos temas:
+cuarenta y ocho estados. Arrastrar el archivo de demostración a mano en cada
+arranque, y además fijar la fecha de corte en `2026-09-09` para que el aging
+coincida con las cifras de referencia, convertía el recorrido en algo que nadie
+iba a completar dos veces.
+
+**Decisión.** `?fixture=demo`, exclusivo de desarrollo. `src/main.tsx` importa el
+módulo dentro de `if (import.meta.env.DEV)`: en `build`, Vite sustituye esa
+expresión por `false`, Rollup elimina la rama y el chunk dinámico nunca se emite,
+así que en producción el módulo no queda inerte, queda **ausente**. La ruta del
+archivo es un import estático `?url` y nunca sale de la query; lo que viaja en la
+URL es una bandera que se compara contra un literal.
+
+**Alternativa descartada.** Un parámetro que reciba la ruta del archivo
+(`?archivo=…`). Habría servido también para el archivo real del cliente, y ahí
+está el problema: un cargador de rutas arbitrarias en una aplicación cuyo
+argumento de venta es que los datos no salen del navegador. La comodidad no vale
+ese riesgo, y el fixture es el único archivo que el recorrido necesita.
+
+**Consecuencia.** La cerca es doble y automática. Una prueba guardián recorre
+`src/` —al estilo de la que protege `src/lib/preferencias`— y exige que el módulo
+entre solo por `main.tsx` bajo la guarda, y que dentro del módulo la ruta venga
+solo del import estático. Y trece casos de ejecución comprueban que ninguna query
+—incluida `?fixture=demo&archivo=/etc/passwd`— pida algo distinto del fixture.
+Como evidencia de que la rama no llega al cliente: el bundle de producción quedó
+con los mismos hashes que antes del cambio, byte a byte idéntico.

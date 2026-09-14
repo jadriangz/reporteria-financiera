@@ -100,6 +100,17 @@ las "simplifica" sin leer el porqué, rompe el reporte en silencio.
   `new Date()`. El default de "hoy" vive en la UI (`hoyUTC()`), no en el cálculo: si el
   motor lo tomara del reloj, el mismo archivo daría un aging distinto cada día y las
   pruebas del fixture caducarían solas. Las pruebas pasan `2026-09-09` explícitamente.
+- **El parámetro `?fixture=demo` es exclusivo de desarrollo, y su guarda no es cosmética.**
+  Carga el archivo de demostración y fija el corte en `2026-09-09` para que `/verificar` recorra
+  la matriz de anchos y temas sin intervención humana. `src/main.tsx` lo importa dentro de
+  `if (import.meta.env.DEV)`: en `build`, Vite sustituye esa expresión por `false`, Rollup
+  elimina la rama y el chunk dinámico nunca se emite, así que en producción el módulo no queda
+  inerte, queda **ausente**. La ruta del archivo es un import estático `?url` y **nunca sale de
+  la query** —lo que viaja en la URL es una bandera que se compara contra un literal—, por eso no
+  puede cargar una ruta arbitraria. Una prueba guardián
+  (`src/dev/__tests__/fixtureDesarrollo.test.ts`) exige las dos cosas; quitar cualquiera de las
+  dos publicaría un cargador de archivos en una aplicación cuyo argumento de venta es que los
+  datos no salen del navegador.
 
 ## Definiciones de cálculo (exactas, no reinterpretar)
 
@@ -160,7 +171,8 @@ Incluir exportación a Excel del dataset actual para que el cliente se lleve su 
 ## Exportación a PDF
 
 Vista imprimible con `@media print` y `window.print()`. No agregar Puppeteer ni librerías
-pesadas. El PDF de referencia (11 páginas) define la estructura y el orden de secciones.
+pesadas. La estructura y el orden de secciones los define `docs/linea-base-pdf.md`, que es la
+línea base contra la que `/verificar` compara el PDF generado.
 
 ## Dirección visual
 

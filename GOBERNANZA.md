@@ -157,6 +157,39 @@ mal, se sabe exactamente dónde mirar.
 - **Si una corrección rompe pruebas viejas, revisar si las pruebas codificaban el error.**
   Suele ser el caso. Exigir que explique qué asumía cada una.
 
+### Comandos del proyecto
+
+Tres comandos en `.claude/commands/` convierten en rutina lo que este manual describe en prosa.
+No cambian el proceso: lo ejecutan siempre igual, que es justo lo que la prosa no garantiza.
+
+| Comando | Qué hace | Qué NO hace |
+|---|---|---|
+| `/verificar` | El paso 5 de la sección 5, en sus cuatro planos: `test`, `typecheck`, `lint` y `build`; recorrido visual de los seis módulos —de humo por omisión, la matriz de cuatro anchos y dos temas con `/verificar todo`—; y el PDF completo contra su línea base | No arregla lo que encuentra, y **no declara verificado lo que no observó** |
+| `/terminado` | Recorre la sección 8 casilla por casilla, y la cadena de seis pasos de la sección 7 cuando el cambio toca `schema.ts` | No declara que algo esté terminado: eso lo decide una persona |
+| `/preparar` | Resumen de cambios por módulo, confirmación de que `src/lib/calc/` está intacto, verificación del incremento de versión según la sección 3, y propuesta de mensaje de commit | **No hace commit**, ni `git add`, ni rama, ni `push` |
+
+Cinco cosas que conviene saber antes de usarlos:
+
+- **Ninguno commitea.** El commit sigue siendo humano y sigue siendo el único punto de control
+  real. Los comandos existen para que esa revisión sea corta, no para reemplazarla.
+- **`/verificar` sin argumentos es un recorrido de humo** —1440 px, tema claro, los seis
+  módulos, con las fases automática y de PDF completas—; **`/verificar todo` es la matriz de 48
+  estados**, y los filtros de ancho, tema y módulo siguen acotando esa matriz. Cuarenta y ocho
+  estados están bien al cerrar una fase, pero a ese costo el comando no se usa entre sesiones, y
+  una verificación que no se corre no verifica nada. Lo que el humo no recorre se reporta
+  «no verificado», nunca limpio.
+- **`/verificar` depende de la extensión Claude in Chrome** para la parte visual. Si no está
+  conectada, reporta «no verificado» y sigue con lo automático. «No verificado» no es «bien».
+- **El recorrido visual carga los datos con `?fixture=demo`**, un parámetro exclusivo de
+  desarrollo que fija además la fecha de corte en `2026-09-09`. Sin ese corte fijo el aging
+  cambia cada día y la comparación contra las cifras de referencia no significa nada.
+- **La línea base del PDF vive en `docs/linea-base-pdf.md`**, no en un binario. Se actualiza solo
+  con un cambio deliberado, y ese cambio se registra en `docs/decisiones.md` (sección 9).
+
+La casilla del archivo real de la sección 8 **siempre se reporta como pendiente humana**, nunca
+como incumplimiento: ningún archivo con datos de un cliente entra al repositorio (sección 10),
+así que verificarlo es, por diseño, trabajo de la persona en su propia máquina.
+
 ### Lo que le corresponde a cada quien
 
 Claude Code implementa, prueba y reporta. La persona decide el alcance, resuelve las
@@ -235,9 +268,14 @@ ni en `docs/`, ni temporalmente. En `.gitignore`:
 
 ```
 *_CLIENTE*.xlsx
-DEMO_*.xlsx
+DEMO_datos_completos*.xlsx
 /datos-reales/
 ```
+
+El patrón ignora los demos con datos completos, no todo lo que empiece con `DEMO_`: el archivo
+de demostración **ficticio** sí está en el repositorio, a propósito, porque es el fixture de las
+pruebas. La línea que separa uno de otro es de dónde salieron las cifras, no cómo se llama el
+archivo.
 
 Las pruebas usan el archivo de demostración con datos ficticios. Si una prueba necesita
 un caso que solo aparece en datos reales, se reproduce el **caso**, no los datos:
