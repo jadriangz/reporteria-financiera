@@ -110,9 +110,10 @@ Forma: asunto de unos 72 caracteres, sin punto final, minúscula después de los
 Cuerpo solo si hace falta explicar el **por qué** —el qué ya está en el diff—. Sin líneas de
 atribución: los commits de este repositorio son solo asunto y así se quedan.
 
-**Y lo más importante de este paso: un commit por unidad lógica de cambio.** La sección 4 lo dice
-sin matices: un commit que toca el motor, la UI y la plantilla a la vez es imposible de revertir
-sin daño colateral. Si el diff abarca varias unidades, **propón varios commits**, cada uno con su
+**Y lo más importante de este paso: un commit por unidad lógica de cambio.** La sección 4 dice
+por qué: deja el historial legible y bisecable. No promete que un parche se pueda revertir aislado
+cuando otro posterior toca las mismas líneas, así que no lo prometas tú al proponer el desglose.
+Si el diff abarca varias unidades, **propón varios commits**, cada uno con su
 mensaje y su lista de archivos, en el orden en que deben entrar. No entregues un mensaje único
 para un cambio que son tres.
 

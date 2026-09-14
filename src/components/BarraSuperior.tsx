@@ -158,6 +158,8 @@ export function BarraSuperior() {
  * ayuda existe porque, sin "Graficos de fondo", los fondos de color de las
  * tarjetas y los avisos salen en blanco. Los tonos de riesgo no dependen solo
  * del fondo (tambien el texto y el borde van en color), pero se ven mejor con el.
+ * Tambien pide desactivar "Encabezados y pies de pagina": el navegador pondria la
+ * direccion de la aplicacion en el margen de cada hoja (docs/linea-base-pdf.md).
  */
 function MenuPdf() {
   const [abierto, setAbierto] = useState(false);
@@ -199,6 +201,11 @@ function MenuPdf() {
             En el diálogo elija <span className="font-semibold">«Guardar como PDF»</span> y active{" "}
             <span className="font-semibold">«Gráficos de fondo»</span>: sin esa opción, los fondos de
             color de tarjetas y avisos salen en blanco.
+          </p>
+          <p className="mt-1.5 text-[11px] leading-snug text-slate-600">
+            Desactive <span className="font-semibold">«Encabezados y pies de página»</span>: si queda
+            activada, el navegador imprime en el margen de cada hoja la dirección de esta página y la
+            fecha de impresión.
           </p>
         </div>
       )}

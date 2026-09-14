@@ -133,8 +133,14 @@ chore: actualiza oxlint a 1.83
 docs: registra la decisión sobre escenarios de provisión
 ```
 
-Un commit por unidad lógica de cambio. Un commit que toca el motor, la UI y la plantilla
-a la vez es imposible de revertir sin daño colateral.
+**Un commit por unidad lógica de cambio.** Hace el historial **legible** —cada commit dice qué
+cambió— y **bisecable**: si cada commit compila y pasa pruebas, se puede aislar en cuál apareció un
+defecto. **No garantiza que un parche se pueda revertir aislado** cuando un parche posterior toca
+las mismas líneas. Comprobado el 2026-09-14 con la serie 1.1.1–1.1.4: revertir cualquiera de sus
+commits desde la punta da conflicto en `schema.ts`, `reglas.ts`, `package.json` y la
+documentación, y lo que sale limpio es revertir en orden inverso. Aun así, un conflicto de
+reversión señala las líneas exactas; un commit que mezcla motor, interfaz y plantilla no deja ni
+eso.
 
 ---
 
@@ -387,6 +393,24 @@ Priorizado. Lo de arriba entra primero.
 - **Coherencia entre parámetros.** Verificado por lectura del código, no ejecutado:
   `periodo_fin` anterior a `periodo_inicio` no produce hallazgo. `diasDelPeriodo` devuelve
   null, así que el DSO queda sin calcular, y `periodoDelReporte` pinta el rango al revés.
+- **El nombre propuesto del PDF no distingue el archivo de origen.** Observado el 2026-09-14 en la
+  primera corrida de `/verificar todo`: `nombreArchivoReporte()` (`src/components/impresion.ts`)
+  arma el nombre solo con el periodo y el corte. Dos archivos de origen distintos con el mismo
+  periodo y el mismo corte proponen los dos `Reporte_2026-01-01-a-2026-12-31_2026-09-09`, y Chrome
+  sobrescribe el primero sin avisar. Con multiempresa (v1.2) —dos clientes, mismo día— se vuelve
+  un problema real. Falta decidir qué distingue el nombre.
+- **El texto derecho del encabezado y del pie del PDF no tiene holgura.** Observado el
+  2026-09-14: en las hojas de módulo, «Corte al 09/09/2026 · DEMO_Agrodrones_Bajio_FICTICIO.xlsx»
+  termina a 0.1 pt del límite imprimible. Con un archivo de origen de nombre más largo no cabría.
+  No está verificado qué pasa entonces.
+- **Dos pruebas guardián pueden fallar por el disco y no por el código.** Observado el
+  2026-09-14: «ningun otro archivo lo importa» (`src/dev/__tests__/fixtureDesarrollo.test.ts`) y
+  «solo src/lib/preferencias menciona localStorage»
+  (`src/lib/preferencias/__tests__/preferencias.test.ts`) recorren `src/` leyendo cada archivo de
+  forma síncrona. En el repositorio tardan 0.2–0.3 s. En copias del proyecto bajo `%TEMP%`
+  tardaron hasta 7.4 s y fallaron por el límite de 5 s de vitest («Test timed out in 5000ms»);
+  con 60 s de límite pasaron, con la aserción cumplida. Es la peor clase de prueba frágil: su
+  rojo no dice nada del código, y enseña a ignorar el rojo de las pruebas que sí cuidan algo.
 - Gastos por categoría en el motor, hoy solo agregados.
 - Números de página en el PDF impreso.
 

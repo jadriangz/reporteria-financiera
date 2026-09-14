@@ -603,3 +603,47 @@ valores crudos. El demo tiene sus importes, fechas, porcentajes y días como nú
 válidos, así que las cifras de referencia no se mueven. Es la versión 1.1.4, PARCHE.
 Quedan en el backlog (GOBERNANZA.md §11) las columnas fuera del contrato, la hoja
 `parametros` sin encabezados y la coherencia entre parámetros.
+
+---
+
+## 2026-09-14 — Al guardar el PDF se recomienda desactivar los encabezados y pies del navegador
+
+**Contexto.** La primera corrida de `/verificar todo` guardó el reporte con la casilla
+«Encabezados y pies de página» de Chrome activada. En el margen de cada hoja salieron la fecha y
+hora de impresión («9/14/26, 2:05 AM»), el título, la dirección de la aplicación
+(`localhost:5174/?fixture=demo`) y el número de hoja («4/15»). La aplicación todavía no imprime
+sus propios números de hoja (GOBERNANZA.md §11).
+
+**Decisión.** Se recomienda desactivarla. La recomendación está en `docs/linea-base-pdf.md`
+(«Opciones del diálogo de impresión») y en la ayuda junto al botón «Descargar PDF», y la corrida
+canónica de la línea base se guarda así.
+
+**Alternativa descartada.** Recomendar activarla, porque hoy es lo único que numera las hojas. La
+dirección de la aplicación en el encabezado del reporte de un cliente es peor que perder el número
+de hoja, que ya está en el backlog. Además, la fecha de impresión en el formato del navegador
+compite con la fecha de corte.
+
+**Consecuencia.** El reporte impreso no lleva número de hoja hasta que la aplicación lo imprima.
+Que desactivar la casilla no mueva los saltos de página no está verificado: la corrida que fijó la
+paginación se guardó con la casilla activada.
+
+---
+
+## 2026-09-14 — «Sale en claro» se juzga sobre la hoja completa, y mirando el papel
+
+**Contexto.** Desde v1.1 el invariante «la impresión siempre sale en claro» se daba por
+verificado. Se había comprobado leyendo `data-tema` y los tokens del contenido, no mirando una hoja
+impresa. La primera corrida de `/verificar` que abrió el PDF encontró las 15 hojas pintadas de
+`#121212`, con un rectángulo blanco solo en el área de contenido: el contenido salía claro y la
+hoja no.
+
+**Decisión.** La línea base agrega el invariante «la hoja completa sale en claro, márgenes
+incluidos», y deja escrito cómo se verificaba el anterior.
+
+**Alternativa descartada.** Seguir juzgando el invariante sobre el contenido, que es lo que el
+código controla directamente. El margen también es papel: es lo primero que ve quien recibe el
+reporte, y lo que se imprime en cada hoja.
+
+**Consecuencia.** Un invariante que solo se verifica por código puede estar incumplido sin que
+nadie lo note. El defecto queda abierto, candidato a 1.1.5, y sin diagnosticar: no se sabe si pasa
+también imprimiendo con el tema claro.
