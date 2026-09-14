@@ -23,11 +23,12 @@ describe("version de la aplicacion", () => {
     expect(VERSION).toBe(paquete.version);
   });
 
-  it("hoy es la 1.1.0: interfaz, sin cambios de contrato ni de cifras", () => {
-    // MENOR y no PARCHE porque v1.1 agrega capacidades compatibles hacia atras
-    // —temas, layout responsivo—; MENOR y no MAYOR porque ninguna definicion de
-    // calculo cambio y ninguna cifra reportada se mueve (GOBERNANZA.md §3).
-    expect(VERSION).toBe("1.1.0");
+  it("hoy es la 1.1.1: parche del motor, sin cambio de definiciones", () => {
+    // PARCHE y no MAYOR: el motor por fin excluye las filas Demo escritas «demo»
+    // o «DEMO», como CLAUDE.md siempre especifico. Mueve las cifras de quien las
+    // escribio asi, pero la definicion de calculo no cambio: el codigo la cumple
+    // (GOBERNANZA.md §3; docs/decisiones.md, 2026-09-13). La 1.1.0 fue MENOR.
+    expect(VERSION).toBe("1.1.1");
   });
 
   it("es un semver de tres numeros, sin sufijos", () => {

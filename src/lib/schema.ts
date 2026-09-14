@@ -104,6 +104,16 @@ export function parseNumero(raw: unknown): number | null {
 /** Normaliza claves de agrupación: "  t70p " → "T70P" */
 export const norm = (s: unknown): string => String(s ?? "").trim().replace(/\s+/g, " ").toUpperCase();
 
+/**
+ * Grafía del contrato de un valor de enumeración escrito con otra capitalización
+ * o con espacios de más: " demo " → "Demo". null si no corresponde a ninguna
+ * opción. Compara con `norm()`, la misma normalización con la que agrupa el motor.
+ */
+export function canonizar<T extends string>(opciones: readonly T[], valor: unknown): T | null {
+  const clave = norm(valor);
+  return opciones.find((o) => norm(o) === clave) ?? null;
+}
+
 const zMonto  = z.unknown().transform(parseMonto);
 const zFecha  = z.unknown().transform(parseFecha);
 const zPct    = z.unknown().transform(parsePct);
@@ -114,7 +124,10 @@ const zTexto  = z.unknown().transform((v) => { const s = String(v ?? "").trim();
 export const VentaSchema = z.object({
   folio:          z.unknown().transform((v) => String(v ?? "").trim()).pipe(z.string().min(1, "folio requerido")),
   fecha:          zFecha,
-  linea:          zTexto.transform((v) => (v ?? "Equipo") as (typeof LINEA)[number]),
+  // Grafia del contrato («demo» → "Demo"): el motor compara exacto. Canonizar no
+  // excluye; un valor fuera de la lista se conserva como vino. Ver CLAUDE.md,
+  // «Restricciones aprendidas».
+  linea:          zTexto.transform((v) => (v === null ? "Equipo" : canonizar(LINEA, v) ?? v) as (typeof LINEA)[number]),
   cliente:        zTexto.pipe(z.string({ message: "cliente requerido" })),
   modelo:         zTexto.pipe(z.string({ message: "modelo requerido" })),
   serie:          zTexto,

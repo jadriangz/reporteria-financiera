@@ -410,3 +410,52 @@ sugeriría productos que no vende.
 **Consecuencia.** La plantilla ya no previene los errores de dedo en modelo
 (`T70p` / `T70P`). Los absorbe la normalización a mayúsculas antes de agrupar, que
 ya existía (CLAUDE.md, «Trampas de parseo»).
+
+---
+
+## 2026-09-13 — `linea` se canoniza en el esquema, no en el motor
+
+**Contexto.** Una venta con `linea` escrita «demo» o «DEMO» se contaba como venta,
+mientras el panel de validación afirmaba que se había excluido. La regla del
+validador comparaba sin distinguir mayúsculas; el motor comparaba exacto contra
+`"Demo"` (`base.ts`, `insights.ts`) y nada normalizaba el campo antes. El tipo
+`Dataset` ya declaraba `linea` como enumeración, pero `VentaSchema` solo hacía un
+*cast*: el tipo afirmaba algo que nadie comprobaba.
+
+**Decisión.** `VentaSchema` canoniza `linea` contra `LINEA` con `canonizar()`, que
+compara con `norm()`. La regla `filas-demo` del validador usa la misma función, de
+modo que el panel y el motor no pueden volver a juzgar distinto la misma celda.
+
+**Alternativa descartada.** Normalizar en el motor, comparando `norm(linea)` en
+`base.ts` y en `insights.ts`. Son dos puntos de comparación, y cada consumidor
+futuro tendría que acordarse. El `Dataset` seguiría diciendo «demo» en la interfaz,
+en la exportación a Excel y en el tipo. Y contradice AD-06: el motor recibe el
+esquema canónico, no lo reconstruye.
+
+**Consecuencia.** La frontera de `CLAUDE.md` queda intacta: el parser canoniza la
+grafía y conserva la fila; excluirla sigue siendo trabajo exclusivo del motor. Una
+fuente futura (Odoo) tiene que pasar por el esquema para heredar la corrección. Un
+valor que no es de la lista («Accesorio») se conserva tal como vino, así que el tipo
+todavía miente para esos valores: queda pendiente decidir si son error o advertencia.
+
+---
+
+## 2026-09-13 — Arreglar el código para que cumpla la especificación es PARCHE, aunque mueva cifras
+
+**Contexto.** El arreglo anterior mueve las cifras de cualquier cliente que haya
+escrito «demo»: su costo y su utilidad bruta dejan de incluir una unidad que no
+vendió. La regla crítica de GOBERNANZA.md §3 dice MAYOR cuando un cambio altera un
+número ya reportado, y leída sola lo clasificaría así.
+
+**Decisión.** PARCHE (1.1.1). §3 pide MAYOR cuando cambia una definición de cálculo.
+Aquí la definición no cambió: `CLAUDE.md` siempre dijo que las filas Demo se
+excluyen de todo cálculo de venta, y el código por fin lo hace. Se agregó la
+distinción a §3, con este caso como ejemplo.
+
+**Alternativa descartada.** MAYOR (2.0.0) por el solo hecho de mover cifras.
+Equipararía el arreglo de un defecto con un cambio de criterio y vaciaría de
+significado el número mayor, que existe para avisar que decidimos calcular distinto.
+
+**Consecuencia.** Lo que protege la regla crítica es el criterio, no la cifra. El
+arreglo se anuncia igual, porque un número que el cliente vio cambia, pero no se
+presenta como incompatible.

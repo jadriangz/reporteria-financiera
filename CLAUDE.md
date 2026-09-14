@@ -95,6 +95,12 @@ las "simplifica" sin leer el porqué, rompe el reporte en silencio.
 - **El parser CONSERVA las filas con `linea = "Demo"`.** Excluirlas es trabajo exclusivo
   del motor de cálculo. Si el lector las tira, el motor pierde la capacidad de listarlas
   aparte y el usuario nunca se entera de que existen.
+- **`linea` llega al motor con la grafía del contrato.** `VentaSchema` la canoniza contra
+  `LINEA` sin distinguir mayúsculas ni espacios («demo», « DEMO » → `Demo`), y la regla del
+  validador que anuncia la exclusión usa la misma función (`canonizar`). El motor compara
+  exacto: una fila «demo» se contó como venta mientras el panel afirmaba haberla excluido.
+  Canonizar no es excluir: la fila se conserva, y un valor que no es de la lista se queda
+  como vino.
 - **`fecha_corte` nunca tiene valor por omisión dentro del motor.** Es un campo obligatorio
   de `OpcionesCartera` y `OpcionesInsights`, y ninguna función de `calc/` llama a
   `new Date()`. El default de "hoy" vive en la UI (`hoyUTC()`), no en el cálculo: si el

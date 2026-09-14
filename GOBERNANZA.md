@@ -67,6 +67,19 @@ MAYOR, aunque técnicamente sea un arreglo de una línea. Si el socio vio $1,022
 pasado y hoy la app dice $998,000, eso necesita explicación y número de versión que la
 justifique.
 
+**Lo que decide es qué cambió, no que las cifras se muevan.** Corregir una divergencia
+entre el código y la especificación es **PARCHE**, aunque mueva cifras: la definición que
+el cliente tenía no cambió, el código por fin la cumple. Cambiar la especificación —la
+definición en `CLAUDE.md`— es **MAYOR**. La regla crítica protege al cliente de cambios
+silenciosos de criterio; no obliga a versionar como incompatible el arreglo de un defecto.
+
+*Caso (1.1.1).* `CLAUDE.md` siempre dijo que las filas `linea = "Demo"` se excluyen de todo
+cálculo de venta, pero el motor comparaba exacto contra `"Demo"` y contaba como venta una
+fila escrita «demo», mientras el panel de validación afirmaba que la había excluido. Quien
+la escribió así ve bajar su costo y su utilidad al actualizar. Es PARCHE: la definición es la
+misma, y la cifra anterior estaba mal respecto de ella. El arreglo sí se anuncia, con la
+versión que lo explica.
+
 La versión vive en `package.json` y se muestra en el pie de la aplicación y en el PDF
 exportado. Un reporte sin versión no es auditable.
 

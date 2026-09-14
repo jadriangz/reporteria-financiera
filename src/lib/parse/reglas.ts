@@ -1,6 +1,8 @@
 import {
   type Hallazgo,
+  LINEA,
   type Severidad,
+  canonizar,
   parseFecha,
   parseMonto,
   parsePct,
@@ -426,7 +428,9 @@ const filasDemo: Regla = {
   evaluar(ctx) {
     const out: Hallazgo[] = [];
     for (const f of ctx.ventas) {
-      if (texto(f.valores["linea"]).toLowerCase() !== "demo") continue;
+      // La misma canonizacion que VentaSchema: lo que este panel anuncia como
+      // excluido tiene que ser exactamente lo que el motor excluye.
+      if (canonizar(LINEA, f.valores["linea"]) !== "Demo") continue;
       out.push(
         hallazgo("info", "ventas", `Venta marcada como Demo: se excluye del analisis de venta.`, {
           fila: f.fila,
