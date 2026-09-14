@@ -397,7 +397,7 @@ Priorizado. Lo de arriba entra primero.
   primera corrida de `/verificar todo`: `nombreArchivoReporte()` (`src/components/impresion.ts`)
   arma el nombre solo con el periodo y el corte. Dos archivos de origen distintos con el mismo
   periodo y el mismo corte proponen los dos `Reporte_2026-01-01-a-2026-12-31_2026-09-09`, y Chrome
-  sobrescribe el primero sin avisar. Con multiempresa (v1.2) —dos clientes, mismo día— se vuelve
+  sobrescribe el primero sin avisar. Con multiempresa (v1.4) —dos clientes, mismo día— se vuelve
   un problema real. Falta decidir qué distingue el nombre.
 - **El texto derecho del encabezado y del pie del PDF no tiene holgura.** Observado el
   2026-09-14: en las hojas de módulo, «Corte al 09/09/2026 · DEMO_Agrodrones_Bajio_FICTICIO.xlsx»

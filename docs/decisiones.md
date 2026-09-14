@@ -647,3 +647,36 @@ reporte, y lo que se imprime en cada hoja.
 **Consecuencia.** Un invariante que solo se verifica por código puede estar incumplido sin que
 nadie lo note. El defecto queda abierto, candidato a 1.1.5, y sin diagnosticar: no se sabe si pasa
 también imprimiendo con el tema claro.
+
+---
+
+## 2026-09-14 — La plantilla de Google Sheets se lee solo con el usuario presente, sin servidor
+
+**Contexto.** La fase v1.3 (ROADMAP.md §3) lleva la plantilla a Google Sheets: el cliente la
+clona, la llena en línea y la aplicación la lee después de iniciar sesión con Google. Al plantear
+la fase se supuso el flujo de código de autorización, que intercambia el código en un servidor, y
+se concluyó que rompía «nada sale del navegador». Se verificó en la documentación de Google
+Identity Services que no hace falta. El modelo de tokens entrega el token de acceso directamente
+al navegador, sin servidor ni secreto de cliente, y no emite tokens de actualización. El servidor
+solo hace falta para leer sin el usuario presente.
+
+**Decisión.** En v1.3 la aplicación lee la hoja **solo con el usuario presente**, con el modelo de
+tokens y sin servidor. Tres razones:
+
+1. **Conserva «nada sale del navegador»**, que es la promesa que se le hace al cliente y lo que
+   diferencia al producto.
+2. **Evita custodiar tokens de acceso al Drive de terceros**, una responsabilidad que no conviene
+   adquirir por adelantado.
+3. **El acceso sin el usuario presente solo hace falta para lectura programada.** Eso pertenece
+   al envío automático mensual del backlog, que llega con la persistencia de v1.4.
+
+**Alternativa descartada.** El flujo de código de autorización, con servidor y token de
+actualización, para leer la hoja sin el usuario o recordarla entre sesiones. Rompería el principio
+y adelantaría la custodia de credenciales a una fase que no la necesita.
+
+**Consecuencia.** El token vive solo en memoria. Ni él ni el identificador del archivo se guardan
+(regla 1 de `CLAUDE.md`): en cada sesión el usuario inicia sesión y elige la hoja otra vez, y
+cuando el token vence lo renueva con un gesto. La v1.3 no carga con la sección de seguridad de la
+persistencia, pero sí con el aviso de privacidad y la verificación de la app ante Google, porque
+pide acceso a documentos del cliente. Leer sin el usuario presente sería una decisión nueva que
+reabre esta entrada.

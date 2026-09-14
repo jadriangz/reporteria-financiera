@@ -40,6 +40,7 @@ deliberada y controlada:
 | Principio v1 | Estado en v2 | Razón |
 |---|---|---|
 | Sin backend | **Cambia.** Funciones serverless + base de datos | Persistencia, comparativos, conectores e integración con Banxico lo exigen |
+| Los datos entran desde un archivo del equipo | **Cambia en v1.3, sin romper «nada sale del navegador».** El navegador los lee de Google Sheets con permiso por archivo (`drive.file`) y con el usuario presente | Quitar el ciclo de descarga y subida, y la plantilla editada a mano |
 | Sin almacenamiento en navegador | **Se relaja para preferencias de interfaz** (tema, idioma, layout). Nunca para datos financieros | El tema no es un dato financiero |
 | Motor de cálculo puro y aislado | **Se refuerza** | Es lo que permite cambiar de origen de datos sin reescribir nada |
 | Ausencia de dato ≠ dato en cero | **Se refuerza** | Más orígenes = más huecos posibles |
@@ -47,7 +48,10 @@ deliberada y controlada:
 
 **Consecuencia directa:** desde el momento en que se guardan datos de terceros, el
 proyecto adquiere obligaciones legales (LFPDPPP), contractuales y de seguridad que antes
-no tenía. La fase v1.2 no arranca sin la sección de seguridad resuelta.
+no tenía. La fase de persistencia (v1.4) no arranca sin la sección de seguridad resuelta. La de
+Google Sheets (v1.3) no la necesita: lee solo con el usuario presente, y ningún dato ni token pasa
+por un servidor nuestro. Pero pide acceso a documentos del cliente, así que arranca con aviso de
+privacidad y verificación de la app ante Google.
 
 ---
 
@@ -69,9 +73,82 @@ Mejoras sobre lo existente. Sin cambios de arquitectura, sin persistencia.
   tarjetas, tablas de detalle con scroll horizontal y primera columna fija.
 
 **Salida:** desplegado en producción y usado con el cliente actual. Retroalimentación real
-antes de invertir en v1.2.
+antes de invertir en la persistencia (v1.4).
 
-### v1.2 — Persistencia y comparativos (3–4 semanas)
+### v1.2 — Varias partidas por venta
+
+**Por qué entró aquí.** No estaba en el roadmap: la pidió el negocio real del cliente. Una venta
+incluye un equipo y sus accesorios, y el cliente ya capturaba varias filas con el mismo folio sin
+que nadie se lo pidiera. Es la mejor razón que existe para reordenar un roadmap, y fue **la
+primera vez que el uso real corrigió el diseño**, que es justo lo que la salida de v1.1 esperaba.
+Las fases siguientes conservan su orden y solo cambian de número: persistencia pasa de v1.2 a
+v1.4 y divisas de v1.3 a v1.5, porque detrás de esta entró también Google Sheets (v1.3).
+Decidido el 2026-09-14.
+
+- El folio agrupa partidas dentro de `ventas`, sin hoja nueva. La cabecera va por folio
+  (cliente, días de crédito, condición, vendedor); cada partida es una fila con su fecha de
+  entrega.
+- Los pagos se aplican a las partidas en orden de entrega: lo que queda sin pagar es lo último
+  entregado.
+- Anticipos como información, y su proporción de la cobranza como métrica nueva.
+- Cobro, saldo, antigüedad y ticket por folio; utilidad, margen y producto por partida.
+- Venta cruzada por folio como métrica nueva. El attach rate por cliente se conserva.
+
+**Entrada:** producción en 1.1.4.
+**Salida:** un archivo con varias partidas por folio carga sin rechazar el folio repetido, y la
+suma de tramos, cobrado más saldo y la utilidad por partida cuadran contra sus totales.
+
+### v1.3 — Plantilla en Google Sheets
+
+La plantilla deja de ser un .xlsx que se descarga, se llena y se sube. Es una hoja de Google que
+el cliente clona y llena en línea, y que la aplicación lee directamente después de que el usuario
+inicia sesión con Google.
+
+**Va después de v1.2 a propósito.** El modelo de partidas cambia la estructura de `ventas`:
+construir la plantilla de Sheets antes obligaría a rehacerla.
+
+- **Desaparece el XML editado a mano como categoría de defecto.** Sheets genera sus propios
+  archivos. Con eso se cierran la fragilidad de GOBERNANZA.md §7, la razón por la que no hay
+  generador de plantilla y la deuda de la plantilla v2 sin filas de relleno (§11).
+- **La plantilla trae sus propias defensas:** validación de datos por columna, formato
+  condicional que señale lo que falta o no cuadra, rangos protegidos en las columnas calculadas y
+  hojas de catálogo con búsqueda automática. Es más robusta de lo que Excel permite mantener a
+  mano.
+- **Permiso mínimo.** Alcance `drive.file`: solo da acceso a los archivos que el usuario elige con
+  el selector de Google, nunca lectura de todo su Drive. Google lo clasifica como no sensible y
+  pide solo la verificación básica de la app, sin evaluación de seguridad (documentación de Google,
+  consultada el 2026-09-14).
+- **Encaja con AD-06: Sheets es otro adaptador de origen, como Odoo.** Verificado leyendo
+  `src/lib/parse/readWorkbook.ts`: el lector ya convierte `.xlsx` y `.csv` en una rejilla de
+  celdas antes de construir las hojas, y la API de Sheets (`spreadsheets.values`) entrega esa
+  misma forma. Sus fechas como número de serie cuentan días desde el 30 de diciembre de 1899, la
+  época que el lector ya usa para Excel. Falta exponer como API pública la construcción de hojas
+  desde una rejilla, que hoy es interna. `validate()` y el motor no cambian.
+
+**«Nada sale del navegador» se conserva, mientras la lectura ocurra con el usuario presente.** Es
+la promesa que se le hace al cliente y lo que diferencia al producto. Lo que cambia es de dónde
+entran los datos: ya no de un archivo del equipo, sino de Google, que el navegador consulta con el
+permiso del usuario. El modelo de tokens de Google Identity Services entrega el token de acceso
+directamente al navegador, sin servidor propio ni secreto de cliente, y no emite tokens de
+actualización: cuando vence, se pide otro con un gesto del usuario (documentación de Google,
+consultada el 2026-09-14). **Ningún dato ni token pasa por un servidor nuestro.**
+
+El flujo de código de autorización sí necesita servidor. Solo haría falta para leer la hoja sin el
+usuario presente, y **está descartado para esta fase** (`docs/decisiones.md`, 2026-09-14). La
+lectura programada llega con el envío automático mensual, sobre la persistencia de v1.4.
+
+Aun sin servidor, la responsabilidad crece y deja de ser opcional:
+
+- La aplicación pide acceso a documentos del cliente: aviso de privacidad y verificación de la app
+  OAuth ante Google antes de abrirla a clientes.
+- El token vive solo en memoria. La regla 1 de CLAUDE.md prohíbe guardarlo, y por la misma regla
+  tampoco el identificador del archivo elegido: en cada sesión se vuelve a elegir la hoja.
+
+**Entrada:** v1.2 cerrada y aviso de privacidad redactado.
+**Salida:** un cliente clona la plantilla, la llena en Sheets y la aplicación la lee sin
+descargar ni subir archivos, con los mismos hallazgos de validación que daría el .xlsx.
+
+### v1.4 — Persistencia y comparativos (3–4 semanas)
 
 La fase de mayor retorno por esfuerzo de todo el roadmap.
 
@@ -90,7 +167,7 @@ La fase de mayor retorno por esfuerzo de todo el roadmap.
 **Salida:** un consultor puede administrar tres empresas, comparar periodos y emitir
 reportes cerrados.
 
-### v1.3 — Divisas y volumen histórico (2–3 semanas)
+### v1.5 — Divisas y volumen histórico (2–3 semanas)
 
 - **El tipo de cambio se congela con la transacción, nunca se consulta al reportar.** Un
   reporte de julio debe dar el mismo número hoy y en diciembre. Cada operación guarda
@@ -187,7 +264,9 @@ reescritura**. Ese es el criterio de diseño de toda la v2.0, aunque v3 nunca se
 ### Backlog sin fase asignada
 
 - Envío automático mensual del reporte por correo. Convierte uso esporádico en
-  suscripción: la gente paga por lo que no tiene que acordarse de hacer.
+  suscripción: la gente paga por lo que no tiene que acordarse de hacer. Exige leer los datos
+  sin el usuario presente, así que no puede llegar antes de la persistencia (v1.4): con Google
+  Sheets (v1.3) la lectura ocurre solo con el usuario presente.
 - Alertas por umbral (cliente sobre su límite de crédito, cartera vencida sobre 30%).
 - Plantillas por giro: comercializadora, servicios, manufactura, agropecuario.
 - Números de página en el PDF impreso.
@@ -272,7 +351,7 @@ narrativa de hallazgos, análisis de cartera y provisiones, y formato pensado pa
 o socio no técnico. No competir en reportes operativos, donde Odoo es mejor.
 
 **Custodia de datos financieros de terceros.** Obligaciones LFPDPPP, respaldos, retención,
-borrado y contrato. No se arranca v1.2 sin esto resuelto.
+borrado y contrato. No se arranca la persistencia (v1.4) sin esto resuelto.
 
 **Mercado de reportería genérica saturado** (Power BI, Looker, Fathom, LiveFlow). La
 defensa es el nicho: PyME mexicana con ERP, operada por consultores. Un producto genérico
