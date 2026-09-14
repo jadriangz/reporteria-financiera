@@ -34,8 +34,12 @@ modifica la cifra esperada para que pase la prueba.
 
 ## 2. Estado actual
 
-**v1.1.4.** Qué cambió en cada versión, para quien ya usaba la aplicación, y si sus cifras
-pueden moverse: `docs/notas-version.md`.
+**v1.1.4, en producción desde el 2026-09-14.** Verificado comparando por SHA-256 los archivos que
+sirve `reporteria-financiera.vercel.app` contra el build local del commit fusionado —7 de 7
+idénticos—, y no con el estado del despliegue. El método está en la sección 5, paso 6. Hasta la
+fusión del PR #1, producción servía 1.1.0 aunque la serie 1.1.1–1.1.4 ya estaba terminada: el
+trabajo sin commit no llega al cliente. Qué cambió en cada versión, para quien ya usaba la
+aplicación, y si sus cifras pueden moverse: `docs/notas-version.md`.
 
 **v1.0 — MVP.** Seis módulos de reporte, carga de Excel/CSV, captura manual, exportación a
 Excel, exportación a PDF por impresión del navegador y validación en tres niveles de severidad.
@@ -57,7 +61,8 @@ Excel, exportación a PDF por impresión del navegador y validación en tres niv
 - **Plantilla:** su XML reparado (1,297 filas sin cerrar), sin la lista de modelos del cliente
   de drones y con «Modelo A» como ejemplo.
 
-**v1.1.1 a v1.1.4 — serie de parches del contrato de datos.** Cuatro defectos con la misma
+**v1.1.1 a v1.1.4 — serie de parches del contrato de datos.** Desplegada en producción el
+2026-09-14, con el PR #1 y las etiquetas `v1.1.1` a `v1.1.4`. Cuatro defectos con la misma
 causa: el contrato prometía algo que el esquema no verificaba, y cada consumidor coercionaba
 por su cuenta.
 
@@ -124,6 +129,12 @@ Ramas cortas: si una rama vive más de una semana, el alcance estaba mal definid
 un pull request contra `main` y Vercel genera una URL de preview por rama — esa URL es lo
 que se comparte para revisión, nunca producción.
 
+**Con un solo desarrollador, revisar la vista previa antes de fusionar cumple el propósito del
+PR.** No hay otra persona que lo apruebe. Lo que el PR protege es que nada llegue a `main` sin
+haberse visto funcionando, y eso lo garantiza abrir la vista previa de la rama en un navegador
+real antes de fusionar. El PR se sigue abriendo, porque deja la fusión registrada con su merge
+commit. Así entró la serie 1.1.1–1.1.4 (PR #1, 2026-09-14).
+
 **Mensajes de commit** con prefijo convencional, en español, en imperativo:
 
 ```
@@ -169,6 +180,23 @@ algo que se imprime, y revisión de que las cifras conocidas siguen cuadrando.
 **6. Desplegar y anotar.** Merge a `main`, verificar en producción, y registrar la
 decisión si hubo alguna no obvia (sección 9).
 
+**Verificar en producción es comparar lo servido, no leer un estado.** Que el despliegue diga
+«éxito» no prueba qué se está sirviendo. Hay tres niveles, de menos a más fuerte:
+
+1. **Leer la versión dentro del bundle servido.** Así se descubrió el 2026-09-14 que producción
+   seguía en 1.1.0 cuando la serie 1.1.1–1.1.4 ya estaba terminada.
+2. **Ver que el nombre del bundle (`index-<hash>.js`) coincide** con el del build local del mismo
+   commit. Es un indicio fuerte, porque Vite pone en el nombre un hash del contenido, pero ese
+   hash es corto y no prueba igualdad.
+3. **Bajar `index.html` y cada archivo de `dist/assets/` desde producción y compararlos por
+   SHA-256** contra el build local del commit fusionado. Si todos coinciden, lo servido es
+   exactamente lo que se probó. Así se verificó la 1.1.4 el 2026-09-14: 7 de 7 archivos idénticos.
+
+El build local tiene que salir del mismo árbol que se desplegó, y eso se comprueba primero por
+hash de árbol. Si con el mismo árbol los bytes difieren, no se concluye que el despliegue esté
+mal, porque el entorno de build puede cambiar el resultado: se baja al nivel 1 y se averigua por
+qué.
+
 ---
 
 ## 6. Trabajo con Claude Code
@@ -207,6 +235,11 @@ mal, se sabe exactamente dónde mirar.
 - **Cuando diga que no pudo verificar algo, no tratarlo como verificado.** Verificarlo.
 - **Si una corrección rompe pruebas viejas, revisar si las pruebas codificaban el error.**
   Suele ser el caso. Exigir que explique qué asumía cada una.
+- **En este entorno `set -e` no es confiable.** Las cadenas de comandos llevan una comprobación
+  explícita después de cada paso, que las detiene si falla. Observado el 2026-09-14: en una cadena
+  con `set -euo pipefail`, `git switch main` falló y la cadena siguió. El avance rápido cayó en la
+  rama equivocada, y una comprobación que leía `HEAD` pasó por la razón equivocada. El remoto quedó
+  bien solo porque las etiquetas se crearon con hash explícito.
 
 ### Comandos del proyecto
 
@@ -397,7 +430,7 @@ Priorizado. Lo de arriba entra primero.
   primera corrida de `/verificar todo`: `nombreArchivoReporte()` (`src/components/impresion.ts`)
   arma el nombre solo con el periodo y el corte. Dos archivos de origen distintos con el mismo
   periodo y el mismo corte proponen los dos `Reporte_2026-01-01-a-2026-12-31_2026-09-09`, y Chrome
-  sobrescribe el primero sin avisar. Con multiempresa (v1.2) —dos clientes, mismo día— se vuelve
+  sobrescribe el primero sin avisar. Con multiempresa (v1.4) —dos clientes, mismo día— se vuelve
   un problema real. Falta decidir qué distingue el nombre.
 - **El texto derecho del encabezado y del pie del PDF no tiene holgura.** Observado el
   2026-09-14: en las hojas de módulo, «Corte al 09/09/2026 · DEMO_Agrodrones_Bajio_FICTICIO.xlsx»
