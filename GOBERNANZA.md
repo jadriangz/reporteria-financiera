@@ -34,9 +34,13 @@ modifica la cifra esperada para que pase la prueba.
 
 ## 2. Estado actual
 
-**v1.1.0.** Sobre el MVP de v1.0 —seis módulos de reporte, carga de Excel/CSV, captura
-manual, exportación a Excel, exportación a PDF por impresión del navegador, validación en
-tres niveles de severidad—, v1.1 sumó:
+**v1.1.4.** Qué cambió en cada versión, para quien ya usaba la aplicación, y si sus cifras
+pueden moverse: `docs/notas-version.md`.
+
+**v1.0 — MVP.** Seis módulos de reporte, carga de Excel/CSV, captura manual, exportación a
+Excel, exportación a PDF por impresión del navegador y validación en tres niveles de severidad.
+
+**v1.1.0 — interfaz.** Sin cambios de contrato ni de cifras:
 
 - **Temas claro, oscuro y sistema**, con contraste AA verificado por prueba en los dos y la
   impresión siempre en claro.
@@ -44,7 +48,27 @@ tres niveles de severidad—, v1.1 sumó:
   contenedor, y tablas que eligen entre volverse tarjetas o desplazarse a lo ancho.
 - **Panel de validación con semáforo**: el tono del encabezado resume la severidad antes de
   abrir el detalle.
-- **Tres comandos de proyecto** —`/verificar`, `/terminado` y `/preparar`— (sección 6).
+
+**Después de v1.1.0, sin incremento de versión.** No están en el tag `v1.1.0`:
+
+- **Herramientas y documentación:** los tres comandos de proyecto —`/verificar`, `/terminado`
+  y `/preparar`— (sección 6), el parámetro de desarrollo `?fixture=demo` y la línea base del
+  PDF.
+- **Plantilla:** su XML reparado (1,297 filas sin cerrar), sin la lista de modelos del cliente
+  de drones y con «Modelo A» como ejemplo.
+
+**v1.1.1 a v1.1.4 — serie de parches del contrato de datos.** Cuatro defectos con la misma
+causa: el contrato prometía algo que el esquema no verificaba, y cada consumidor coercionaba
+por su cuenta.
+
+- **v1.1.1:** una fila `linea` «demo» ya no se cuenta como venta.
+- **v1.1.2:** `comision_base` y las seis columnas de lista se canonizan, y lo no reconocido se
+  avisa.
+- **v1.1.3:** la hoja `parametros` se valida como capa.
+- **v1.1.4:** los parámetros sustituidos se ven junto a la cifra y en la portada del PDF, y los
+  números y fechas de las hojas de datos validan su dominio.
+
+La serie deja una restricción en `CLAUDE.md`: toda coerción del contrato vive en el esquema.
 
 Fuera de alcance en v1, por decisión: autenticación, multiusuario, persistencia,
 histórico entre cortes, conexión a Odoo, multimoneda, consolidación de varias empresas.
@@ -321,6 +345,23 @@ posterior: hay que reescribir el historial y rotar lo que se haya expuesto.
 Priorizado. Lo de arriba entra primero.
 
 **Correcciones y deuda**
+- **Quitar las normalizaciones redundantes de los consumidores.** Desde la 1.1.4 toda coerción y
+  toda canonización del contrato vive en el esquema (CLAUDE.md, «Restricciones aprendidas»).
+  Aun así quedan consumidores que vuelven a normalizar valores que ya llegan canónicos:
+  - `tipo` con `trim().toLowerCase()`: `src/lib/calc/resultados.ts:70` y
+    `src/modules/estado-resultados/selectores.ts:294` y `:299`.
+  - `comision_base` con `trim()`: `src/lib/calc/venta.ts:49`.
+  - `categoria` y `subcategoria` con `trim()`: `selectores.ts:385-386`.
+
+  Hoy no producen ningún error. El riesgo es otro: mientras exista normalización fuera del
+  esquema, alguien puede creer que ahí es donde va y reintroducir la divergencia que costó
+  cuatro parches. Quitarlas es lo que convierte la restricción en algo que el código sostiene,
+  y no solo el documento. Toca el motor, así que va con sus pruebas y sin mover cifras.
+- **Avisar de importes negativos en `precio_venta` y `costo_unitario`.** Decidido el
+  2026-09-14: no son decisiones de negocio válidas, sino errores de captura o de signo. Hoy se
+  aceptan sin aviso: «-500» se lee como −$500. Los importes negativos de `cobranza.monto` se
+  quedan sin aviso a propósito, porque pueden ser notas de crédito. La severidad se decide al
+  implementarlo, con el criterio de consecuencia (`docs/decisiones.md`, 2026-09-14).
 - Plantilla v2 con hojas como tablas de Excel, para eliminar las filas de relleno con
   fórmulas y el renglón de nota que el lector tiene que descartar. Ese rediseño hay que hacerlo
   igual, y es el momento de decidir con qué herramienta se genera la plantilla, que hoy se
@@ -336,6 +377,16 @@ Priorizado. Lo de arriba entra primero.
   sustituyeron con celdas `inlineStr`. No se borran antes. Renumerar las referencias de todas
   las hojas para quitar texto que nadie ve es riesgo sin beneficio, y es la misma clase de
   cirugía que dejó 1,297 filas sin cerrar.
+- **Columnas fuera del contrato en las hojas de datos.** Verificado el 2026-09-14 ejecutándolo:
+  una columna `descuento` con valores en `ventas` se descarta sin ningún hallazgo. El esquema
+  la ignora y ninguna regla la mira. Falta avisar de toda columna con datos que no sea del
+  contrato, con hoja y nombre.
+- **`parametros` sin fila de encabezados.** Verificado ejecutándolo: si el cliente borra la
+  fila `parametro | valor | nota`, el lector toma la primera fila de datos por encabezado y su
+  valor se pierde en silencio. `provision_91_180` «30%» en la fila 1 aplicó 25% sin aviso.
+- **Coherencia entre parámetros.** Verificado por lectura del código, no ejecutado:
+  `periodo_fin` anterior a `periodo_inicio` no produce hallazgo. `diasDelPeriodo` devuelve
+  null, así que el DSO queda sin calcular, y `periodoDelReporte` pinta el rango al revés.
 - Gastos por categoría en el motor, hoy solo agregados.
 - Números de página en el PDF impreso.
 

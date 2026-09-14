@@ -5,6 +5,7 @@ import { fecha as formatearFecha } from "../lib/format";
 import { COMISION_BASE } from "../lib/schema";
 import { etiquetaOrigen, totalCapturas } from "../lib/captura";
 import { MODULOS, type ModoImpresion, useAppStore } from "../store/useAppStore";
+import { AvisoParametros, PARAMETROS_DE } from "./AvisoParametros";
 import { BotonExcel } from "./captura/BotonExcel";
 import { SelectorTema } from "./SelectorTema";
 import { Boton } from "./ui/primitivas";
@@ -136,6 +137,12 @@ export function BarraSuperior() {
             <span className="cifras">{formatearFecha(parametros.fechaCorte)}</span>. Estos
             parámetros solo aplican a las filas que no los traen capturados.
           </p>
+          <div className="basis-full">
+            <AvisoParametros
+              claves={[...PARAMETROS_DE.provision, ...PARAMETROS_DE.comision]}
+              efecto="Ajuste el valor aquí para fijarlo; al hacerlo, su aviso desaparece."
+            />
+          </div>
         </div>
       )}
     </header>

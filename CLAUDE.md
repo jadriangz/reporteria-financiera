@@ -62,9 +62,12 @@ Llave de relación: `ventas.folio` ←→ `cobranza.folio_venta`.
 ### Trampas de parseo (documentadas, ya nos costaron)
 
 - **Importes en formato europeo**: `$ 444.800,00` → punto es separador de miles, coma es
-  decimal. Normalizar: quitar `$` y espacios, quitar `.`, cambiar `,` por `.`.
+  decimal. Normalizar: quitar `$` y espacios, quitar `.`, cambiar `,` por `.`. Un texto con
+  otra gramática (`1,234.56`, `1234.56`, `1.50`) **no se adivina**: se rechaza como importe
+  ilegible. Normalizado con la regla de arriba valdría $1.23, $123,456 y $150, sin aviso.
 - **Fechas en `dd/mm/aaaa`**. JavaScript las interpreta como `mm/dd`. Parsear explícitamente,
-  nunca con `new Date(string)`.
+  nunca con `new Date(string)`. El serial de Excel se toma sin la hora, y una fecha fuera de
+  1990–2100 no se lee: un serial 45 sería el 13 de febrero de 1900.
 - Valores basura esperados en celdas numéricas: `N/a`, `N/A`, `-`, `` (vacío), `$ - `.
 - Espacios sobrantes en nombres de cliente y modelo → `.trim()` siempre.
 - Modelos con distinta capitalización (`T70p` / `T70P`) deben normalizarse a mayúsculas
@@ -79,13 +82,17 @@ Llave de relación: `ventas.folio` ←→ `cobranza.folio_venta`.
 Al cargar, mostrar un **panel de resultados de validación** con tres niveles:
 
 - **Error** (bloquea el módulo afectado): folio duplicado, `cobranza.folio_venta` sin venta
-  correspondiente, monto no numérico, fecha inválida.
+  correspondiente, monto que no se puede leer (incluido un importe con otra gramática que la
+  europea), fecha inválida o fuera de 1990–2100.
 - **Advertencia** (no bloquea): fila sin fecha, venta sin `dias_credito`, abono que excede el
   precio de venta, margen exactamente uniforme en más del 80% de las filas, valor de una
   columna de lista que no es ninguna de sus opciones (se toma como celda vacía y se dice qué
   se aplicó), parámetro capturado que no se puede leer, con un nombre que no es del
   contrato, repetido o sin nombre (se aplica su valor por omisión o se ignora, y se dice
-  qué se capturó, qué se aplicó y qué formatos se aceptan).
+  qué se capturó, qué se aplicó y qué formatos se aceptan; si el parámetro mueve cifras, el aviso
+  aparece además junto a la cifra y en el bloque Alcance de la portada del PDF), `dias_credito`
+  que no es un entero no negativo (se mide por antigüedad, como sin `dias_credito`), porcentaje
+  que no se puede leer o fuera de 0–100% (la venta va sin comisión, como con la celda vacía).
 - **Info**: filas ignoradas por estar vacías, filas con `linea = "Demo"` excluidas del análisis.
 
 Cada mensaje debe indicar **hoja, número de fila y qué corregir**. Un validador que solo dice
@@ -119,6 +126,28 @@ las "simplifica" sin leer el porqué, rompe el reporte en silencio.
   capturó, qué se aplicó y qué formatos se aceptan. Una clave desconocida, repetida o un valor
   sin nombre también se avisan. Los parámetros son lo único que el usuario configura a mano:
   un 30% leído como 25% sin aviso es su decisión descartada en silencio.
+- **Toda coerción y toda canonización del contrato vive en el esquema (`src/lib/schema.ts`), y
+  ningún consumidor interpreta valores crudos.** El motor, los selectores y la interfaz reciben
+  el dataset ya coercionado y no vuelven a leer lo que el usuario escribió. El validador sí mira
+  la celda cruda, pero solo para preguntarle al esquema si pudo leerla, nunca con una coerción
+  propia; `src/lib/parse/parametros.ts` solo elige qué coerción del esquema lee cada parámetro y
+  redacta los mensajes. Los cuatro defectos de la serie 1.1.1–1.1.4 fueron **el mismo error de
+  diseño**: el contrato prometía algo que el esquema no verificaba, y cada consumidor coercionaba
+  por su cuenta.
+  1. **`linea` «demo» (1.1.1).** El validador comparaba sin mayúsculas y el motor exacto: el
+     panel decía «excluida» y el motor la contaba como venta.
+  2. **`comision_base` «utilidad» (1.1.2).** El motor comparaba exacto y cobraba la comisión
+     sobre el precio; `comision_base_default` no reconocido caía a «Venta» sin aviso.
+  3. **La hoja `parametros` (1.1.3).** `validate()` coercionaba cada parámetro con su propia
+     regla y lo ilegible caía a su valor por omisión en silencio: «30%» se aplicaba como 25%.
+  4. **Las hojas de datos (1.1.4).** `dias_credito` con `Number()`: «30dias» entraba al dataset
+     como NaN, y «-5» o «30.5» se usaban tal cual en el aging. El motor protegía el aging contra
+     NaN por su cuenta, que es justo el patrón. También `comision_pct` sin rango (150%),
+     importes con otra gramática leídos en silencio («1,234.56» como $1.23) y seriales de fecha
+     sin rango ni hora (45 → 1900).
+
+  Ampliar el contrato es ampliar el esquema. Una lectura nueva escrita en otro lugar sería el
+  quinto caso.
 - **`fecha_corte` nunca tiene valor por omisión dentro del motor.** Es un campo obligatorio
   de `OpcionesCartera` y `OpcionesInsights`, y ninguna función de `calc/` llama a
   `new Date()`. El default de "hoy" vive en la UI (`hoyUTC()`), no en el cálculo: si el

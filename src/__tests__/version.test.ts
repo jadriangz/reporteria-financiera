@@ -23,14 +23,15 @@ describe("version de la aplicacion", () => {
     expect(VERSION).toBe(paquete.version);
   });
 
-  it("hoy es la 1.1.3: parche, sin cambio de definiciones", () => {
+  it("hoy es la 1.1.4: parche que cierra la serie del contrato", () => {
     // PARCHE y no MAYOR (GOBERNANZA.md §3; docs/decisiones.md): el codigo deja
     // de contradecir lo que el contrato promete, sin cambiar ninguna definicion.
     // La 1.1.1 excluyo las filas «demo»; la 1.1.2 corrigio la base de comision y
-    // los valores de lista no reconocidos; la 1.1.3 lee la hoja parametros como
-    // capa y deja de descartar en silencio lo que no entiende. Todas mueven
-    // cifras de quien escribio asi.
-    expect(VERSION).toBe("1.1.3");
+    // los valores de lista; la 1.1.3 leyo la hoja parametros como capa; la 1.1.4
+    // lleva las sustituciones hasta la cifra y el PDF, y valida el dominio de los
+    // numeros y fechas de las hojas de datos. Todas mueven cifras de quien
+    // escribio asi.
+    expect(VERSION).toBe("1.1.4");
   });
 
   it("es un semver de tres numeros, sin sufijos", () => {

@@ -264,4 +264,17 @@ describe("periodo y alcance", () => {
     expect(a.noIncluye.join(" ")).toContain("sin hoja gastos");
     expect(a.noIncluye.join(" ")).not.toContain("Días de crédito");
   });
+
+  it("sin sustituciones no hay lista de parametros no leidos: con el demo, la portada no la muestra", () => {
+    expect(alcanceDelReporte(fixture, calculos).parametrosNoLeidos).toEqual([]);
+  });
+
+  it("cada parametro sustituido va al alcance, que es lo que viaja en la portada del PDF", () => {
+    const a = alcanceDelReporte(fixture, calculos, [
+      { clave: "provision_91_180", capturado: "cincuenta", aplicado: "25% (valor por omisión)", fila: 10 },
+    ]);
+    expect(a.parametrosNoLeidos).toEqual([
+      "En la hoja parámetros, provision_91_180 dice «cincuenta», que no se pudo leer: se aplica 25% (valor por omisión).",
+    ]);
+  });
 });

@@ -40,7 +40,15 @@ Solo existe en el reporte completo. Debe traer, en este orden:
   generador**. Un reporte sin versión no es auditable (GOBERNANZA.md, sección 3)
 - Bloque **Alcance**, que es la sección de limitaciones y supuestos. GOBERNANZA.md, sección 12:
   nunca se entrega un reporte sin ella. Si falta, es regresión, no detalle
-- Nota de IVA, cuando el hallazgo `importes-iva` se dispara
+- Dentro del Alcance, la lista **«Parámetros que no se pudieron leer»**, solo cuando algún
+  parámetro capturado no se pudo leer y el usuario no lo ajustó desde la interfaz. Cada renglón
+  dice qué se capturó y qué valor se aplicó en su lugar. Es lo único que le dice a quien recibe
+  el papel con qué tasa se calculó, porque el panel de validación no viaja con el documento. Si
+  el periodo es uno de ellos, su aviso aparece además en la ficha, bajo «Periodo».
+  **Con el demo no debe aparecer**: sus parámetros están bien escritos. Si aparece, algo dejó de
+  leerlos
+- Nota de IVA, cuando el hallazgo `importes-iva` se dispara; si un parámetro de IVA no se pudo
+  leer, lleva su aviso debajo
 
 ### 2. Una página por módulo
 

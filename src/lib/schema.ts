@@ -25,29 +25,50 @@ export const MONEDA_BASE = ["MXN"] as const;
 
 const BASURA = new Set(["", "-", "n/a", "na", "nd", "null", "undefined", "$-", "$ -"]);
 
+/** Un importe escrito como texto: el punto agrupa de tres en tres y la coma es decimal. */
+const IMPORTE_EUROPEO = /^-?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d+)?$/;
+
 /**
  * Importes en formato europeo: "$ 444.800,00" → 44480000 (centavos).
  * El punto es separador de miles y la coma es decimal.
- * Devuelve null para celdas vacías o basura conocida.
+ *
+ * Devuelve null para celdas vacías, basura conocida y todo texto que no sea de ese
+ * formato. "1,234.56", "1234.56" y "1.50" se leían en silencio como 1.23, 123 456
+ * y 150 pesos. No se adivina el formato: se rechaza, y el validador lo dice.
  */
 export function parseMonto(raw: unknown): number | null {
-  if (typeof raw === "number") return Math.round(raw * 100);
+  if (typeof raw === "number") return Number.isFinite(raw) ? Math.round(raw * 100) : null;
   if (raw == null) return null;
   const s = String(raw).replace(/\s|\u00A0|\$/g, "");
   if (BASURA.has(s.toLowerCase())) return null;
+  if (!IMPORTE_EUROPEO.test(s)) return null;
   const n = Number(s.replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) ? Math.round(n * 100) : null;
 }
 
+/** Años que puede tener una fecha del contrato. Fuera de rango es un número en la celda equivocada. */
+export const ANIO_MINIMO = 1990;
+export const ANIO_MAXIMO = 2100;
+
+function dentroDeRango(d: Date): Date | null {
+  if (Number.isNaN(d.getTime())) return null;
+  const anio = d.getUTCFullYear();
+  return anio >= ANIO_MINIMO && anio <= ANIO_MAXIMO ? d : null;
+}
+
 /**
  * Fechas en dd/mm/aaaa. NUNCA usar new Date(string): interpreta mm/dd.
- * Acepta también el serial numérico de Excel.
+ *
+ * Acepta también el serial numérico de Excel, sin la hora: una celda de fecha y
+ * hora (45000.75) es el día 45000, no las 18:00 de ese día. Fuera de 1990–2100
+ * devuelve null: un serial 45 sería el 13 de febrero de 1900.
  */
 export function parseFecha(raw: unknown): Date | null {
-  if (raw instanceof Date) return raw;
+  if (raw instanceof Date) return dentroDeRango(raw);
   if (typeof raw === "number") {
+    if (!Number.isFinite(raw)) return null;
     // Serial de Excel, base 1899-12-30
-    return new Date(Date.UTC(1899, 11, 30) + raw * 86_400_000);
+    return dentroDeRango(new Date(Date.UTC(1899, 11, 30) + Math.floor(raw) * 86_400_000));
   }
   if (raw == null) return null;
   const s = String(raw).trim();
@@ -60,18 +81,30 @@ export function parseFecha(raw: unknown): Date | null {
   if (d == null || mo == null || y == null) return null;
   const yy = y.length === 2 ? 2000 + Number(y) : Number(y);
   const dt = new Date(Date.UTC(yy, Number(mo) - 1, Number(d)));
-  return dt.getUTCMonth() === Number(mo) - 1 ? dt : null;
+  return dt.getUTCMonth() === Number(mo) - 1 ? dentroDeRango(dt) : null;
 }
 
-/** Porcentajes: "20,00%" | "20%" | 0.2 | 20 → 0.20 */
+/**
+ * Porcentajes: "20,00%" | "20%" | 0.2 | 20 → 0.20.
+ *
+ * Un número mayor que 1 se lee como por ciento ("30" es 30%, nunca 3000%); uno
+ * entre 0 y 1, como fracción; con signo %, siempre por ciento. Fuera de 0–100%
+ * devuelve null: "150" no es una comisión ni una provisión.
+ */
 export function parsePct(raw: unknown): number | null {
   if (raw == null) return null;
-  if (typeof raw === "number") return raw > 1 ? raw / 100 : raw;
-  const s = String(raw).trim();
-  if (BASURA.has(s.toLowerCase())) return null;
-  const n = Number(s.replace("%", "").replace(",", "."));
-  if (!Number.isFinite(n)) return null;
-  return s.includes("%") || n > 1 ? n / 100 : n;
+  let valor: number;
+  if (typeof raw === "number") {
+    if (!Number.isFinite(raw)) return null;
+    valor = raw > 1 ? raw / 100 : raw;
+  } else {
+    const s = String(raw).trim();
+    if (BASURA.has(s.toLowerCase())) return null;
+    const n = Number(s.replace("%", "").replace(",", "."));
+    if (!Number.isFinite(n)) return null;
+    valor = s.includes("%") || n > 1 ? n / 100 : n;
+  }
+  return valor >= 0 && valor <= 1 ? valor : null;
 }
 
 /**
@@ -101,6 +134,24 @@ export function parseNumero(raw: unknown): number | null {
   if (BASURA.has(s.toLowerCase())) return null;
   const n = Number(s.replace(",", "."));
   return Number.isFinite(n) ? n : null;
+}
+
+/** Días: entero no negativo. "30dias", "-5" o "30.5" devuelven null, nunca NaN. */
+export function parseEnteroNoNegativo(raw: unknown): number | null {
+  const n = parseNumero(raw);
+  return n !== null && Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+/** Número mayor que cero, como un tipo de cambio. */
+export function parsePositivo(raw: unknown): number | null {
+  const n = parseNumero(raw);
+  return n !== null && n > 0 ? n : null;
+}
+
+/** Texto libre: sin espacios sobrantes, y null si queda vacío. */
+export function parseTexto(raw: unknown): string | null {
+  const s = String(raw ?? "").trim();
+  return s === "" ? null : s;
 }
 
 /** Normaliza claves de agrupación: "  t70p " → "T70P" */
@@ -176,7 +227,8 @@ export const VentaSchema = z.object({
   precio_venta:   zMonto,
   comision_pct:   zPct,
   comision_base:  zLista(ENUMERACIONES.ventas.comision_base),
-  dias_credito:   z.unknown().transform((v) => (v == null || v === "" ? null : Number(v))),
+  // Entero no negativo o null, nunca NaN: con Number(), "30dias" llegaba al aging como NaN.
+  dias_credito:   z.unknown().transform(parseEnteroNoNegativo),
   condicion:      zLista(ENUMERACIONES.ventas.condicion),
   vendedor:       zTexto,
   notas:          zTexto,

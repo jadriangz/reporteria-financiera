@@ -1,13 +1,17 @@
 import {
+  ANIO_MAXIMO,
+  ANIO_MINIMO,
   COMISION_BASE,
   MONEDA_BASE,
   type Parametros,
   ParametrosSchema,
   canonizar,
   parseBool,
+  parseEnteroNoNegativo,
   parseFecha,
-  parseNumero,
   parsePct,
+  parsePositivo,
+  parseTexto,
 } from "../schema";
 
 import type { RawCelda } from "./tipos";
@@ -20,22 +24,39 @@ import type { RawCelda } from "./tipos";
  * silencio en un valor por omision que nadie eligio: quien decidio provisionar
  * al 30% veria un reporte al 25% sin que nada se lo dijera.
  *
- * Cada parametro declara aqui como se lee y que formatos acepta. `validate()` lee
- * con esta declaracion y la regla `parametro-no-reconocido` avisa con esta misma
- * declaracion, asi que lo que se aplica y lo que se avisa no pueden divergir.
- * Ver docs/decisiones.md (2026-09-14).
+ * Aqui no se coerciona nada: toda coercion vive en el esquema (CLAUDE.md,
+ * «Restricciones aprendidas»). Cada parametro elige cual de las del esquema lo
+ * lee, y se redacta que formatos acepta y que se aplica si no se puede leer.
+ * `validate()` lee con esta declaracion y la regla `parametro-no-reconocido`
+ * avisa con esta misma declaracion. Ver docs/decisiones.md (2026-09-14).
  */
 
 /** Lo que se aplica cuando un parametro esta vacio o no se pudo leer. */
 export const PARAMETROS_POR_OMISION: Parametros = ParametrosSchema.parse({});
 
 export interface LecturaParametro<T> {
-  /** El valor interpretado, o null si lo capturado no se puede leer. Nunca recibe una celda vacia. */
+  /** La coercion del esquema que lo lee: null si lo capturado no se puede leer. Nunca recibe una celda vacia. */
   readonly leer: (crudo: RawCelda) => T | null;
   /** Que formatos se aceptan, dicho para quien captura. Completa la frase "Escriba ...". */
   readonly formatos: string;
-  /** Lo que se aplica si no se puede leer, dicho para quien captura. Completa "se aplica ...". */
+  /** Lo que se aplica si no se puede leer, dicho para quien lee. Completa "se aplica ...". */
   readonly porOmision: string;
+}
+
+/** Un parametro capturado que no se pudo leer, con lo que se aplico en su lugar. */
+export interface ParametroSustituido {
+  readonly clave: keyof Parametros;
+  /** Lo que decia la celda, sin espacios sobrantes. */
+  readonly capturado: string;
+  /** Lo que se aplico, dicho para quien lee: "25% (valor por omisión)". */
+  readonly aplicado: string;
+  /** Fila de la hoja parametros, o null si no se conoce. */
+  readonly fila: number | null;
+}
+
+/** La frase de una sustitucion: la usan el aviso junto a la cifra y la portada del PDF. */
+export function textoSustitucion(s: ParametroSustituido): string {
+  return `En la hoja parámetros, ${s.clave} dice «${s.capturado}», que no se pudo leer: se aplica ${s.aplicado}.`;
 }
 
 type Lecturas = { readonly [K in keyof Parametros]-?: LecturaParametro<NonNullable<Parametros[K]>> };
@@ -46,32 +67,22 @@ export function sinCapturar(crudo: RawCelda | undefined): boolean {
 }
 
 /**
- * La regla de los porcentajes: la misma de `comision_pct` en ventas (`parsePct`),
- * y la que documentan la hoja INSTRUCCIONES y las notas de `parametros` en la
- * plantilla. El caso ambiguo se resuelve asi: un numero mayor que 1 se lee como
- * por ciento ("30" es 30%, nunca 3000%); uno entre 0 y 1, como fraccion ("0.30"
- * es 30%); con el signo %, siempre por ciento. "1" solo es 100%.
+ * La regla de los porcentajes, tal como la aplica `parsePct` y la documentan la
+ * hoja INSTRUCCIONES y las notas de `parametros` en la plantilla.
  */
 export const REGLA_PORCENTAJE =
-  "30%, 30, 0.30 o 0,30 valen lo mismo; un numero mayor que 1 se lee como por ciento, " +
+  "30%, 30, 0.30 o 0,30 valen lo mismo; un número mayor que 1 se lee como por ciento, " +
   "y 1 solo es 100% (para uno por ciento escriba 1%)";
 
-/** Anios que puede tener una fecha de periodo. Un serial fuera de rango es un numero en la celda equivocada. */
-const ANIO_MINIMO = 1990;
-const ANIO_MAXIMO = 2100;
-
-const NINGUNO = "ningun valor: queda vacio, como si no se hubiera capturado";
-const omision = (valor: string): string => `${valor} (valor por omision)`;
+const NINGUNO = "ningún valor: queda vacío, como si no se hubiera capturado";
+const omision = (valor: string): string => `${valor} (valor por omisión)`;
 const porciento = (v: number): string => `${Number((v * 100).toFixed(4))}%`;
 const ddmmaaaa = (d: Date): string =>
   `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
 
 function textoLibre(porOmision: string | null): LecturaParametro<string> {
   return {
-    leer: (crudo) => {
-      const s = String(crudo ?? "").trim();
-      return s === "" ? null : s;
-    },
+    leer: parseTexto,
     formatos: "cualquier texto",
     porOmision: porOmision === null ? NINGUNO : omision(`"${porOmision}"`),
   };
@@ -87,19 +98,16 @@ function lista<T extends string>(opciones: readonly T[], porOmision: T): Lectura
 
 function siNo(porOmision: boolean | null): LecturaParametro<boolean> {
   return {
-    leer: (crudo) => parseBool(crudo),
-    formatos: "SI o NO (tambien se acepta Si, si, true, false, 1 o 0)",
+    leer: parseBool,
+    formatos: "SI o NO (también se acepta Sí, si, true, false, 1 o 0)",
     porOmision:
-      porOmision === null ? "ningun valor: la pregunta queda sin contestar" : omision(porOmision ? "SI" : "NO"),
+      porOmision === null ? "ningún valor: la pregunta queda sin contestar" : omision(porOmision ? "SI" : "NO"),
   };
 }
 
 function porcentaje(porOmision: number): LecturaParametro<number> {
   return {
-    leer: (crudo) => {
-      const n = parsePct(crudo);
-      return n !== null && n >= 0 && n <= 1 ? n : null;
-    },
+    leer: parsePct,
     formatos: `un porcentaje entre 0% y 100%: ${REGLA_PORCENTAJE}`,
     porOmision: omision(porciento(porOmision)),
   };
@@ -107,35 +115,24 @@ function porcentaje(porOmision: number): LecturaParametro<number> {
 
 function fecha(porOmision: Date | null): LecturaParametro<Date> {
   return {
-    leer: (crudo) => {
-      const f = parseFecha(crudo);
-      if (f === null || Number.isNaN(f.getTime())) return null;
-      const anio = f.getUTCFullYear();
-      return anio >= ANIO_MINIMO && anio <= ANIO_MAXIMO ? f : null;
-    },
-    formatos: "una fecha dd/mm/aaaa, como 31/12/2026, o una celda con formato de fecha de Excel",
+    leer: parseFecha,
+    formatos: `una fecha dd/mm/aaaa, como 31/12/2026, o una celda con formato de fecha de Excel, entre ${ANIO_MINIMO} y ${ANIO_MAXIMO}`,
     porOmision: porOmision === null ? NINGUNO : omision(ddmmaaaa(porOmision)),
   };
 }
 
 function diasEnteros(porOmision: number | null): LecturaParametro<number> {
   return {
-    leer: (crudo) => {
-      const n = parseNumero(crudo);
-      return n !== null && Number.isInteger(n) && n >= 0 ? n : null;
-    },
-    formatos: "un numero entero de dias, sin texto: 30",
+    leer: parseEnteroNoNegativo,
+    formatos: "un número entero de días, sin texto: 30",
     porOmision: porOmision === null ? NINGUNO : omision(String(porOmision)),
   };
 }
 
 function mayorQueCero(porOmision: number | null): LecturaParametro<number> {
   return {
-    leer: (crudo) => {
-      const n = parseNumero(crudo);
-      return n !== null && n > 0 ? n : null;
-    },
-    formatos: "un numero mayor que cero, con punto o coma decimal y sin texto: 17.50 o 17,50",
+    leer: parsePositivo,
+    formatos: "un número mayor que cero, con punto o coma decimal y sin texto: 17.50 o 17,50",
     porOmision: porOmision === null ? NINGUNO : omision(String(porOmision)),
   };
 }

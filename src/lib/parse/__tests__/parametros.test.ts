@@ -191,5 +191,17 @@ describe("la hoja parametros: ningun valor capturado se descarta sin un hallazgo
     );
     expect(avisosDeParametros(demo)).toEqual([]);
     expect(avisosDeParametros(vacia)).toEqual([]);
+    expect(demo.sustituciones).toEqual([]);
+    expect(vacia.sustituciones).toEqual([]);
+  });
+
+  it("validate entrega como datos cada sustitucion que avisa, con lo capturado y lo aplicado", () => {
+    const r = cargar([["provision_91_180", "cincuenta"], ["tasa_iva", "16%"], ["periodo_inicio", "2026-01-01"]]);
+    expect(r.sustituciones).toEqual([
+      { clave: "periodo_inicio", capturado: "2026-01-01", aplicado: LECTURAS.periodo_inicio.porOmision, fila: 4 },
+      { clave: "provision_91_180", capturado: "cincuenta", aplicado: LECTURAS.provision_91_180.porOmision, fila: 2 },
+    ]);
+    // El panel y la interfaz salen de la misma lista: un aviso por sustitucion.
+    expect(avisosDeParametros(r).map((h) => h.campo)).toEqual(r.sustituciones.map((s) => s.clave));
   });
 });

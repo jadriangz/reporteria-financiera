@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { type ReactNode, useMemo } from "react";
 
+import { AvisoParametros, PARAMETROS_DE } from "../../components/AvisoParametros";
 import { Callout, type TonoCallout } from "../../components/ui/Callout";
 import { TablaCifras } from "../../components/ui/TablaCifras";
 import { RejillaKPI, TarjetaKPI } from "../../components/ui/TarjetaKPI";
@@ -50,6 +51,7 @@ export function ModuloEstadoResultados({ calculos }: { calculos: Calculos }) {
           {insights.map((i) => (
             <Callout key={i.id} titulo={i.titulo} tono={i.nivel}>
               {i.detalle}
+              {i.id === "importes-iva" && <AvisoParametros claves={PARAMETROS_DE.iva} />}
             </Callout>
           ))}
         </div>
@@ -101,6 +103,10 @@ function CascadaPeriodo({ calculos }: { calculos: Calculos }) {
   return (
     <div className="max-w-2xl">
       <TablaCascada cascada={resultados.total} />
+      <AvisoParametros
+        claves={PARAMETROS_DE.comision}
+        efecto="Afecta la comisión de las ventas que no traen base de comisión propia."
+      />
       <Nota>
         El resultado resta únicamente los gastos capturados: no es utilidad neta auditada. No
         incluye impuestos, depreciación ni gastos que falten por capturar.

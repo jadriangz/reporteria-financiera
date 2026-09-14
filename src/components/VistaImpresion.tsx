@@ -6,8 +6,9 @@ import { fecha } from "../lib/format";
 import { TEMA_IMPRESION, atributosTema } from "../lib/tema";
 import { ListaAlcance } from "../modules/resumen";
 import { alcanceDelReporte, periodoDelReporte, textoPeriodo } from "../modules/resumen/selectores";
-import { type Calculos, type ModoImpresion, useAppStore } from "../store/useAppStore";
+import { type Calculos, type ModoImpresion, sustitucionesVigentes, useAppStore } from "../store/useAppStore";
 import { ETIQUETA_VERSION } from "../version";
+import { AvisoParametros, PARAMETROS_DE } from "./AvisoParametros";
 import { ContenidoModulo } from "./ContenidoModulo";
 import { NombreCliente } from "./NombreCliente";
 import { type ModuloOmitido, nombreArchivoReporte, planImpresion, tituloModulo } from "./impresion";
@@ -215,6 +216,8 @@ function Portada({
   textoDePeriodo: string;
 }) {
   const dataset = useAppStore((s) => s.dataset);
+  const sustituciones = useAppStore((s) => s.sustituciones);
+  const ajustados = useAppStore((s) => s.ajustados);
   const iva = calculos.insights.find((i) => i.id === "importes-iva");
   const cliente = dataset?.parametros.nombre_cliente ?? null;
 
@@ -235,7 +238,10 @@ function Portada({
           <NombreCliente nombre={cliente} />
         </dd>
         <dt className="font-semibold">Periodo</dt>
-        <dd className="cifras">{textoDePeriodo}</dd>
+        <dd>
+          <span className="cifras">{textoDePeriodo}</span>
+          <AvisoParametros claves={PARAMETROS_DE.periodo} />
+        </dd>
         <dt className="font-semibold">Fecha de corte</dt>
         <dd className="cifras">{fecha(calculos.cartera.fechaCorte)}</dd>
         <dt className="font-semibold">Archivo de origen</dt>
@@ -244,15 +250,25 @@ function Portada({
         <dd className="cifras">{ETIQUETA_VERSION}</dd>
       </dl>
 
+      {/*
+        EL BLOQUE MAS IMPORTANTE DE LA SERIE. El panel de validacion no viaja con
+        el documento: si un parametro no se pudo leer, la unica manera de que el
+        socio que recibe el PDF sepa con que tasa se calculo es que lo diga aqui.
+      */}
       <div className="mt-8">
         <p className="text-sm font-semibold text-marino">Alcance</p>
-        {dataset !== null && <ListaAlcance alcance={alcanceDelReporte(dataset, calculos)} />}
+        {dataset !== null && (
+          <ListaAlcance
+            alcance={alcanceDelReporte(dataset, calculos, sustitucionesVigentes({ sustituciones, ajustados }))}
+          />
+        )}
       </div>
 
       {iva !== undefined && (
         <div className="mt-6">
           <Callout titulo={iva.titulo} tono={iva.nivel}>
             {iva.detalle}
+            <AvisoParametros claves={PARAMETROS_DE.iva} />
           </Callout>
         </div>
       )}

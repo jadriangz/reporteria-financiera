@@ -548,3 +548,58 @@ ninguno, así que las cifras de referencia no se mueven. Es la versión 1.1.3,
 PARCHE por la distinción de §3: el contrato siempre prometió leer lo que el
 usuario configura. Queda sin cerca la fila de encabezados: si el cliente la borra,
 la primera fila de datos se toma por encabezado y su valor se pierde.
+
+---
+
+## 2026-09-14 — Cierre de la serie del contrato: las sustituciones llegan al papel y toda coerción vive en el esquema
+
+**Contexto.** La 1.1.3 hizo que el panel avisara de todo parámetro que no se pudo
+leer, pero el panel no viaja con el PDF. Un socio podía recibir un reporte
+calculado al 25% cuando el dueño había capturado un 30% ilegible, sin nada en el
+papel que lo dijera. Y en las hojas de datos seguía el patrón de la serie:
+- `dias_credito` se coercionaba con `Number()`: «30dias» entraba al dataset como NaN, y
+  «-5» o «30.5» se usaban tal cual en el aging. Corrección posterior: esta entrada decía que
+  el NaN llegaba al aging, y no es así. `diasDeVenta` ya descartaba lo no finito y medía esa
+  venta por antigüedad.
+- `comision_pct` aceptaba 150%.
+- Un importe con otra gramática se leía en silencio: «1,234.56» como $1.23 y
+  «1234.56» como $123,456.
+- Un serial de fecha sin rango daba 1900 o 2173, y con la hora incluida.
+
+**Decisión.**
+- `validate()` entrega las sustituciones de parámetros como datos
+  (`{clave, capturado, aplicado, fila}`). El store las guarda con el dataset y la
+  interfaz las pinta junto a la cifra que afectan: provisiones, periodo y DSO,
+  tarjeta de IVA y comisión. También las pinta en el bloque Alcance de la portada
+  del PDF. Lo hace la interfaz, no el motor, que recibe el esquema canónico y no
+  razona sobre la procedencia de sus entradas (AD-06).
+- Cuando el usuario ajusta un parámetro desde la interfaz, su aviso desaparece: el
+  valor ya es decisión suya. Volver a validar no lo revive; cargar otro archivo
+  empieza de cero.
+- En las hojas de datos, las coerciones del esquema validan el dominio: importes
+  solo con la gramática europea del contrato, porcentajes entre 0 y 100%, días como
+  entero no negativo y fechas entre 1990 y 2100, sin hora.
+- La severidad sigue a la consecuencia, con el criterio de la 1.1.3. Un importe o
+  una fecha que no se pueden leer siguen siendo **error**: sin importe la operación
+  no se suma, y sin fecha no se ubica. Un porcentaje o unos días de crédito
+  ilegibles son **advertencia**, porque la venta se calcula como con la celda vacía.
+  `comision_pct` ilegible era error y pasa a advertencia: el panel afirmaba un
+  bloqueo mientras la venta se calculaba igual.
+
+**Alternativas descartadas.**
+- **Adivinar la gramática de un importe.** «1,234.56» tiene coma de miles y punto
+  decimal, y adivinarlo resuelve ese caso; «1.500» no: en el contrato es mil
+  quinientos, y para quien escribe con punto decimal es uno y medio. Adivinar a
+  veces es peor que no adivinar nunca. El contrato dice formato europeo, y lo que no
+  lo cumple se rechaza con un hallazgo.
+- **Pasar las sustituciones al motor** en `OpcionesInsights` para que él redactara
+  la tarjeta de IVA. Pondría al motor a razonar sobre la calidad de sus propios
+  datos.
+
+**Consecuencia.** Los cuatro defectos de la serie 1.1.1–1.1.4 eran el mismo error de
+diseño. Queda escrito como restricción aprendida en CLAUDE.md: toda coerción y toda
+canonización del contrato viven en el esquema, y ningún consumidor interpreta
+valores crudos. El demo tiene sus importes, fechas, porcentajes y días como números
+válidos, así que las cifras de referencia no se mueven. Es la versión 1.1.4, PARCHE.
+Quedan en el backlog (GOBERNANZA.md §11) las columnas fuera del contrato, la hoja
+`parametros` sin encabezados y la coherencia entre parámetros.

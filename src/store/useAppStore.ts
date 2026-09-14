@@ -26,8 +26,9 @@ import {
 } from "../lib/captura";
 import { libroDeDataset } from "../lib/exportar";
 import { cargarSheetJS, readWorkbook, validate } from "../lib/parse";
+import type { ParametroSustituido } from "../lib/parse/parametros";
 import type { NombreHoja, RawSheets } from "../lib/parse/tipos";
-import { type Capacidades, type Dataset, type Hallazgo, capacidades } from "../lib/schema";
+import { type Capacidades, type Dataset, type Hallazgo, type Parametros, capacidades } from "../lib/schema";
 
 /**
  * Estado global de la app.
@@ -83,6 +84,17 @@ export interface ParametrosUsuario {
 
 export type ClaveParametro = keyof ParametrosUsuario;
 
+/**
+ * El parametro del contrato que mueve cada control. La fecha de corte no esta en
+ * la hoja parametros: moverla no resuelve ninguna sustitucion.
+ */
+const CLAVE_EN_CONTRATO: Readonly<Record<ClaveParametro, keyof Parametros | null>> = {
+  fechaCorte: null,
+  provision91180: "provision_91_180",
+  provisionMas180: "provision_mas_180",
+  comisionBaseDefault: "comision_base_default",
+};
+
 /** Todo lo que el motor produjo para el dataset y los parametros actuales. */
 export interface Calculos {
   readonly resultados: Resultados;
@@ -123,6 +135,14 @@ interface AppState {
   /** El dataset validado de archivo + capturas: lo que consume el motor. */
   readonly dataset: Dataset | null;
   readonly hallazgos: readonly Hallazgo[];
+  /** Parametros del archivo que no se pudieron leer, y lo que se aplico. Ver `sustitucionesVigentes`. */
+  readonly sustituciones: readonly ParametroSustituido[];
+  /**
+   * Parametros del contrato que el usuario ya ajusto a mano desde la interfaz.
+   * Sobreviven a volver a validar (capturar o borrar una fila) y se vacian al
+   * cargar otro archivo, empezar de cero o limpiar.
+   */
+  readonly ajustados: readonly (keyof Parametros)[];
   readonly calculos: Calculos | null;
   readonly parametros: ParametrosUsuario;
   readonly moduloActivo: IdModulo;
@@ -146,6 +166,19 @@ interface AppState {
   solicitarImpresion(modo: ModoImpresion): void;
   /** Desmonta la vista imprimible, al cerrar el dialogo de impresion. */
   terminarImpresion(): void;
+}
+
+/**
+ * Las sustituciones que siguen vigentes: las del archivo, menos las de los
+ * parametros que el usuario ya ajusto. Ajustar el control es decidir el valor:
+ * desde ahi lo que se aplica ya no es un valor por omision que nadie eligio, y
+ * el aviso sobra. No calcula nada: filtra lo que entrego `validate()`.
+ */
+export function sustitucionesVigentes(s: {
+  readonly sustituciones: readonly ParametroSustituido[];
+  readonly ajustados: readonly (keyof Parametros)[];
+}): readonly ParametroSustituido[] {
+  return s.sustituciones.filter((x) => !s.ajustados.includes(x.clave));
 }
 
 const PARAMETROS_INICIALES: ParametrosUsuario = {
@@ -197,9 +230,9 @@ function derivar(
   raw: RawSheets,
   capturas: Capturas,
   parametros: ParametrosUsuario,
-): Pick<AppState, "dataset" | "hallazgos" | "calculos"> {
-  const { dataset, hallazgos } = validate(combinar(raw, capturas));
-  return { dataset, hallazgos, calculos: recalcular(dataset, parametros) };
+): Pick<AppState, "dataset" | "hallazgos" | "sustituciones" | "calculos"> {
+  const { dataset, hallazgos, sustituciones } = validate(combinar(raw, capturas));
+  return { dataset, hallazgos, sustituciones, calculos: recalcular(dataset, parametros) };
 }
 
 /** Parametros ajustables a partir de lo que trae el archivo. */
@@ -227,6 +260,8 @@ const ESTADO_VACIO = {
   capturas: SIN_CAPTURAS,
   dataset: null,
   hallazgos: [],
+  sustituciones: [],
+  ajustados: [],
   calculos: null,
   moduloActivo: "resumen",
   impresion: null,
@@ -252,6 +287,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
         raw,
         capturas: SIN_CAPTURAS,
         parametros,
+        // Archivo nuevo, decisiones nuevas: ningun parametro esta ajustado todavia.
+        ajustados: [],
         ...derivar(raw, SIN_CAPTURAS, parametros),
         moduloActivo: "resumen",
         pantalla: "reporte",
@@ -269,6 +306,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
         capturas: SIN_CAPTURAS,
         dataset: null,
         hallazgos: [],
+        sustituciones: [],
+        ajustados: [],
         calculos: null,
       });
     }
@@ -329,10 +368,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   actualizarParametro(clave, valor) {
-    const { dataset, parametros } = get();
+    const { dataset, parametros, ajustados } = get();
     const nuevos = { ...parametros, [clave]: valor };
+    const contrato = CLAVE_EN_CONTRATO[clave];
     set({
       parametros: nuevos,
+      // El usuario decidio este valor: su aviso de sustitucion deja de aplicar.
+      ajustados: contrato === null || ajustados.includes(contrato) ? ajustados : [...ajustados, contrato],
       // Recalcula aqui, una sola vez, no en cada render de cada modulo.
       calculos: dataset === null ? null : recalcular(dataset, nuevos),
     });
