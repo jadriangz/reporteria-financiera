@@ -217,11 +217,20 @@ raro.
 **Cambiar un campo obliga a seis pasos, en este orden:**
 
 1. Actualizar `schema.ts`
-2. Actualizar el generador de la plantilla y regenerar el archivo
+2. Editar la plantilla a mano sobre su XML, preservando estilos, listas desplegables y paneles
+   fijos
 3. Actualizar la exportación a Excel para que siga siendo ida y vuelta
 4. Actualizar la prueba que compara encabezados contra la plantilla real
 5. Actualizar `CLAUDE.md`
 6. **Versionar la plantilla** (`_v2.xlsx`) y decidir si la app soporta ambas
+
+**No hay generador de la plantilla, y es a propósito.** La versión gratuita de SheetJS escribe
+valores, fórmulas, formatos numéricos y anchos, pero no estilos de celda, listas desplegables ni
+paneles fijos. La hoja INSTRUCCIONES depende de esa presentación: le dice al cliente «solo escriba
+en las celdas de letra azul» y que la fila de fondo verde es el ejemplo. Una plantilla regenerada
+sin estilos le daría instrucciones falsas. La cerca contra la divergencia es
+`src/lib/parse/__tests__/plantilla.test.ts`, que compara `ENCABEZADOS` contra el .xlsx real y
+exige que el XML de cada hoja esté bien formado. Ver `docs/decisiones.md` (2026-09-13).
 
 **Nunca se rompe una plantilla que el cliente ya tiene en sus manos.** Si un campo nuevo
 es obligatorio, se acepta su ausencia con advertencia durante al menos una versión.
@@ -300,7 +309,20 @@ Priorizado. Lo de arriba entra primero.
 
 **Correcciones y deuda**
 - Plantilla v2 con hojas como tablas de Excel, para eliminar las filas de relleno con
-  fórmulas y el renglón de nota que el lector tiene que descartar.
+  fórmulas y el renglón de nota que el lector tiene que descartar. Ese rediseño hay que hacerlo
+  igual, y es el momento de decidir con qué herramienta se genera la plantilla, que hoy se
+  edita a mano (sección 7). Opciones evaluadas el 2026-09-13:
+  1. **SheetJS más un inyector de XML** que agregue estilos, listas y paneles. No compensa hoy:
+     cambia sincronizar `ENCABEZADOS` con un .xlsx por sincronizar `ENCABEZADOS`, una tabla de
+     estilos y un inyector. Más piezas y el mismo riesgo de deriva.
+  2. **ExcelJS como dependencia solo del generador.** Escribe la presentación de forma nativa,
+     pero obliga a traducir el libro de SheetJS y es un cambio de stack que se discute antes.
+
+  Al rehacerla se limpian también las cadenas huérfanas de `xl/sharedStrings.xml` que dejaron
+  las ediciones a mano: los modelos de drones de la lista que se quitó y los textos que se
+  sustituyeron con celdas `inlineStr`. No se borran antes. Renumerar las referencias de todas
+  las hojas para quitar texto que nadie ve es riesgo sin beneficio, y es la misma clase de
+  cirugía que dejó 1,297 filas sin cerrar.
 - Gastos por categoría en el motor, hoy solo agregados.
 - Números de página en el PDF impreso.
 

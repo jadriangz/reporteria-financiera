@@ -6,16 +6,26 @@ import { beforeAll, describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
 
 import { ENCABEZADOS } from "../../exportar";
-import { capacidades, type Hallazgo } from "../../schema";
+import {
+  CATEGORIA_GASTO,
+  COMISION_BASE,
+  CONDICION,
+  LINEA,
+  METODO_PAGO,
+  TIPO_GASTO,
+  capacidades,
+  type Hallazgo,
+} from "../../schema";
 import { readWorkbookFromBuffer } from "../readWorkbook";
-import type { RawSheets } from "../tipos";
+import { HOJAS_TABULARES, type NombreHoja, type RawSheets } from "../tipos";
 import { validate, type ResultadoValidacion } from "../validate";
+import { fallaXml, hojasXml, partesXml } from "./xmlXlsx";
 
 /**
  * El CONTRATO DE DATOS contra la plantilla real que descarga el cliente.
  *
  * Esta plantilla esta VACIA a proposito: encabezados, la fila verde de ejemplo
- * y las filas de relleno con sus formulas, y nada mas. Ningun archivo con datos
+ * con sus formulas y las filas de relleno del formato, y nada mas. Ningun archivo con datos
  * de un cliente entra al repositorio (GOBERNANZA.md, seccion 10), asi que el
  * comportamiento del lector frente a datos reales se prueba con el archivo de
  * demostracion ficticio, en `demo.test.ts`.
@@ -135,5 +145,69 @@ describe("la plantilla que descarga el cliente", () => {
   it("nunca lanza: devuelve dataset y hallazgos incluso con el archivo en blanco", () => {
     expect(() => validate(raw)).not.toThrow();
     expect(res.hallazgos.length).toBeGreaterThan(0);
+  });
+});
+
+describe("la plantilla vista como XML, que es como se edita", () => {
+  const partes = partesXml(readFileSync(RUTA_PLANTILLA));
+  const hojas = hojasXml(partes);
+
+  it("cada parte XML esta bien formada", () => {
+    // SheetJS lee sin quejarse un XML con filas sin cerrar, y Excel pide reparar
+    // el archivo. Ya paso una vez: 1,297 filas sin cerrar en ventas, cobranza y
+    // gastos, en el archivo que el cliente descarga desde produccion.
+    const fallas = [...partes].flatMap(([ruta, xml]) => {
+      const falla = fallaXml(xml);
+      return falla === null ? [] : [`${ruta}: ${falla}`];
+    });
+    expect(fallas).toEqual([]);
+    expect([...hojas.keys()]).toEqual(["INSTRUCCIONES", "_listas", "ventas", "cobranza", "gastos", "parametros"]);
+  });
+
+  it("el verificador detecta la fila sin cerrar que ya se colo una vez", () => {
+    // Sin esta prueba, un verificador roto que siempre dijera "bien formado"
+    // haria pasar la de arriba en silencio.
+    const sinCerrar =
+      '<?xml version="1.0"?><sheetData><row r="3"><c r="A3" s="18"/><row r="4"><c r="A4" s="18"/></row></sheetData>';
+    expect(fallaXml(sinCerrar)).not.toBeNull();
+    expect(fallaXml(sinCerrar.replace('s="18"/><row r="4"', 's="18"/></row><row r="4"'))).toBeNull();
+    expect(fallaXml("<a><b></a></b>")).not.toBeNull();
+    expect(fallaXml("<a/><b/>")).not.toBeNull();
+    expect(fallaXml("<a>1 & 2</a>")).not.toBeNull();
+    expect(fallaXml("<a>1 &amp; 2<![CDATA[ < & ]]></a>")).toBeNull();
+  });
+
+  it("las listas desplegables son las enumeraciones del contrato, y modelo es texto libre", () => {
+    // La lista de modelos era del cliente de drones: la plantilla es agnostica
+    // al giro (CLAUDE.md, "Contexto"). Cada lista que queda apunta a la columna de
+    // _listas que contiene exactamente su enumeracion de schema.ts.
+    const esperadas: Readonly<Record<NombreHoja, Readonly<Record<string, readonly string[]>>>> = {
+      ventas: { linea: LINEA, comision_base: COMISION_BASE, condicion: CONDICION },
+      cobranza: { metodo: METODO_PAGO },
+      gastos: { categoria: CATEGORIA_GASTO, tipo: TIPO_GASTO },
+    };
+    const listas = XLSX.utils.sheet_to_json<unknown[]>(
+      XLSX.read(readFileSync(RUTA_PLANTILLA)).Sheets["_listas"] ?? {},
+      { header: 1, defval: null },
+    );
+    const valores = (col: number, desde = 0, hasta = listas.length - 1) =>
+      listas.slice(desde, hasta + 1).map((f) => f[col]).filter((v): v is string => typeof v === "string");
+
+    for (const hoja of HOJAS_TABULARES) {
+      const validadas: Record<string, readonly string[]> = {};
+      const xml = hojas.get(hoja) ?? "";
+      for (const [, sqref = "", formula = ""] of xml.matchAll(
+        /<dataValidation\b[^>]*\bsqref="([^"]+)"[^>]*>\s*<formula1>([^<]*)<\/formula1>/g,
+      )) {
+        const columna = ENCABEZADOS[hoja][XLSX.utils.decode_range(sqref).s.c] ?? sqref;
+        const origen = XLSX.utils.decode_range(formula.replace(/^_listas!/, "").replaceAll("$", ""));
+        const rango = valores(origen.s.c, origen.s.r, origen.e.r);
+        // El rango cubre la columna completa de _listas, ni una celda de mas ni de menos.
+        expect(rango, `${hoja}.${columna}`).toEqual(valores(origen.s.c));
+        validadas[columna] = rango;
+      }
+      expect(validadas, hoja).toEqual(esperadas[hoja]);
+    }
+    expect(listas[0]).toHaveLength(6);
   });
 });

@@ -175,7 +175,7 @@ const EJEMPLO: Readonly<Record<NombreHoja, (fila: number) => Celda[]>> = {
     texto("15/03/2026"),
     texto("Equipo"),
     texto("EJEMPLO — Cliente Demostrativo"),
-    texto("T55"),
+    texto("Modelo A"),
     texto("ABC123456789"),
     importe(20_000_000),
     importe(26_000_000),

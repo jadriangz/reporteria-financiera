@@ -135,7 +135,7 @@ Los seis pasos de la sección 7, y qué verificar en cada uno:
 | Paso | Qué revisar | Si falta |
 |---|---|---|
 | 1. `schema.ts` | Es el disparador | — |
-| 2. Regenerar la plantilla | **Pendiente humana.** No existe generador en el repositorio: no hay `scripts/`, y la plantilla se edita por XML a mano para no perder estilos. Pide confirmación explícita de que `docs/Plantilla_Captura_Reporteria_v1.xlsx` se actualizó | pendiente humana |
+| 2. Editar la plantilla | **Pendiente humana, a propósito.** No hay generador: la versión gratuita de SheetJS no escribe estilos, listas desplegables ni paneles fijos, y la hoja INSTRUCCIONES depende de esa presentación («solo escriba en las celdas de letra azul»). La plantilla se edita a mano sobre su XML (GOBERNANZA.md §7). Pide confirmación explícita de que `docs/Plantilla_Captura_Reporteria_v1.xlsx` se actualizó conservando estilos, listas y paneles, y de que Excel de escritorio la abre sin pedir reparación. La cerca automática son las pruebas del paso 4 | pendiente humana |
 | 3. Exportación a Excel | `ENCABEZADOS` en `src/lib/exportar/index.ts` se movió con el cambio, para que la ida y vuelta siga cerrando | **bloqueante** |
 | 4. Prueba de encabezados | `src/lib/parse/__tests__/plantilla.test.ts` está en el diff **y pasa**: es la que compara `ENCABEZADOS` contra el .xlsx real | **bloqueante** |
 | 5. `CLAUDE.md` | Está en el diff, con el contrato actualizado | **bloqueante** |

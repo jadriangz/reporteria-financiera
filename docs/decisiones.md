@@ -355,3 +355,58 @@ solo del import estático. Y trece casos de ejecución comprueban que ninguna qu
 —incluida `?fixture=demo&archivo=/etc/passwd`— pida algo distinto del fixture.
 Como evidencia de que la rama no llega al cliente: el bundle de producción quedó
 con los mismos hashes que antes del cambio, byte a byte idéntico.
+
+---
+
+## 2026-09-13 — La plantilla se edita a mano: no hay generador
+
+**Contexto.** La plantilla y `ENCABEZADOS` son dos copias del contrato,
+sincronizadas por una prueba. Se propuso un generador que produjera el .xlsx
+reutilizando la exportación a Excel con un dataset vacío, para que la divergencia
+fuera imposible por construcción. Un prototipo midió lo que se perdía: la versión
+gratuita de SheetJS no escribe estilos de celda, listas desplegables ni paneles
+fijos. La plantilla tiene unas 1,460 celdas con estilo, 7 reglas de validación y
+el encabezado fijo en cuatro hojas. Además, su hoja INSTRUCCIONES le dice al
+cliente «solo escriba en las celdas de letra azul» y que la fila de fondo verde es
+el ejemplo.
+
+**Decisión.** No se escribe el generador. La plantilla se edita a mano sobre su
+XML, conservando estilos, listas y paneles (GOBERNANZA.md §7, paso 2). La
+herramienta de generación se decide con el rediseño de la plantilla v2 (§11).
+
+**Alternativa descartada.** El generador con SheetJS más un inyector de XML que
+agregue estilos, listas y paneles. No quita piezas: cambia sincronizar
+`ENCABEZADOS` con un .xlsx por sincronizar `ENCABEZADOS`, una tabla de estilos y
+un inyector, con el mismo riesgo de deriva.
+
+**Consecuencia.** La sincronización sigue dependiendo de la prueba de encabezados
+(`src/lib/parse/__tests__/plantilla.test.ts`), no de una sola fuente, y
+`/terminado` reporta el paso 2 como pendiente humana. Para que una edición a mano
+no vuelva a romper el archivo sin que nadie lo note, la misma prueba exige ahora
+que cada parte XML esté bien formada. La plantilla versionada tenía 1,297 filas sin
+cerrar en ventas, cobranza y gastos: SheetJS las leía sin quejarse, y probablemente
+Excel pedía reparar el archivo al abrirlo. Editar el XML a mano, además, acumula basura
+invisible: las cadenas de `sharedStrings.xml` que quedaron huérfanas al quitar la lista
+de modelos y al sustituir textos de la plantilla lo prueban. Es una razón más para que
+la plantilla v2 no se haga a mano.
+
+---
+
+## 2026-09-13 — Modelo es texto libre: la plantilla no trae lista de modelos
+
+**Contexto.** `_listas` traía una columna de modelos (T100, T70P, T55, T25P y
+accesorios) con su lista desplegable en `ventas.modelo`. Son los productos del
+cliente de drones, y la plantilla debe ser agnóstica al giro (CLAUDE.md,
+«Contexto»).
+
+**Decisión.** Se quitan la lista de modelos y su validación: modelo es texto libre.
+Las seis listas que quedan son las enumeraciones de `schema.ts`, y una prueba
+exige que coincidan y que cada lista desplegable apunte a la suya.
+
+**Alternativa descartada.** Conservar la lista como ejemplo editable. Cualquier
+otro giro la encontraría llena de drones, y la lista desplegable de Excel le
+sugeriría productos que no vende.
+
+**Consecuencia.** La plantilla ya no previene los errores de dedo en modelo
+(`T70p` / `T70P`). Los absorbe la normalización a mayúsculas antes de agrupar, que
+ya existía (CLAUDE.md, «Trampas de parseo»).
