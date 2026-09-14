@@ -64,7 +64,7 @@ export function hojasEnBlanco(): RawSheets {
     ventas: hojaEnBlanco("ventas"),
     cobranza: hojaEnBlanco("cobranza"),
     gastos: hojaEnBlanco("gastos"),
-    parametros: { presente: true, valores: {}, filaDe: {} },
+    parametros: { presente: true, valores: {}, filaDe: {}, filasRepetidas: {}, filasSinClave: [] },
   };
 }
 

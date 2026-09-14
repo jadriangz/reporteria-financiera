@@ -1,5 +1,4 @@
 import {
-  COMISION_BASE,
   type Cobranza,
   CobranzaSchema,
   type Dataset,
@@ -10,14 +9,11 @@ import {
   ParametrosSchema,
   type Venta,
   VentaSchema,
-  canonizar,
-  parseBool,
-  parseFecha,
-  parseNumero,
 } from "../schema";
 
+import { CLAVES_PARAMETROS, LECTURAS, sinCapturar } from "./parametros";
 import { REGLAS, type ContextoValidacion, type FilaEvaluada } from "./reglas";
-import type { RawCelda, RawHoja, RawParametros, RawSheets } from "./tipos";
+import type { RawHoja, RawParametros, RawSheets } from "./tipos";
 
 export interface ResultadoValidacion {
   readonly dataset: Dataset;
@@ -47,43 +43,21 @@ function aplicarEsquema<T>(
 }
 
 /**
- * Coerciona la hoja clave-valor a los tipos que espera ParametrosSchema.
+ * Lee la hoja clave-valor con la declaracion de `parametros.ts`.
  *
- * Zod aplica `.default()` solo ante `undefined`, nunca ante `null`, asi que un
- * parametro que el cliente dejo en blanco debe omitirse para que tome su valor
- * por omision. La excepcion es importes_incluyen_iva, cuyo default ES null:
- * ahi null significa "el cliente todavia no lo contesta".
+ * Zod aplica `.default()` solo ante `undefined`, asi que un parametro vacio se
+ * omite para que tome su valor por omision. Uno capturado que no se puede leer
+ * tambien se omite, pero NO en silencio: lo avisa la regla
+ * `parametro-no-reconocido`, que consulta la misma lectura.
  */
 function coercionarParametros(raw: RawParametros): Parametros {
-  const v = raw.valores;
-  const crudo = (k: string): RawCelda => v[k] ?? null;
-
-  const numero = (k: string): number | undefined => parseNumero(crudo(k)) ?? undefined;
-  const fecha = (k: string): Date | undefined => parseFecha(crudo(k)) ?? undefined;
-
-  const monedaBase = String(crudo("moneda_base") ?? "").trim();
-  const nombreCliente = String(crudo("nombre_cliente") ?? "").trim();
-  const baseComision = crudo("comision_base_default");
-  // ParametrosSchema lo canoniza («utilidad» → "Utilidad"). Uno que ni asi es de la
-  // lista se omite y toma el valor por omision, pero NO en silencio: lo avisa la
-  // regla `parametro-no-reconocido`.
-  const comisionValida = canonizar(COMISION_BASE, baseComision) !== null;
-
-  const entrada: Record<string, unknown> = {
-    importes_incluyen_iva: parseBool(crudo("importes_incluyen_iva")),
-  };
-  if (monedaBase !== "") entrada["moneda_base"] = monedaBase;
-  if (nombreCliente !== "") entrada["nombre_cliente"] = nombreCliente;
-  if (comisionValida) entrada["comision_base_default"] = baseComision;
-  for (const k of ["tasa_iva", "provision_91_180", "provision_mas_180", "dias_credito_default", "tipo_cambio_usd"]) {
-    const n = numero(k);
-    if (n !== undefined) entrada[k] = n;
+  const entrada: Partial<Record<keyof Parametros, unknown>> = {};
+  for (const clave of CLAVES_PARAMETROS) {
+    const crudo = raw.valores[clave];
+    if (sinCapturar(crudo)) continue;
+    const valor = LECTURAS[clave].leer(crudo ?? null);
+    if (valor !== null) entrada[clave] = valor;
   }
-  for (const k of ["periodo_inicio", "periodo_fin"]) {
-    const f = fecha(k);
-    if (f !== undefined) entrada[k] = f;
-  }
-
   return ParametrosSchema.parse(entrada);
 }
 

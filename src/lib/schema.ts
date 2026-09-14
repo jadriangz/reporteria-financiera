@@ -18,6 +18,8 @@ export const CATEGORIA_GASTO = [
 ] as const;
 export const TIPO_GASTO = ["Fijo", "Variable"] as const;
 export const METODO_PAGO = ["Efectivo", "Transferencia", "Cheque", "Deposito", "Otro"] as const;
+/** Moneda del reporte. v1 reporta solo en pesos: multimoneda esta fuera de alcance. */
+export const MONEDA_BASE = ["MXN"] as const;
 
 // ─────────────────────────── Coerciones ───────────────────────────
 
@@ -88,9 +90,9 @@ export function parseBool(raw: unknown): boolean | null {
 }
 
 /**
- * Número plano de la hoja `parametros`: tasas, provisiones, días y tipo de
- * cambio. NO es dinero (no va a centavos) y NO es porcentaje (no se divide
- * entre 100): 17.5 se queda en 17.5. Acepta coma decimal.
+ * Número plano de la hoja `parametros`: días y tipo de cambio. NO es dinero (no
+ * va a centavos) y NO es porcentaje (no se divide entre 100): 17.5 se queda en
+ * 17.5. Acepta coma decimal. Las tasas y provisiones son porcentajes: `parsePct`.
  */
 export function parseNumero(raw: unknown): number | null {
   if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
@@ -205,7 +207,9 @@ export const GastoSchema = z.object({
 export const ParametrosSchema = z.object({
   /** Nombre del cliente o empresa tal como va en la portada del reporte. */
   nombre_cliente:        z.string().nullable().default(null),
-  moneda_base:           z.string().default("MXN"),
+  moneda_base:           z
+    .preprocess((v) => canonizar(MONEDA_BASE, v) ?? v, z.enum(MONEDA_BASE))
+    .default("MXN"),
   importes_incluyen_iva: z.boolean().nullable().default(null),
   tasa_iva:              z.number().default(0.16),
   periodo_inicio:        z.date().nullable().default(null),

@@ -497,3 +497,54 @@ estrechar el tipo tocaría selectores y pruebas de la interfaz, fuera de este
 parche. Es la versión 1.1.2, PARCHE por la distinción de §3: la fórmula de comisión
 de CLAUDE.md no cambió. El mismo patrón de valor por omisión silencioso sigue en
 otros parámetros numéricos y de fecha, y queda sin arreglar aquí.
+
+---
+
+## 2026-09-14 — La hoja `parametros` se valida como capa, con la severidad de las listas
+
+**Contexto.** La hoja `parametros` nunca recibió el tratamiento de las hojas de
+datos. Un valor que no se podía leer caía a su valor por omisión sin ningún
+hallazgo: `provision_91_180` «30%» aplicaba 25%, `tasa_iva` «16» se leía como
+1600%, `periodo_inicio` «2026-01-01» se perdía e `importes_incluyen_iva` «Sí
+incluye» quedaba sin contestar. Y los parámetros son lo único que el usuario
+configura a mano para ajustar el reporte a su criterio.
+
+**Decisión.** `src/lib/parse/parametros.ts` declara, para cada parámetro del
+contrato, cómo se lee y qué formatos acepta. `validate()` lee con esa declaración,
+y la regla `parametro-no-reconocido` avisa, con la misma declaración, de todo
+valor capturado que no se pudo leer: qué se capturó, qué se aplicó y qué formatos
+se aceptan. Tres reglas más cierran lo que el lector descartaba antes de llegar
+ahí: `parametro-desconocido` (un nombre que no es del contrato),
+`parametro-repetido` (gana la última fila) y `valor-sin-parametro`. Las lecturas
+se amplían a lo que escribe una persona:
+
+- Porcentajes con `parsePct`, la misma regla de `comision_pct`: «30%», «30», «0.30»
+  y «0,30» son 30%. El caso ambiguo se resuelve así: un número mayor que 1 se lee
+  como por ciento, nunca como 3000%, y «1» solo es 100%. La regla está escrita en
+  INSTRUCCIONES y en las notas de la plantilla. Fuera de 0–100% no se lee.
+- Fechas con `parseFecha`, entre 1990 y 2100: un serial de Excel fuera de ese
+  rango es un número que cayó en la celda equivocada.
+- Booleanos con `parseBool` (SI, NO, Sí, sí, true, 1…).
+- `moneda_base` contra `MONEDA_BASE`, que en v1 solo tiene MXN.
+- Días como entero no negativo; tipo de cambio mayor que cero.
+
+**Severidad: advertencia, la misma que un valor de lista.** Un parámetro mal leído
+sí mueve cifras, y una `linea` mal escrita solo reclasifica. Pero en este proyecto
+la severidad no mide importancia: mide qué se deja de calcular. «Error» significa
+que bloquea el módulo afectado, y el panel lo dice textualmente («N errores
+bloquean los módulos afectados»). Un parámetro que no se pudo leer no bloquea
+nada: el reporte se calcula con el valor por omisión, y el aviso lo dice.
+
+**Alternativa descartada.** Error para los parámetros que mueven cifras. Sin
+bloquear, el panel mentiría: diría que el módulo está bloqueado mientras muestra
+la provisión. Bloquear de verdad apagaría la cartera entera —aging, DSO,
+detalle— por una tasa que solo afecta a la provisión. La diferencia de impacto se
+atiende donde importa: haciendo visible la sustitución junto a la cifra que
+afecta, que queda por acordar. Subir la severidad no la atiende.
+
+**Consecuencia.** Ningún valor capturado en `parametros` se descarta sin un
+hallazgo. El demo y la plantilla tienen los parámetros bien escritos y no producen
+ninguno, así que las cifras de referencia no se mueven. Es la versión 1.1.3,
+PARCHE por la distinción de §3: el contrato siempre prometió leer lo que el
+usuario configura. Queda sin cerca la fila de encabezados: si el cliente la borra,
+la primera fila de datos se toma por encabezado y su valor se pierde.

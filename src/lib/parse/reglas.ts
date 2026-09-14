@@ -1,6 +1,4 @@
 import {
-  COMISION_BASE,
-  COMISION_BASE_POR_OMISION,
   ENUMERACIONES,
   type Hallazgo,
   LINEA,
@@ -11,6 +9,7 @@ import {
   parsePct,
 } from "../schema";
 
+import { CLAVES_PARAMETROS, LECTURAS, sinCapturar } from "./parametros";
 import { COLUMNAS_MONTO, HOJAS_TABULARES, type NombreHoja, type RawCelda, type RawSheets } from "./tipos";
 
 /**
@@ -523,34 +522,105 @@ const enumeracionNoReconocida: Regla = {
   },
 };
 
+// --------------------------- Hoja parametros ---------------------------
+//
+// La hoja parametros se valida como capa, igual que las de datos: ningun valor
+// capturado se descarta sin un hallazgo que cite hoja y fila. Advertencia y no
+// error, tambien cuando el parametro mueve cifras: ver docs/decisiones.md
+// (2026-09-14).
+
 /**
- * `comision_base_default` con un valor que no es de la lista. Antes se descartaba
- * sin aviso y quedaba "Venta": el usuario configuraba una base y la aplicacion
- * calculaba con otra. Sigue aplicandose el valor por omision —el reporte se puede
- * calcular—, pero el panel dice que se capturo, que no se reconocio y que se aplico.
+ * Un parametro capturado que no se puede leer. Antes caia en silencio a su valor
+ * por omision: quien decidio provisionar al 30% veia un reporte al 25%. Se sigue
+ * aplicando el valor por omision —el reporte se puede calcular—, y el panel dice
+ * que se capturo, que se aplico y que formatos se aceptan. La lectura es la misma
+ * que usa validate() (`LECTURAS`, en parametros.ts).
  */
 const parametroNoReconocido: Regla = {
   id: "parametro-no-reconocido",
   severidad: "advertencia",
-  descripcion: "comision_base_default con un valor que no es de la lista: se aplica el valor por omision, y se dice.",
+  descripcion: "Parametro capturado que no se puede leer: se aplica su valor por omision, y se dice.",
   evaluar(ctx) {
     const p = ctx.raw.parametros;
-    const crudo = p.valores["comision_base_default"];
-    if (!p.presente || vacia(crudo) || canonizar(COMISION_BASE, crudo) !== null) return [];
-    const fila = p.filaDe["comision_base_default"];
-    return [
-      hallazgo(
+    if (!p.presente) return [];
+    const out: Hallazgo[] = [];
+    for (const clave of CLAVES_PARAMETROS) {
+      const crudo = p.valores[clave];
+      const lectura = LECTURAS[clave];
+      if (sinCapturar(crudo) || lectura.leer(crudo ?? null) !== null) continue;
+      const fila = p.filaDe[clave];
+      out.push(
+        hallazgo(
+          "advertencia",
+          "parametros",
+          `${clave} dice "${texto(crudo)}", que no se pudo leer: se aplica ${lectura.porOmision}.`,
+          { ...(fila === undefined ? {} : { fila }), campo: clave, accion: `Escriba ${lectura.formatos}.` },
+        ),
+      );
+    }
+    return out;
+  },
+};
+
+/** Una fila con un nombre que no es parametro del contrato: su valor nunca se aplica. */
+const parametroDesconocido: Regla = {
+  id: "parametro-desconocido",
+  severidad: "advertencia",
+  descripcion: "Fila de parametros con un nombre que no es del contrato: su valor no se aplica.",
+  evaluar(ctx) {
+    const p = ctx.raw.parametros;
+    if (!p.presente) return [];
+    const conocidas = new Set<string>(CLAVES_PARAMETROS);
+    const out: Hallazgo[] = [];
+    for (const [clave, crudo] of Object.entries(p.valores)) {
+      if (conocidas.has(clave) || sinCapturar(crudo)) continue;
+      const fila = p.filaDe[clave];
+      out.push(
+        hallazgo("advertencia", "parametros", `${clave} no es un parametro del contrato: su valor "${texto(crudo)}" no se aplica.`, {
+          ...(fila === undefined ? {} : { fila }),
+          campo: clave,
+          accion: `Revise el nombre. Los parametros son: ${CLAVES_PARAMETROS.join(", ")}.`,
+        }),
+      );
+    }
+    return out;
+  },
+};
+
+/** Un parametro en mas de una fila: gana la ultima, y las demas se pierden si nadie lo dice. */
+const parametroRepetido: Regla = {
+  id: "parametro-repetido",
+  severidad: "advertencia",
+  descripcion: "Parametro escrito en mas de una fila: se aplica la ultima.",
+  evaluar(ctx) {
+    const p = ctx.raw.parametros;
+    if (!p.presente) return [];
+    return Object.entries(p.filasRepetidas).map(([clave, filas]) => {
+      const ultima = filas.at(-1);
+      return hallazgo(
         "advertencia",
         "parametros",
-        `comision_base_default dice "${texto(crudo)}", que no es una base de comision reconocida: ` +
-          `se aplica "${COMISION_BASE_POR_OMISION}", el valor por omision, a toda venta sin base propia.`,
-        {
-          ...(fila === undefined ? {} : { fila }),
-          campo: "comision_base_default",
-          accion: `Escriba una de: ${COMISION_BASE.join(", ")}.`,
-        },
-      ),
-    ];
+        `${clave} aparece en las filas ${filas.join(", ")}: se aplica la fila ${ultima ?? "?"} y las demas no.`,
+        { ...(ultima === undefined ? {} : { fila: ultima }), campo: clave, accion: "Deje una sola fila por parametro." },
+      );
+    });
+  },
+};
+
+/** Un valor escrito en una fila sin nombre de parametro: no hay a que aplicarlo. */
+const valorSinParametro: Regla = {
+  id: "valor-sin-parametro",
+  severidad: "advertencia",
+  descripcion: "Fila de parametros con valor pero sin nombre: el valor no se aplica.",
+  evaluar(ctx) {
+    const p = ctx.raw.parametros;
+    if (!p.presente) return [];
+    return p.filasSinClave.map((fila) =>
+      hallazgo("advertencia", "parametros", `La fila ${fila} trae un valor sin nombre de parametro: no se aplica.`, {
+        fila,
+        accion: "Escriba el nombre del parametro en la columna parametro, o borre el valor.",
+      }),
+    );
   },
 };
 
@@ -567,6 +637,9 @@ export const REGLAS: readonly Regla[] = [
   margenUniforme,
   enumeracionNoReconocida,
   parametroNoReconocido,
+  parametroDesconocido,
+  parametroRepetido,
+  valorSinParametro,
   hojaAusente,
   filasEjemplo,
   filasVacias,

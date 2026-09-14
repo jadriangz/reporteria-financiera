@@ -23,13 +23,14 @@ describe("version de la aplicacion", () => {
     expect(VERSION).toBe(paquete.version);
   });
 
-  it("hoy es la 1.1.2: parche, sin cambio de definiciones", () => {
-    // PARCHE y no MAYOR (GOBERNANZA.md §3; docs/decisiones.md, 2026-09-13): el
-    // codigo deja de contradecir a CLAUDE.md sin que cambie la definicion. La
-    // 1.1.1 excluyo las filas Demo escritas «demo»; la 1.1.2 aplica la formula de
-    // comision a «utilidad» y «no aplica», y deja de sustituir en silencio un
-    // valor de lista no reconocido. Ambas mueven cifras de quien escribio asi.
-    expect(VERSION).toBe("1.1.2");
+  it("hoy es la 1.1.3: parche, sin cambio de definiciones", () => {
+    // PARCHE y no MAYOR (GOBERNANZA.md §3; docs/decisiones.md): el codigo deja
+    // de contradecir lo que el contrato promete, sin cambiar ninguna definicion.
+    // La 1.1.1 excluyo las filas «demo»; la 1.1.2 corrigio la base de comision y
+    // los valores de lista no reconocidos; la 1.1.3 lee la hoja parametros como
+    // capa y deja de descartar en silencio lo que no entiende. Todas mueven
+    // cifras de quien escribio asi.
+    expect(VERSION).toBe("1.1.3");
   });
 
   it("es un semver de tres numeros, sin sufijos", () => {

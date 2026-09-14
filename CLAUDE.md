@@ -69,6 +69,10 @@ Llave de relación: `ventas.folio` ←→ `cobranza.folio_venta`.
 - Espacios sobrantes en nombres de cliente y modelo → `.trim()` siempre.
 - Modelos con distinta capitalización (`T70p` / `T70P`) deben normalizarse a mayúsculas
   antes de agrupar, o el reporte por modelo se duplica.
+- **Porcentajes**, en `comision_pct` y en los parámetros: `30%`, `30`, `0.30` y `0,30` son
+  30% (`parsePct`). Un número mayor que 1 se lee como por ciento, nunca como 3000%, y `1` solo
+  es 100%: para uno por ciento se escribe `1%`. La regla está escrita en INSTRUCCIONES y en las
+  notas de `parametros` de la plantilla, porque es la que el usuario tiene que conocer.
 
 ### Validación
 
@@ -79,7 +83,9 @@ Al cargar, mostrar un **panel de resultados de validación** con tres niveles:
 - **Advertencia** (no bloquea): fila sin fecha, venta sin `dias_credito`, abono que excede el
   precio de venta, margen exactamente uniforme en más del 80% de las filas, valor de una
   columna de lista que no es ninguna de sus opciones (se toma como celda vacía y se dice qué
-  se aplicó), `comision_base_default` no reconocido (se aplica `Venta` y se dice).
+  se aplicó), parámetro capturado que no se puede leer, con un nombre que no es del
+  contrato, repetido o sin nombre (se aplica su valor por omisión o se ignora, y se dice
+  qué se capturó, qué se aplicó y qué formatos se aceptan).
 - **Info**: filas ignoradas por estar vacías, filas con `linea = "Demo"` excluidas del análisis.
 
 Cada mensaje debe indicar **hoja, número de fila y qué corregir**. Un validador que solo dice
@@ -106,6 +112,13 @@ las "simplifica" sin leer el porqué, rompe el reporte en silencio.
   esto, una fila «demo» se contó como venta y «utilidad» cobró la comisión sobre el precio,
   mientras el panel callaba o afirmaba lo contrario. Canonizar no es excluir: la fila se
   conserva.
+- **La hoja `parametros` se valida como las de datos: ningún valor capturado se descarta sin
+  un hallazgo.** `src/lib/parse/parametros.ts` declara cómo se lee cada parámetro y qué
+  formatos acepta; `validate()` y la regla `parametro-no-reconocido` consultan esa misma
+  declaración. Lo que no se puede leer toma su valor por omisión y el panel dice qué se
+  capturó, qué se aplicó y qué formatos se aceptan. Una clave desconocida, repetida o un valor
+  sin nombre también se avisan. Los parámetros son lo único que el usuario configura a mano:
+  un 30% leído como 25% sin aviso es su decisión descartada en silencio.
 - **`fecha_corte` nunca tiene valor por omisión dentro del motor.** Es un campo obligatorio
   de `OpcionesCartera` y `OpcionesInsights`, y ninguna función de `calc/` llama a
   `new Date()`. El default de "hoy" vive en la UI (`hoyUTC()`), no en el cálculo: si el
