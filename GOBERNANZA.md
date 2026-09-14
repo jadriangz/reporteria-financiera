@@ -180,6 +180,23 @@ algo que se imprime, y revisión de que las cifras conocidas siguen cuadrando.
 **6. Desplegar y anotar.** Merge a `main`, verificar en producción, y registrar la
 decisión si hubo alguna no obvia (sección 9).
 
+**Verificar en producción es comparar lo servido, no leer un estado.** Que el despliegue diga
+«éxito» no prueba qué se está sirviendo. Hay tres niveles, de menos a más fuerte:
+
+1. **Leer la versión dentro del bundle servido.** Así se descubrió el 2026-09-14 que producción
+   seguía en 1.1.0 cuando la serie 1.1.1–1.1.4 ya estaba terminada.
+2. **Ver que el nombre del bundle (`index-<hash>.js`) coincide** con el del build local del mismo
+   commit. Es un indicio fuerte, porque Vite pone en el nombre un hash del contenido, pero ese
+   hash es corto y no prueba igualdad.
+3. **Bajar `index.html` y cada archivo de `dist/assets/` desde producción y compararlos por
+   SHA-256** contra el build local del commit fusionado. Si todos coinciden, lo servido es
+   exactamente lo que se probó. Así se verificó la 1.1.4 el 2026-09-14: 7 de 7 archivos idénticos.
+
+El build local tiene que salir del mismo árbol que se desplegó, y eso se comprueba primero por
+hash de árbol. Si con el mismo árbol los bytes difieren, no se concluye que el despliegue esté
+mal, porque el entorno de build puede cambiar el resultado: se baja al nivel 1 y se averigua por
+qué.
+
 ---
 
 ## 6. Trabajo con Claude Code
@@ -218,6 +235,11 @@ mal, se sabe exactamente dónde mirar.
 - **Cuando diga que no pudo verificar algo, no tratarlo como verificado.** Verificarlo.
 - **Si una corrección rompe pruebas viejas, revisar si las pruebas codificaban el error.**
   Suele ser el caso. Exigir que explique qué asumía cada una.
+- **En este entorno `set -e` no es confiable.** Las cadenas de comandos llevan una comprobación
+  explícita después de cada paso, que las detiene si falla. Observado el 2026-09-14: en una cadena
+  con `set -euo pipefail`, `git switch main` falló y la cadena siguió. El avance rápido cayó en la
+  rama equivocada, y una comprobación que leía `HEAD` pasó por la razón equivocada. El remoto quedó
+  bien solo porque las etiquetas se crearon con hash explícito.
 
 ### Comandos del proyecto
 
