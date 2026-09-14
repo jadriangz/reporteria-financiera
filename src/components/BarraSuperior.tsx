@@ -5,6 +5,7 @@ import { fecha as formatearFecha } from "../lib/format";
 import { COMISION_BASE } from "../lib/schema";
 import { etiquetaOrigen, totalCapturas } from "../lib/captura";
 import { MODULOS, type ModoImpresion, useAppStore } from "../store/useAppStore";
+import { AvisoParametros, PARAMETROS_DE } from "./AvisoParametros";
 import { BotonExcel } from "./captura/BotonExcel";
 import { SelectorTema } from "./SelectorTema";
 import { Boton } from "./ui/primitivas";
@@ -136,6 +137,12 @@ export function BarraSuperior() {
             <span className="cifras">{formatearFecha(parametros.fechaCorte)}</span>. Estos
             parámetros solo aplican a las filas que no los traen capturados.
           </p>
+          <div className="basis-full">
+            <AvisoParametros
+              claves={[...PARAMETROS_DE.provision, ...PARAMETROS_DE.comision]}
+              efecto="Ajuste el valor aquí para fijarlo; al hacerlo, su aviso desaparece."
+            />
+          </div>
         </div>
       )}
     </header>
@@ -151,6 +158,8 @@ export function BarraSuperior() {
  * ayuda existe porque, sin "Graficos de fondo", los fondos de color de las
  * tarjetas y los avisos salen en blanco. Los tonos de riesgo no dependen solo
  * del fondo (tambien el texto y el borde van en color), pero se ven mejor con el.
+ * Tambien pide desactivar "Encabezados y pies de pagina": el navegador pondria la
+ * direccion de la aplicacion en el margen de cada hoja (docs/linea-base-pdf.md).
  */
 function MenuPdf() {
   const [abierto, setAbierto] = useState(false);
@@ -192,6 +201,11 @@ function MenuPdf() {
             En el diálogo elija <span className="font-semibold">«Guardar como PDF»</span> y active{" "}
             <span className="font-semibold">«Gráficos de fondo»</span>: sin esa opción, los fondos de
             color de tarjetas y avisos salen en blanco.
+          </p>
+          <p className="mt-1.5 text-[11px] leading-snug text-slate-600">
+            Desactive <span className="font-semibold">«Encabezados y pies de página»</span>: si queda
+            activada, el navegador imprime en el margen de cada hoja la dirección de esta página y la
+            fecha de impresión.
           </p>
         </div>
       )}

@@ -7,6 +7,7 @@ import { capacidades, type Hallazgo } from "../../schema";
 import { readWorkbookFromBuffer } from "../readWorkbook";
 import type { RawSheets } from "../tipos";
 import { validate, type ResultadoValidacion } from "../validate";
+import { fallaXml, partesXml } from "./xmlXlsx";
 
 /**
  * Prueba de integracion del lector contra un archivo CAPTURADO, no en blanco.
@@ -172,5 +173,15 @@ describe("lectura del archivo de demostracion", () => {
   it("nunca lanza: devuelve dataset y hallazgos incluso con datos incompletos", () => {
     expect(() => validate(raw)).not.toThrow();
     expect(res.hallazgos.length).toBeGreaterThan(0);
+  });
+
+  it("cada parte XML del archivo esta bien formada: tambien se ofrece como descarga", () => {
+    // Misma cerca que la de la plantilla (plantilla.test.ts): SheetJS tolera XML
+    // mal formado que Excel no.
+    const fallas = [...partesXml(Buffer.from(bufferFixture()))].flatMap(([ruta, xml]) => {
+      const falla = fallaXml(xml);
+      return falla === null ? [] : [`${ruta}: ${falla}`];
+    });
+    expect(fallas).toEqual([]);
   });
 });

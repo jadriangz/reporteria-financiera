@@ -34,9 +34,41 @@ modifica la cifra esperada para que pase la prueba.
 
 ## 2. Estado actual
 
-**v1.0 — MVP funcional.** Seis módulos de reporte, carga de Excel/CSV, captura manual,
-exportación a Excel, exportación a PDF por impresión del navegador, validación en tres
-niveles de severidad.
+**v1.1.4.** Qué cambió en cada versión, para quien ya usaba la aplicación, y si sus cifras
+pueden moverse: `docs/notas-version.md`.
+
+**v1.0 — MVP.** Seis módulos de reporte, carga de Excel/CSV, captura manual, exportación a
+Excel, exportación a PDF por impresión del navegador y validación en tres niveles de severidad.
+
+**v1.1.0 — interfaz.** Sin cambios de contrato ni de cifras:
+
+- **Temas claro, oscuro y sistema**, con contraste AA verificado por prueba en los dos y la
+  impresión siempre en claro.
+- **Layout responsivo por contenido**, no por dispositivo: rejillas `auto-fit`, consultas de
+  contenedor, y tablas que eligen entre volverse tarjetas o desplazarse a lo ancho.
+- **Panel de validación con semáforo**: el tono del encabezado resume la severidad antes de
+  abrir el detalle.
+
+**Después de v1.1.0, sin incremento de versión.** No están en el tag `v1.1.0`:
+
+- **Herramientas y documentación:** los tres comandos de proyecto —`/verificar`, `/terminado`
+  y `/preparar`— (sección 6), el parámetro de desarrollo `?fixture=demo` y la línea base del
+  PDF.
+- **Plantilla:** su XML reparado (1,297 filas sin cerrar), sin la lista de modelos del cliente
+  de drones y con «Modelo A» como ejemplo.
+
+**v1.1.1 a v1.1.4 — serie de parches del contrato de datos.** Cuatro defectos con la misma
+causa: el contrato prometía algo que el esquema no verificaba, y cada consumidor coercionaba
+por su cuenta.
+
+- **v1.1.1:** una fila `linea` «demo» ya no se cuenta como venta.
+- **v1.1.2:** `comision_base` y las seis columnas de lista se canonizan, y lo no reconocido se
+  avisa.
+- **v1.1.3:** la hoja `parametros` se valida como capa.
+- **v1.1.4:** los parámetros sustituidos se ven junto a la cifra y en la portada del PDF, y los
+  números y fechas de las hojas de datos validan su dominio.
+
+La serie deja una restricción en `CLAUDE.md`: toda coerción del contrato vive en el esquema.
 
 Fuera de alcance en v1, por decisión: autenticación, multiusuario, persistencia,
 histórico entre cortes, conexión a Odoo, multimoneda, consolidación de varias empresas.
@@ -58,6 +90,19 @@ Versionado semántico adaptado al contexto: lo que rompe aquí no es una API pú
 MAYOR, aunque técnicamente sea un arreglo de una línea. Si el socio vio $1,022,000 el mes
 pasado y hoy la app dice $998,000, eso necesita explicación y número de versión que la
 justifique.
+
+**Lo que decide es qué cambió, no que las cifras se muevan.** Corregir una divergencia
+entre el código y la especificación es **PARCHE**, aunque mueva cifras: la definición que
+el cliente tenía no cambió, el código por fin la cumple. Cambiar la especificación —la
+definición en `CLAUDE.md`— es **MAYOR**. La regla crítica protege al cliente de cambios
+silenciosos de criterio; no obliga a versionar como incompatible el arreglo de un defecto.
+
+*Caso (1.1.1).* `CLAUDE.md` siempre dijo que las filas `linea = "Demo"` se excluyen de todo
+cálculo de venta, pero el motor comparaba exacto contra `"Demo"` y contaba como venta una
+fila escrita «demo», mientras el panel de validación afirmaba que la había excluido. Quien
+la escribió así ve bajar su costo y su utilidad al actualizar. Es PARCHE: la definición es la
+misma, y la cifra anterior estaba mal respecto de ella. El arreglo sí se anuncia, con la
+versión que lo explica.
 
 La versión vive en `package.json` y se muestra en el pie de la aplicación y en el PDF
 exportado. Un reporte sin versión no es auditable.
@@ -88,8 +133,14 @@ chore: actualiza oxlint a 1.83
 docs: registra la decisión sobre escenarios de provisión
 ```
 
-Un commit por unidad lógica de cambio. Un commit que toca el motor, la UI y la plantilla
-a la vez es imposible de revertir sin daño colateral.
+**Un commit por unidad lógica de cambio.** Hace el historial **legible** —cada commit dice qué
+cambió— y **bisecable**: si cada commit compila y pasa pruebas, se puede aislar en cuál apareció un
+defecto. **No garantiza que un parche se pueda revertir aislado** cuando un parche posterior toca
+las mismas líneas. Comprobado el 2026-09-14 con la serie 1.1.1–1.1.4: revertir cualquiera de sus
+commits desde la punta da conflicto en `schema.ts`, `reglas.ts`, `package.json` y la
+documentación, y lo que sale limpio es revertir en orden inverso. Aun así, un conflicto de
+reversión señala las líneas exactas; un commit que mezcla motor, interfaz y plantilla no deja ni
+eso.
 
 ---
 
@@ -157,6 +208,39 @@ mal, se sabe exactamente dónde mirar.
 - **Si una corrección rompe pruebas viejas, revisar si las pruebas codificaban el error.**
   Suele ser el caso. Exigir que explique qué asumía cada una.
 
+### Comandos del proyecto
+
+Tres comandos en `.claude/commands/` convierten en rutina lo que este manual describe en prosa.
+No cambian el proceso: lo ejecutan siempre igual, que es justo lo que la prosa no garantiza.
+
+| Comando | Qué hace | Qué NO hace |
+|---|---|---|
+| `/verificar` | El paso 5 de la sección 5, en sus cuatro planos: `test`, `typecheck`, `lint` y `build`; recorrido visual de los seis módulos —de humo por omisión, la matriz de cuatro anchos y dos temas con `/verificar todo`—; y el PDF completo contra su línea base | No arregla lo que encuentra, y **no declara verificado lo que no observó** |
+| `/terminado` | Recorre la sección 8 casilla por casilla, y la cadena de seis pasos de la sección 7 cuando el cambio toca `schema.ts` | No declara que algo esté terminado: eso lo decide una persona |
+| `/preparar` | Resumen de cambios por módulo, confirmación de que `src/lib/calc/` está intacto, verificación del incremento de versión según la sección 3, y propuesta de mensaje de commit | **No hace commit**, ni `git add`, ni rama, ni `push` |
+
+Cinco cosas que conviene saber antes de usarlos:
+
+- **Ninguno commitea.** El commit sigue siendo humano y sigue siendo el único punto de control
+  real. Los comandos existen para que esa revisión sea corta, no para reemplazarla.
+- **`/verificar` sin argumentos es un recorrido de humo** —1440 px, tema claro, los seis
+  módulos, con las fases automática y de PDF completas—; **`/verificar todo` es la matriz de 48
+  estados**, y los filtros de ancho, tema y módulo siguen acotando esa matriz. Cuarenta y ocho
+  estados están bien al cerrar una fase, pero a ese costo el comando no se usa entre sesiones, y
+  una verificación que no se corre no verifica nada. Lo que el humo no recorre se reporta
+  «no verificado», nunca limpio.
+- **`/verificar` depende de la extensión Claude in Chrome** para la parte visual. Si no está
+  conectada, reporta «no verificado» y sigue con lo automático. «No verificado» no es «bien».
+- **El recorrido visual carga los datos con `?fixture=demo`**, un parámetro exclusivo de
+  desarrollo que fija además la fecha de corte en `2026-09-09`. Sin ese corte fijo el aging
+  cambia cada día y la comparación contra las cifras de referencia no significa nada.
+- **La línea base del PDF vive en `docs/linea-base-pdf.md`**, no en un binario. Se actualiza solo
+  con un cambio deliberado, y ese cambio se registra en `docs/decisiones.md` (sección 9).
+
+La casilla del archivo real de la sección 8 **siempre se reporta como pendiente humana**, nunca
+como incumplimiento: ningún archivo con datos de un cliente entra al repositorio (sección 10),
+así que verificarlo es, por diseño, trabajo de la persona en su propia máquina.
+
 ### Lo que le corresponde a cada quien
 
 Claude Code implementa, prueba y reporta. La persona decide el alcance, resuelve las
@@ -176,11 +260,20 @@ raro.
 **Cambiar un campo obliga a seis pasos, en este orden:**
 
 1. Actualizar `schema.ts`
-2. Actualizar el generador de la plantilla y regenerar el archivo
+2. Editar la plantilla a mano sobre su XML, preservando estilos, listas desplegables y paneles
+   fijos
 3. Actualizar la exportación a Excel para que siga siendo ida y vuelta
 4. Actualizar la prueba que compara encabezados contra la plantilla real
 5. Actualizar `CLAUDE.md`
 6. **Versionar la plantilla** (`_v2.xlsx`) y decidir si la app soporta ambas
+
+**No hay generador de la plantilla, y es a propósito.** La versión gratuita de SheetJS escribe
+valores, fórmulas, formatos numéricos y anchos, pero no estilos de celda, listas desplegables ni
+paneles fijos. La hoja INSTRUCCIONES depende de esa presentación: le dice al cliente «solo escriba
+en las celdas de letra azul» y que la fila de fondo verde es el ejemplo. Una plantilla regenerada
+sin estilos le daría instrucciones falsas. La cerca contra la divergencia es
+`src/lib/parse/__tests__/plantilla.test.ts`, que compara `ENCABEZADOS` contra el .xlsx real y
+exige que el XML de cada hoja esté bien formado. Ver `docs/decisiones.md` (2026-09-13).
 
 **Nunca se rompe una plantilla que el cliente ya tiene en sus manos.** Si un campo nuevo
 es obligatorio, se acepta su ausencia con advertencia durante al menos una versión.
@@ -235,9 +328,14 @@ ni en `docs/`, ni temporalmente. En `.gitignore`:
 
 ```
 *_CLIENTE*.xlsx
-DEMO_*.xlsx
+DEMO_datos_completos*.xlsx
 /datos-reales/
 ```
+
+El patrón ignora los demos con datos completos, no todo lo que empiece con `DEMO_`: el archivo
+de demostración **ficticio** sí está en el repositorio, a propósito, porque es el fixture de las
+pruebas. La línea que separa uno de otro es de dónde salieron las cifras, no cómo se llama el
+archivo.
 
 Las pruebas usan el archivo de demostración con datos ficticios. Si una prueba necesita
 un caso que solo aparece en datos reales, se reproduce el **caso**, no los datos:
@@ -253,10 +351,66 @@ posterior: hay que reescribir el historial y rotar lo que se haya expuesto.
 Priorizado. Lo de arriba entra primero.
 
 **Correcciones y deuda**
-- Regla `attach-rate-bajo`: no debe dispararse si el negocio no vende accesorios en
-  absoluto. Mismo error que ya se corrigió en cartera: ausencia de línea ≠ attach bajo.
+- **Quitar las normalizaciones redundantes de los consumidores.** Desde la 1.1.4 toda coerción y
+  toda canonización del contrato vive en el esquema (CLAUDE.md, «Restricciones aprendidas»).
+  Aun así quedan consumidores que vuelven a normalizar valores que ya llegan canónicos:
+  - `tipo` con `trim().toLowerCase()`: `src/lib/calc/resultados.ts:70` y
+    `src/modules/estado-resultados/selectores.ts:294` y `:299`.
+  - `comision_base` con `trim()`: `src/lib/calc/venta.ts:49`.
+  - `categoria` y `subcategoria` con `trim()`: `selectores.ts:385-386`.
+
+  Hoy no producen ningún error. El riesgo es otro: mientras exista normalización fuera del
+  esquema, alguien puede creer que ahí es donde va y reintroducir la divergencia que costó
+  cuatro parches. Quitarlas es lo que convierte la restricción en algo que el código sostiene,
+  y no solo el documento. Toca el motor, así que va con sus pruebas y sin mover cifras.
+- **Avisar de importes negativos en `precio_venta` y `costo_unitario`.** Decidido el
+  2026-09-14: no son decisiones de negocio válidas, sino errores de captura o de signo. Hoy se
+  aceptan sin aviso: «-500» se lee como −$500. Los importes negativos de `cobranza.monto` se
+  quedan sin aviso a propósito, porque pueden ser notas de crédito. La severidad se decide al
+  implementarlo, con el criterio de consecuencia (`docs/decisiones.md`, 2026-09-14).
 - Plantilla v2 con hojas como tablas de Excel, para eliminar las filas de relleno con
-  fórmulas y el renglón de nota que el lector tiene que descartar.
+  fórmulas y el renglón de nota que el lector tiene que descartar. Ese rediseño hay que hacerlo
+  igual, y es el momento de decidir con qué herramienta se genera la plantilla, que hoy se
+  edita a mano (sección 7). Opciones evaluadas el 2026-09-13:
+  1. **SheetJS más un inyector de XML** que agregue estilos, listas y paneles. No compensa hoy:
+     cambia sincronizar `ENCABEZADOS` con un .xlsx por sincronizar `ENCABEZADOS`, una tabla de
+     estilos y un inyector. Más piezas y el mismo riesgo de deriva.
+  2. **ExcelJS como dependencia solo del generador.** Escribe la presentación de forma nativa,
+     pero obliga a traducir el libro de SheetJS y es un cambio de stack que se discute antes.
+
+  Al rehacerla se limpian también las cadenas huérfanas de `xl/sharedStrings.xml` que dejaron
+  las ediciones a mano: los modelos de drones de la lista que se quitó y los textos que se
+  sustituyeron con celdas `inlineStr`. No se borran antes. Renumerar las referencias de todas
+  las hojas para quitar texto que nadie ve es riesgo sin beneficio, y es la misma clase de
+  cirugía que dejó 1,297 filas sin cerrar.
+- **Columnas fuera del contrato en las hojas de datos.** Verificado el 2026-09-14 ejecutándolo:
+  una columna `descuento` con valores en `ventas` se descarta sin ningún hallazgo. El esquema
+  la ignora y ninguna regla la mira. Falta avisar de toda columna con datos que no sea del
+  contrato, con hoja y nombre.
+- **`parametros` sin fila de encabezados.** Verificado ejecutándolo: si el cliente borra la
+  fila `parametro | valor | nota`, el lector toma la primera fila de datos por encabezado y su
+  valor se pierde en silencio. `provision_91_180` «30%» en la fila 1 aplicó 25% sin aviso.
+- **Coherencia entre parámetros.** Verificado por lectura del código, no ejecutado:
+  `periodo_fin` anterior a `periodo_inicio` no produce hallazgo. `diasDelPeriodo` devuelve
+  null, así que el DSO queda sin calcular, y `periodoDelReporte` pinta el rango al revés.
+- **El nombre propuesto del PDF no distingue el archivo de origen.** Observado el 2026-09-14 en la
+  primera corrida de `/verificar todo`: `nombreArchivoReporte()` (`src/components/impresion.ts`)
+  arma el nombre solo con el periodo y el corte. Dos archivos de origen distintos con el mismo
+  periodo y el mismo corte proponen los dos `Reporte_2026-01-01-a-2026-12-31_2026-09-09`, y Chrome
+  sobrescribe el primero sin avisar. Con multiempresa (v1.2) —dos clientes, mismo día— se vuelve
+  un problema real. Falta decidir qué distingue el nombre.
+- **El texto derecho del encabezado y del pie del PDF no tiene holgura.** Observado el
+  2026-09-14: en las hojas de módulo, «Corte al 09/09/2026 · DEMO_Agrodrones_Bajio_FICTICIO.xlsx»
+  termina a 0.1 pt del límite imprimible. Con un archivo de origen de nombre más largo no cabría.
+  No está verificado qué pasa entonces.
+- **Dos pruebas guardián pueden fallar por el disco y no por el código.** Observado el
+  2026-09-14: «ningun otro archivo lo importa» (`src/dev/__tests__/fixtureDesarrollo.test.ts`) y
+  «solo src/lib/preferencias menciona localStorage»
+  (`src/lib/preferencias/__tests__/preferencias.test.ts`) recorren `src/` leyendo cada archivo de
+  forma síncrona. En el repositorio tardan 0.2–0.3 s. En copias del proyecto bajo `%TEMP%`
+  tardaron hasta 7.4 s y fallaron por el límite de 5 s de vitest («Test timed out in 5000ms»);
+  con 60 s de límite pasaron, con la aserción cumplida. Es la peor clase de prueba frágil: su
+  rojo no dice nada del código, y enseña a ignorar el rojo de las pruebas que sí cuidan algo.
 - Gastos por categoría en el motor, hoy solo agregados.
 - Números de página en el PDF impreso.
 
@@ -269,8 +423,12 @@ Priorizado. Lo de arriba entra primero.
 
 **Arquitectura**
 - Persistencia con Supabase y autenticación, requisito de todo lo histórico.
-- **Conexión a Odoo por XML-RPC**, sustituyendo la carga de Excel. Es el destino del
-  proyecto: el motor de cálculo ya está preparado y solo cambia la fuente.
+- **Conexión a Odoo**, sustituyendo la carga de Excel. Es el destino del proyecto: el motor
+  de cálculo ya está preparado y solo cambia la fuente. El transporte va aislado del negocio
+  (ROADMAP.md, AD-02): un adaptador por protocolo detrás de una interfaz común, que soporte
+  XML-RPC/JSON-RPC y el API JSON-2 según la versión del ERP del cliente. XML-RPC y JSON-RPC
+  están programados para eliminarse en Odoo 22 y el JSON-2 es su reemplazo, así que habrá que
+  convivir con ambos durante años.
 - Web Worker para el parseo, si aparecen archivos grandes.
 
 ---

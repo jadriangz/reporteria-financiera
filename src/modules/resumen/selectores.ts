@@ -9,6 +9,7 @@ import {
   particionarVentas,
 } from "../../lib/calc";
 import { entero, fecha, moneda, porcentaje } from "../../lib/format";
+import { type ParametroSustituido, textoSustitucion } from "../../lib/parse/parametros";
 import type { Dataset } from "../../lib/schema";
 import type { Calculos } from "../../store/useAppStore";
 import { type ExposicionCliente, exposicionPorCliente } from "../cobranza/selectores";
@@ -237,6 +238,12 @@ export function textoPeriodo(periodo: Periodo | null): string {
 export interface Alcance {
   readonly incluye: readonly string[];
   readonly noIncluye: readonly string[];
+  /**
+   * Parametros capturados que no se pudieron leer, con lo que se aplico. Van en el
+   * alcance porque el alcance es lo que viaja en la portada del PDF, y el panel de
+   * validacion no.
+   */
+  readonly parametrosNoLeidos: readonly string[];
 }
 
 const MOTIVO_CORTO: Readonly<Record<VentaExcluida["motivo"], string>> = {
@@ -251,8 +258,16 @@ const MOTIVO_CORTO: Readonly<Record<VentaExcluida["motivo"], string>> = {
  * hay inventario ni balance, sin importar el archivo) y los huecos de ESTE
  * archivo (no trae fechas de pago, no trae dias de credito). El lector necesita
  * ambos para saber cuanto pesar las cifras.
+ *
+ * `sustituciones` son los parametros que no se pudieron leer y siguen vigentes
+ * (`sustitucionesVigentes`, en el store): el llamador las pasa, aqui solo se
+ * redactan.
  */
-export function alcanceDelReporte(dataset: Dataset, calculos: Calculos): Alcance {
+export function alcanceDelReporte(
+  dataset: Dataset,
+  calculos: Calculos,
+  sustituciones: readonly ParametroSustituido[] = [],
+): Alcance {
   const { resultados, capacidades } = calculos;
   const incluye: string[] = [];
   const noIncluye: string[] = [];
@@ -294,5 +309,5 @@ export function alcanceDelReporte(dataset: Dataset, calculos: Calculos): Alcance
   noIncluye.push("Utilidad neta auditada: no hay impuestos, depreciación ni gastos sin capturar.");
   noIncluye.push("Inventario, activos fijos, deuda ni aportaciones de socios.");
 
-  return { incluye, noIncluye };
+  return { incluye, noIncluye, parametrosNoLeidos: sustituciones.map(textoSustitucion) };
 }

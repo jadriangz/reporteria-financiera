@@ -175,7 +175,7 @@ const EJEMPLO: Readonly<Record<NombreHoja, (fila: number) => Celda[]>> = {
     texto("15/03/2026"),
     texto("Equipo"),
     texto("EJEMPLO — Cliente Demostrativo"),
-    texto("T55"),
+    texto("Modelo A"),
     texto("ABC123456789"),
     importe(20_000_000),
     importe(26_000_000),
@@ -265,7 +265,11 @@ function hojaParametros(xlsx: ModuloSheetJS, p: Parametros): SheetJS.WorkSheet {
         ? "PENDIENTE — Escriba SI o NO. Critico: define si los reportes van con o sin IVA."
         : "SI o NO: define si los reportes van con o sin IVA.",
     ],
-    ["tasa_iva", numero(p.tasa_iva), "Tasa aplicable."],
+    [
+      "tasa_iva",
+      numero(p.tasa_iva),
+      "Tasa aplicable. Porcentaje: 16%, 16 o 0.16 valen lo mismo; un numero mayor que 1 se lee como por ciento.",
+    ],
     ["periodo_inicio", fecha(p.periodo_inicio), "Inicio del periodo a reportar."],
     ["periodo_fin", fecha(p.periodo_fin), "Fin del periodo a reportar."],
     ["comision_base_default", texto(p.comision_base_default), "Venta, Utilidad o No aplica."],
@@ -273,12 +277,12 @@ function hojaParametros(xlsx: ModuloSheetJS, p: Parametros): SheetJS.WorkSheet {
     [
       "provision_91_180",
       numero(p.provision_91_180),
-      "% de la cartera de 91-180 dias que se estima incobrable.",
+      "% de la cartera de 91-180 dias que se estima incobrable. Porcentaje: 25%, 25 o 0.25; un numero mayor que 1 se lee como por ciento.",
     ],
     [
       "provision_mas_180",
       numero(p.provision_mas_180),
-      "% de la cartera de mas de 180 dias que se estima incobrable.",
+      "% de la cartera de mas de 180 dias que se estima incobrable. Porcentaje: 50%, 50 o 0.50; un numero mayor que 1 se lee como por ciento.",
     ],
     ["tipo_cambio_usd", numero(p.tipo_cambio_usd), "Solo si compran en USD."],
     [

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { AvisoParametros, PARAMETROS_DE } from "../../components/AvisoParametros";
 import { NombreCliente } from "../../components/NombreCliente";
 import { Callout, TodoEnOrden } from "../../components/ui/Callout";
 import { Grafica } from "../../components/ui/Grafica";
@@ -7,7 +8,7 @@ import { RejillaKPI, TarjetaKPI } from "../../components/ui/TarjetaKPI";
 import { Boton, Cifra, RejillaSecciones, Seccion } from "../../components/ui/primitivas";
 import { etiquetaOrigen, totalCapturas } from "../../lib/captura";
 import { fecha, moneda } from "../../lib/format";
-import { type Calculos, type IdModulo, useAppStore } from "../../store/useAppStore";
+import { type Calculos, type IdModulo, sustitucionesVigentes, useAppStore } from "../../store/useAppStore";
 import { BarraAntiguedad } from "../cobranza/BarraAntiguedad";
 import { ETIQUETA_BUCKET } from "../cobranza/selectores";
 import { TablaCascada } from "../estado-resultados/TablaCascada";
@@ -23,6 +24,9 @@ import {
   porSeveridad,
   textoPeriodo,
 } from "./selectores";
+
+/** El hallazgo del motor que usa los parametros de IVA: su tarjeta lleva el aviso si no se pudieron leer. */
+const ID_INSIGHT_IVA = "importes-iva";
 
 /**
  * Modulo 1 — Resumen ejecutivo.
@@ -111,6 +115,7 @@ function Hallazgos({ calculos }: { calculos: Calculos }) {
       {hallazgos.map((i) => (
         <Callout key={i.id} titulo={i.titulo} tono={i.nivel}>
           {i.detalle}
+          {i.id === ID_INSIGHT_IVA && <AvisoParametros claves={PARAMETROS_DE.iva} />}
         </Callout>
       ))}
     </div>
@@ -202,7 +207,9 @@ function PieDeAlcance({ calculos }: { calculos: Calculos }) {
   const dataset = useAppStore((s) => s.dataset);
   const nombreArchivo = useAppStore((s) => s.nombreArchivo);
   const capturas = useAppStore((s) => s.capturas);
-  const iva = calculos.insights.find((i) => i.id === "importes-iva");
+  const sustituciones = useAppStore((s) => s.sustituciones);
+  const ajustados = useAppStore((s) => s.ajustados);
+  const iva = calculos.insights.find((i) => i.id === ID_INSIGHT_IVA);
 
   return (
     <footer className="imp-bloque border-t-2 border-marino pt-3 text-xs text-slate-700">
@@ -214,17 +221,25 @@ function PieDeAlcance({ calculos }: { calculos: Calculos }) {
         <dt className="font-semibold">Fecha de corte</dt>
         <dd className="cifras">{fecha(calculos.cartera.fechaCorte)}</dd>
         <dt className="font-semibold">Periodo</dt>
-        <dd className="cifras">{dataset === null ? "—" : textoPeriodo(periodoDelReporte(dataset))}</dd>
+        <dd>
+          <span className="cifras">{dataset === null ? "—" : textoPeriodo(periodoDelReporte(dataset))}</span>
+          <AvisoParametros claves={PARAMETROS_DE.periodo} />
+        </dd>
         <dt className="font-semibold">Origen de los datos</dt>
         <dd>{etiquetaOrigen(nombreArchivo, totalCapturas(capturas))}</dd>
       </dl>
 
-      {dataset !== null && <ListaAlcance alcance={alcanceDelReporte(dataset, calculos)} />}
+      {dataset !== null && (
+        <ListaAlcance
+          alcance={alcanceDelReporte(dataset, calculos, sustitucionesVigentes({ sustituciones, ajustados }))}
+        />
+      )}
 
       {iva !== undefined && (
         <div className="mt-3">
           <Callout titulo={iva.titulo} tono={iva.nivel}>
             {iva.detalle}
+            <AvisoParametros claves={PARAMETROS_DE.iva} />
           </Callout>
         </div>
       )}
@@ -235,24 +250,42 @@ function PieDeAlcance({ calculos }: { calculos: Calculos }) {
 /** Lo que el reporte cubre y lo que no. Lo usan el pie del Resumen y la portada. */
 export function ListaAlcance({ alcance }: { alcance: ReturnType<typeof alcanceDelReporte> }) {
   return (
-    <div className="mt-3 grid gap-4 sm:grid-cols-2">
-      <div>
-        <p className="font-semibold text-marino">Incluye</p>
-        <ul className="mt-1 list-disc space-y-0.5 pl-4 cifras">
-          {alcance.incluye.map((t) => (
-            <li key={t}>{t}</li>
-          ))}
-        </ul>
+    <>
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="font-semibold text-marino">Incluye</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 cifras">
+            {alcance.incluye.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="font-semibold text-advertencia">No incluye</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {alcance.noIncluye.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </div>
       </div>
-      <div>
-        <p className="font-semibold text-advertencia">No incluye</p>
-        <ul className="mt-1 list-disc space-y-0.5 pl-4">
-          {alcance.noIncluye.map((t) => (
-            <li key={t}>{t}</li>
-          ))}
-        </ul>
-      </div>
-    </div>
+      {/*
+        Los parametros sustituidos van en el alcance porque el alcance es lo que
+        viaja en la portada del PDF, y el panel de validacion no: quien recibe el
+        papel tiene que saber con que tasa se calculo, no con cual se capturo.
+      */}
+      {alcance.parametrosNoLeidos.length > 0 && (
+        <div className="mt-3">
+          <p className="font-semibold text-advertencia">Parámetros que no se pudieron leer</p>
+          <p className="mt-0.5">El reporte se calculó con el valor indicado, no con el capturado.</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {alcance.parametrosNoLeidos.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
   );
 }
 

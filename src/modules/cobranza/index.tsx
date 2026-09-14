@@ -1,3 +1,4 @@
+import { AvisoParametros, PARAMETROS_DE } from "../../components/AvisoParametros";
 import { Callout, TodoEnOrden } from "../../components/ui/Callout";
 import { TablaCifras } from "../../components/ui/TablaCifras";
 import { RejillaKPI, TarjetaKPI } from "../../components/ui/TarjetaKPI";
@@ -106,6 +107,7 @@ function Indicadores({ calculos }: { calculos: Calculos }) {
   const partMas180 = cartera.aging.participacion["+180"];
 
   return (
+    <>
     <RejillaKPI>
       <TarjetaKPI
         etiqueta="Saldo por cobrar"
@@ -139,6 +141,11 @@ function Indicadores({ calculos }: { calculos: Calculos }) {
         }
       />
     </RejillaKPI>
+    <AvisoParametros
+      claves={PARAMETROS_DE.periodo}
+      efecto="El DSO se calcula con los días del rango de las ventas capturadas."
+    />
+    </>
   );
 }
 
@@ -334,6 +341,10 @@ function PanelProvision({ calculos }: { calculos: Calculos }) {
           valor={parametros.provisionMas180}
           onChange={(v) => actualizarParametro("provisionMas180", v)}
           monto={porBucket["+180"]}
+        />
+        <AvisoParametros
+          claves={PARAMETROS_DE.provision}
+          efecto="Ajuste la tasa aquí para fijarla; al hacerlo, su aviso desaparece."
         />
 
         <div className="mt-3 border-t border-slate-200 pt-2">

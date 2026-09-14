@@ -44,6 +44,11 @@ src/
     calc/              motor de cálculo: funciones puras, sin React
       __tests__/       pruebas contra el archivo de demostración ficticio
     format/            formateo de moneda, fecha, porcentaje
+    captura/           captura manual de filas: escribe al mismo store normalizado
+    exportar/          exportación del dataset a Excel con la estructura de la plantilla
+    preferencias/      preferencias de interfaz: la única excepción a no persistir
+    tema/              paleta y contraste de los temas claro y oscuro
+  dev/                 solo desarrollo: `?fixture=demo`, ausente del build de producción
   store/               estado global (Zustand), en memoria
   modules/             un directorio por módulo de reporte
     resumen/             1. Resumen ejecutivo
@@ -53,7 +58,7 @@ src/
     producto/            5. Rendimiento por producto
     clientes/            6. Clientes
   components/ui/       primitivas compartidas
-docs/                  plantilla Excel, PDF de referencia, contrato
+docs/                  plantilla Excel, demo ficticio, línea base del PDF, decisiones
 ```
 
 Reglas de arquitectura, definiciones de cálculo y orden de construcción: ver `CLAUDE.md`.
@@ -64,4 +69,6 @@ Reglas de arquitectura, definiciones de cálculo y orden de construcción: ver `
   solo al pintar.
 - Ningún componente calcula. Si un componente hace `.reduce()` sobre montos, ese cálculo va
   en `src/lib/calc/` con su prueba.
-- Nada de `localStorage`, `sessionStorage` ni `IndexedDB` en v1.
+- Nada de `localStorage`, `sessionStorage` ni `IndexedDB` para datos. Hay una única excepción,
+  acotada a preferencias de interfaz y encapsulada en `src/lib/preferencias/`: la regla y su
+  porqué están en la regla dura 1 de `CLAUDE.md`, y solo ahí.

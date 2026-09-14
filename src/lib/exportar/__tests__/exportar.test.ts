@@ -171,6 +171,27 @@ describe("misma estructura que la plantilla", () => {
     expect(exportado.Sheets["ventas"]?.["A3"]?.v).toBe("V-001");
   });
 
+  it("la fila de ejemplo es la de la plantilla, celda por celda", () => {
+    // Son dos copias del mismo ejemplo: si divergen, el primer archivo exportado
+    // le devuelve al cliente algo distinto de lo que descargo. Asi volvio a
+    // aparecer el modelo "T55" del cliente de drones.
+    const vacio: Dataset = { ventas: [], cobranza: [], gastos: [], parametros: ParametrosSchema.parse({}) };
+    const exportado = libroDeDataset(XLSX, vacio);
+    const celda = (libro: XLSX.WorkBook, hoja: string, ref: string) => {
+      const c = libro.Sheets[hoja]?.[ref] as XLSX.CellObject | undefined;
+      if (c === undefined) return null;
+      // Las formulas se comparan por su texto: la plantilla guarda ademas el
+      // ultimo valor calculado, que la exportacion no escribe.
+      return c.f === undefined ? { v: c.v, z: c.z === "General" ? undefined : c.z } : { f: c.f, z: c.z };
+    };
+    for (const hoja of ["ventas", "cobranza", "gastos"] as const) {
+      ENCABEZADOS[hoja].forEach((campo, c) => {
+        const ref = XLSX.utils.encode_cell({ r: 1, c });
+        expect(celda(exportado, hoja, ref), `${hoja}.${campo}`).toEqual(celda(plantilla, hoja, ref));
+      });
+    }
+  });
+
   it("los importes, fechas y porcentajes llevan los formatos de la plantilla", () => {
     const ventas = libroDeDataset(XLSX, cargarFixture()).Sheets["ventas"];
     expect(ventas?.["H3"]).toMatchObject({ t: "n", v: 520_000, z: FORMATO.moneda });

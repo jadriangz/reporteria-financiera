@@ -62,6 +62,10 @@ export interface RawParametros {
   readonly valores: Readonly<Record<string, RawCelda>>;
   /** Número de fila real de cada parámetro, para poder señalarlo. */
   readonly filaDe: Readonly<Record<string, number>>;
+  /** Filas de cada clave escrita más de una vez. Gana la última; la regla `parametro-repetido` lo avisa. */
+  readonly filasRepetidas: Readonly<Record<string, readonly number[]>>;
+  /** Filas con un valor pero sin nombre de parámetro: el valor no se aplica, y se avisa. */
+  readonly filasSinClave: readonly number[];
 }
 
 export interface RawSheets {

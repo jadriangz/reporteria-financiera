@@ -168,17 +168,28 @@ function construirParametros(rejilla: Rejilla, filaInicial: number): RawParametr
 
   const valores: Record<string, RawCelda> = {};
   const filaDe: Record<string, number> = {};
+  const filasDeClave: Record<string, number[]> = {};
+  const filasSinClave: number[] = [];
 
   for (let i = filaEncabezado + 1; i < rejilla.length; i += 1) {
     const celdas = rejilla[i];
     if (celdas === undefined) continue;
+    const fila = i + filaInicial;
     const clave = normalizarClave(celdas[colParam]);
-    if (clave === "") continue;
-    valores[clave] = celdas[colValor] ?? null;
-    filaDe[clave] = i + filaInicial;
+    const valor = celdas[colValor] ?? null;
+    if (clave === "") {
+      // Un valor sin nombre no se puede aplicar, pero tampoco se tira en silencio.
+      if (!celdaVacia(valor)) filasSinClave.push(fila);
+      continue;
+    }
+    // Si una clave se repite gana la ultima fila; la regla `parametro-repetido` lo dice.
+    valores[clave] = valor;
+    filaDe[clave] = fila;
+    (filasDeClave[clave] ??= []).push(fila);
   }
 
-  return { presente: true, valores, filaDe };
+  const filasRepetidas = Object.fromEntries(Object.entries(filasDeClave).filter(([, filas]) => filas.length > 1));
+  return { presente: true, valores, filaDe, filasRepetidas, filasSinClave };
 }
 
 // --------------------------- Lectura de xlsx ---------------------------
@@ -249,7 +260,7 @@ function leerXlsx(sheetjs: ModuloSheetJS, datos: ArrayBuffer, origen: string): R
   }
 
   const wsParam = porNombre.get("parametros");
-  let parametros: RawParametros = { presente: false, valores: {}, filaDe: {} };
+  let parametros: RawParametros = { presente: false, valores: {}, filaDe: {}, filasRepetidas: {}, filasSinClave: [] };
   if (wsParam !== undefined) {
     const { rejilla, filaInicial } = rejillaDeHoja(sheetjs, wsParam);
     parametros = construirParametros(rejilla, filaInicial);
@@ -291,7 +302,7 @@ function leerCsv(datos: ArrayBuffer, origen: string): RawSheets {
     ventas: hojaVacia("ventas"),
     cobranza: hojaVacia("cobranza"),
     gastos: hojaVacia("gastos"),
-    parametros: { presente: false, valores: {}, filaDe: {} },
+    parametros: { presente: false, valores: {}, filaDe: {}, filasRepetidas: {}, filasSinClave: [] },
   };
 
   const encabezados = (rejilla[0] ?? []).map(normalizarClave);

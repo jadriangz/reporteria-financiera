@@ -62,22 +62,37 @@ Llave de relación: `ventas.folio` ←→ `cobranza.folio_venta`.
 ### Trampas de parseo (documentadas, ya nos costaron)
 
 - **Importes en formato europeo**: `$ 444.800,00` → punto es separador de miles, coma es
-  decimal. Normalizar: quitar `$` y espacios, quitar `.`, cambiar `,` por `.`.
+  decimal. Normalizar: quitar `$` y espacios, quitar `.`, cambiar `,` por `.`. Un texto con
+  otra gramática (`1,234.56`, `1234.56`, `1.50`) **no se adivina**: se rechaza como importe
+  ilegible. Normalizado con la regla de arriba valdría $1.23, $123,456 y $150, sin aviso.
 - **Fechas en `dd/mm/aaaa`**. JavaScript las interpreta como `mm/dd`. Parsear explícitamente,
-  nunca con `new Date(string)`.
+  nunca con `new Date(string)`. El serial de Excel se toma sin la hora, y una fecha fuera de
+  1990–2100 no se lee: un serial 45 sería el 13 de febrero de 1900.
 - Valores basura esperados en celdas numéricas: `N/a`, `N/A`, `-`, `` (vacío), `$ - `.
 - Espacios sobrantes en nombres de cliente y modelo → `.trim()` siempre.
 - Modelos con distinta capitalización (`T70p` / `T70P`) deben normalizarse a mayúsculas
   antes de agrupar, o el reporte por modelo se duplica.
+- **Porcentajes**, en `comision_pct` y en los parámetros: `30%`, `30`, `0.30` y `0,30` son
+  30% (`parsePct`). Un número mayor que 1 se lee como por ciento, nunca como 3000%, y `1` solo
+  es 100%: para uno por ciento se escribe `1%`. La regla está escrita en INSTRUCCIONES y en las
+  notas de `parametros` de la plantilla, porque es la que el usuario tiene que conocer.
 
 ### Validación
 
 Al cargar, mostrar un **panel de resultados de validación** con tres niveles:
 
 - **Error** (bloquea el módulo afectado): folio duplicado, `cobranza.folio_venta` sin venta
-  correspondiente, monto no numérico, fecha inválida.
+  correspondiente, monto que no se puede leer (incluido un importe con otra gramática que la
+  europea), fecha inválida o fuera de 1990–2100.
 - **Advertencia** (no bloquea): fila sin fecha, venta sin `dias_credito`, abono que excede el
-  precio de venta, margen exactamente uniforme en más del 80% de las filas.
+  precio de venta, margen exactamente uniforme en más del 80% de las filas, valor de una
+  columna de lista que no es ninguna de sus opciones (se toma como celda vacía y se dice qué
+  se aplicó), parámetro capturado que no se puede leer, con un nombre que no es del
+  contrato, repetido o sin nombre (se aplica su valor por omisión o se ignora, y se dice
+  qué se capturó, qué se aplicó y qué formatos se aceptan; si el parámetro mueve cifras, el aviso
+  aparece además junto a la cifra y en el bloque Alcance de la portada del PDF), `dias_credito`
+  que no es un entero no negativo (se mide por antigüedad, como sin `dias_credito`), porcentaje
+  que no se puede leer o fuera de 0–100% (la venta va sin comisión, como con la celda vacía).
 - **Info**: filas ignoradas por estar vacías, filas con `linea = "Demo"` excluidas del análisis.
 
 Cada mensaje debe indicar **hoja, número de fila y qué corregir**. Un validador que solo dice
@@ -95,11 +110,60 @@ las "simplifica" sin leer el porqué, rompe el reporte en silencio.
 - **El parser CONSERVA las filas con `linea = "Demo"`.** Excluirlas es trabajo exclusivo
   del motor de cálculo. Si el lector las tira, el motor pierde la capacidad de listarlas
   aparte y el usuario nunca se entera de que existen.
+- **Las columnas de lista llegan al motor con la grafía del contrato o vacías, nunca con
+  otro valor.** `ENUMERACIONES` (`schema.ts`) declara las seis —`linea`, `comision_base`,
+  `condicion`, `metodo`, `categoria`, `tipo`— con lo que recibe su celda vacía. `canonizar`
+  ignora mayúsculas, espacios y acentos («demo» → `Demo`, «Crédito» → `Credito`); lo que ni
+  así es de la lista recibe lo de la celda vacía, y una advertencia dice qué se capturó y qué
+  se aplicó. `comision_base_default` sigue el mismo criterio. El motor compara exacto: sin
+  esto, una fila «demo» se contó como venta y «utilidad» cobró la comisión sobre el precio,
+  mientras el panel callaba o afirmaba lo contrario. Canonizar no es excluir: la fila se
+  conserva.
+- **La hoja `parametros` se valida como las de datos: ningún valor capturado se descarta sin
+  un hallazgo.** `src/lib/parse/parametros.ts` declara cómo se lee cada parámetro y qué
+  formatos acepta; `validate()` y la regla `parametro-no-reconocido` consultan esa misma
+  declaración. Lo que no se puede leer toma su valor por omisión y el panel dice qué se
+  capturó, qué se aplicó y qué formatos se aceptan. Una clave desconocida, repetida o un valor
+  sin nombre también se avisan. Los parámetros son lo único que el usuario configura a mano:
+  un 30% leído como 25% sin aviso es su decisión descartada en silencio.
+- **Toda coerción y toda canonización del contrato vive en el esquema (`src/lib/schema.ts`), y
+  ningún consumidor interpreta valores crudos.** El motor, los selectores y la interfaz reciben
+  el dataset ya coercionado y no vuelven a leer lo que el usuario escribió. El validador sí mira
+  la celda cruda, pero solo para preguntarle al esquema si pudo leerla, nunca con una coerción
+  propia; `src/lib/parse/parametros.ts` solo elige qué coerción del esquema lee cada parámetro y
+  redacta los mensajes. Los cuatro defectos de la serie 1.1.1–1.1.4 fueron **el mismo error de
+  diseño**: el contrato prometía algo que el esquema no verificaba, y cada consumidor coercionaba
+  por su cuenta.
+  1. **`linea` «demo» (1.1.1).** El validador comparaba sin mayúsculas y el motor exacto: el
+     panel decía «excluida» y el motor la contaba como venta.
+  2. **`comision_base` «utilidad» (1.1.2).** El motor comparaba exacto y cobraba la comisión
+     sobre el precio; `comision_base_default` no reconocido caía a «Venta» sin aviso.
+  3. **La hoja `parametros` (1.1.3).** `validate()` coercionaba cada parámetro con su propia
+     regla y lo ilegible caía a su valor por omisión en silencio: «30%» se aplicaba como 25%.
+  4. **Las hojas de datos (1.1.4).** `dias_credito` con `Number()`: «30dias» entraba al dataset
+     como NaN, y «-5» o «30.5» se usaban tal cual en el aging. El motor protegía el aging contra
+     NaN por su cuenta, que es justo el patrón. También `comision_pct` sin rango (150%),
+     importes con otra gramática leídos en silencio («1,234.56» como $1.23) y seriales de fecha
+     sin rango ni hora (45 → 1900).
+
+  Ampliar el contrato es ampliar el esquema. Una lectura nueva escrita en otro lugar sería el
+  quinto caso.
 - **`fecha_corte` nunca tiene valor por omisión dentro del motor.** Es un campo obligatorio
   de `OpcionesCartera` y `OpcionesInsights`, y ninguna función de `calc/` llama a
   `new Date()`. El default de "hoy" vive en la UI (`hoyUTC()`), no en el cálculo: si el
   motor lo tomara del reloj, el mismo archivo daría un aging distinto cada día y las
   pruebas del fixture caducarían solas. Las pruebas pasan `2026-09-09` explícitamente.
+- **El parámetro `?fixture=demo` es exclusivo de desarrollo, y su guarda no es cosmética.**
+  Carga el archivo de demostración y fija el corte en `2026-09-09` para que `/verificar` recorra
+  la matriz de anchos y temas sin intervención humana. `src/main.tsx` lo importa dentro de
+  `if (import.meta.env.DEV)`: en `build`, Vite sustituye esa expresión por `false`, Rollup
+  elimina la rama y el chunk dinámico nunca se emite, así que en producción el módulo no queda
+  inerte, queda **ausente**. La ruta del archivo es un import estático `?url` y **nunca sale de
+  la query** —lo que viaja en la URL es una bandera que se compara contra un literal—, por eso no
+  puede cargar una ruta arbitraria. Una prueba guardián
+  (`src/dev/__tests__/fixtureDesarrollo.test.ts`) exige las dos cosas; quitar cualquiera de las
+  dos publicaría un cargador de archivos en una aplicación cuyo argumento de venta es que los
+  datos no salen del navegador.
 
 ## Definiciones de cálculo (exactas, no reinterpretar)
 
@@ -125,7 +189,9 @@ punto_equilibrio_mxn  = gastos_fijos / margen_contribucion_pct
 
 **Filas con `linea = "Demo"` se excluyen de todo cálculo de venta**, pero se listan aparte.
 
-`fecha_corte` = hoy por defecto, configurable por el usuario en la barra superior.
+`fecha_corte` **no tiene valor por omisión en el cálculo**: toda función de `calc/` la recibe
+explícita. El "hoy" por defecto lo pone la UI al arrancar (`fechaCorte: hoyUTC()` en el store) y
+el usuario lo cambia en la barra superior. Ver «Restricciones aprendidas».
 
 ## Módulos de reporte
 
@@ -160,7 +226,8 @@ Incluir exportación a Excel del dataset actual para que el cliente se lleve su 
 ## Exportación a PDF
 
 Vista imprimible con `@media print` y `window.print()`. No agregar Puppeteer ni librerías
-pesadas. El PDF de referencia (11 páginas) define la estructura y el orden de secciones.
+pesadas. La estructura y el orden de secciones los define `docs/linea-base-pdf.md`, que es la
+línea base contra la que `/verificar` compara el PDF generado.
 
 ## Dirección visual
 

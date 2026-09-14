@@ -1,5 +1,4 @@
 import {
-  COMISION_BASE,
   type Cobranza,
   CobranzaSchema,
   type Dataset,
@@ -10,17 +9,22 @@ import {
   ParametrosSchema,
   type Venta,
   VentaSchema,
-  parseBool,
-  parseFecha,
-  parseNumero,
 } from "../schema";
 
+import { CLAVES_PARAMETROS, LECTURAS, type ParametroSustituido, sinCapturar } from "./parametros";
 import { REGLAS, type ContextoValidacion, type FilaEvaluada } from "./reglas";
-import type { RawCelda, RawHoja, RawParametros, RawSheets } from "./tipos";
+import type { RawHoja, RawParametros, RawSheets } from "./tipos";
 
 export interface ResultadoValidacion {
   readonly dataset: Dataset;
   readonly hallazgos: readonly Hallazgo[];
+  /**
+   * Parametros capturados que no se pudieron leer, con lo que se aplico en su
+   * lugar. Son datos y no texto: el store los guarda con el dataset y la interfaz
+   * los pinta junto a la cifra que afectan y en la portada del PDF, porque el
+   * panel de validacion no viaja con el documento. El motor no los ve (AD-06).
+   */
+  readonly sustituciones: readonly ParametroSustituido[];
 }
 
 /**
@@ -46,41 +50,34 @@ function aplicarEsquema<T>(
 }
 
 /**
- * Coerciona la hoja clave-valor a los tipos que espera ParametrosSchema.
+ * Lee la hoja clave-valor con la declaracion de `parametros.ts`.
  *
- * Zod aplica `.default()` solo ante `undefined`, nunca ante `null`, asi que un
- * parametro que el cliente dejo en blanco debe omitirse para que tome su valor
- * por omision. La excepcion es importes_incluyen_iva, cuyo default ES null:
- * ahi null significa "el cliente todavia no lo contesta".
+ * Zod aplica `.default()` solo ante `undefined`, asi que un parametro vacio se
+ * omite para que tome su valor por omision. Uno capturado que no se puede leer
+ * tambien se omite, pero queda registrado como sustitucion: la regla
+ * `parametro-no-reconocido` lo avisa en el panel y la interfaz lo pinta donde
+ * se usa. Las dos cosas salen de esta misma lista.
  */
-function coercionarParametros(raw: RawParametros): Parametros {
-  const v = raw.valores;
-  const crudo = (k: string): RawCelda => v[k] ?? null;
-
-  const numero = (k: string): number | undefined => parseNumero(crudo(k)) ?? undefined;
-  const fecha = (k: string): Date | undefined => parseFecha(crudo(k)) ?? undefined;
-
-  const monedaBase = String(crudo("moneda_base") ?? "").trim();
-  const nombreCliente = String(crudo("nombre_cliente") ?? "").trim();
-  const baseComision = String(crudo("comision_base_default") ?? "").trim();
-  const comisionValida = (COMISION_BASE as readonly string[]).includes(baseComision);
-
-  const entrada: Record<string, unknown> = {
-    importes_incluyen_iva: parseBool(crudo("importes_incluyen_iva")),
-  };
-  if (monedaBase !== "") entrada["moneda_base"] = monedaBase;
-  if (nombreCliente !== "") entrada["nombre_cliente"] = nombreCliente;
-  if (comisionValida) entrada["comision_base_default"] = baseComision;
-  for (const k of ["tasa_iva", "provision_91_180", "provision_mas_180", "dias_credito_default", "tipo_cambio_usd"]) {
-    const n = numero(k);
-    if (n !== undefined) entrada[k] = n;
+function leerParametros(raw: RawParametros): { parametros: Parametros; sustituciones: ParametroSustituido[] } {
+  const entrada: Partial<Record<keyof Parametros, unknown>> = {};
+  const sustituciones: ParametroSustituido[] = [];
+  for (const clave of CLAVES_PARAMETROS) {
+    const crudo = raw.valores[clave];
+    if (sinCapturar(crudo)) continue;
+    const lectura = LECTURAS[clave];
+    const valor = lectura.leer(crudo ?? null);
+    if (valor !== null) {
+      entrada[clave] = valor;
+      continue;
+    }
+    sustituciones.push({
+      clave,
+      capturado: String(crudo).trim(),
+      aplicado: lectura.porOmision,
+      fila: raw.filaDe[clave] ?? null,
+    });
   }
-  for (const k of ["periodo_inicio", "periodo_fin"]) {
-    const f = fecha(k);
-    if (f !== undefined) entrada[k] = f;
-  }
-
-  return ParametrosSchema.parse(entrada);
+  return { parametros: ParametrosSchema.parse(entrada), sustituciones };
 }
 
 /**
@@ -95,12 +92,13 @@ export function validate(raw: RawSheets): ResultadoValidacion {
   const ventas = aplicarEsquema<Venta>(raw.ventas, VentaSchema);
   const cobranza = aplicarEsquema<Cobranza>(raw.cobranza, CobranzaSchema);
   const gastos = aplicarEsquema<Gasto>(raw.gastos, GastoSchema);
+  const { parametros, sustituciones } = leerParametros(raw.parametros);
 
   const dataset: Dataset = {
     ventas: ventas.filas,
     cobranza: cobranza.filas,
     gastos: gastos.filas,
-    parametros: coercionarParametros(raw.parametros),
+    parametros,
   };
 
   const ctx: ContextoValidacion = {
@@ -108,11 +106,12 @@ export function validate(raw: RawSheets): ResultadoValidacion {
     ventas: ventas.evaluadas,
     cobranza: cobranza.evaluadas,
     gastos: gastos.evaluadas,
+    sustituciones,
   };
 
   const hallazgos = REGLAS.flatMap((regla) => regla.evaluar(ctx));
 
-  return { dataset, hallazgos };
+  return { dataset, hallazgos, sustituciones };
 }
 
 /** Atajo para la UI: cuenta hallazgos por severidad. */

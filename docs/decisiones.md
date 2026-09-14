@@ -295,3 +295,355 @@ hueco por categoría y predecía barras de 14 px donde el navegador dibujaba 10:
 `barCategoryGap` se aplica a **cada lado** del grupo. El modelo ahora descuenta
 los dos huecos y los márgenes del área de dibujo, y sus predicciones coinciden
 con lo medido en el navegador.
+
+---
+
+## 2026-09-12 — La línea base del PDF es un manifiesto, no el PDF
+
+**Contexto.** `CLAUDE.md` y `README.md` citaban un «PDF de referencia (11
+páginas)» como definición de la estructura y el orden de secciones del reporte.
+Ese archivo no está en el repositorio ni lo estuvo nunca: cero resultados en
+disco y cero en el historial de Git. Era una referencia muerta, y `/verificar`
+necesitaba algo real contra lo que comparar el PDF que genera.
+
+**Decisión.** La línea base vive en `docs/linea-base-pdf.md`: orden y títulos de
+sección, orientación de cada página, invariantes del papel, las cifras que deben
+leerse en él, y las casillas que la primera corrida rellena. Las dos referencias
+muertas ahora apuntan ahí.
+
+**Alternativa descartada.** Commitear un PDF de referencia y comparar página por
+página. Un binario no se revisa en un diff: nadie ve en un pull request qué
+cambió, así que el archivo envejece sin que nadie lo note —que es exactamente lo
+que le pasó al de 11 páginas—. Además obligaría a regenerarlo entero por mover
+un corte de página.
+
+**Consecuencia.** La comparación es de estructura e invariantes, no de píxeles, y
+eso es lo que había que vigilar: que el orden del reporte no se mueva, que el
+Estado de resultados siga apaisado, que la página «Módulos no incluidos» no
+aparezca con el archivo de demostración —que habilita los seis módulos—, y que el
+papel salga en claro aunque la pantalla esté en oscuro. Actualizar la línea base
+exige editar texto y registrar la decisión, no sobrescribir un binario en
+silencio.
+
+---
+
+## 2026-09-12 — El recorrido de verificación carga el fixture con un parámetro de desarrollo
+
+**Contexto.** `/verificar` recorre seis módulos en cuatro anchos y dos temas:
+cuarenta y ocho estados. Arrastrar el archivo de demostración a mano en cada
+arranque, y además fijar la fecha de corte en `2026-09-09` para que el aging
+coincida con las cifras de referencia, convertía el recorrido en algo que nadie
+iba a completar dos veces.
+
+**Decisión.** `?fixture=demo`, exclusivo de desarrollo. `src/main.tsx` importa el
+módulo dentro de `if (import.meta.env.DEV)`: en `build`, Vite sustituye esa
+expresión por `false`, Rollup elimina la rama y el chunk dinámico nunca se emite,
+así que en producción el módulo no queda inerte, queda **ausente**. La ruta del
+archivo es un import estático `?url` y nunca sale de la query; lo que viaja en la
+URL es una bandera que se compara contra un literal.
+
+**Alternativa descartada.** Un parámetro que reciba la ruta del archivo
+(`?archivo=…`). Habría servido también para el archivo real del cliente, y ahí
+está el problema: un cargador de rutas arbitrarias en una aplicación cuyo
+argumento de venta es que los datos no salen del navegador. La comodidad no vale
+ese riesgo, y el fixture es el único archivo que el recorrido necesita.
+
+**Consecuencia.** La cerca es doble y automática. Una prueba guardián recorre
+`src/` —al estilo de la que protege `src/lib/preferencias`— y exige que el módulo
+entre solo por `main.tsx` bajo la guarda, y que dentro del módulo la ruta venga
+solo del import estático. Y trece casos de ejecución comprueban que ninguna query
+—incluida `?fixture=demo&archivo=/etc/passwd`— pida algo distinto del fixture.
+Como evidencia de que la rama no llega al cliente: el bundle de producción quedó
+con los mismos hashes que antes del cambio, byte a byte idéntico.
+
+---
+
+## 2026-09-13 — La plantilla se edita a mano: no hay generador
+
+**Contexto.** La plantilla y `ENCABEZADOS` son dos copias del contrato,
+sincronizadas por una prueba. Se propuso un generador que produjera el .xlsx
+reutilizando la exportación a Excel con un dataset vacío, para que la divergencia
+fuera imposible por construcción. Un prototipo midió lo que se perdía: la versión
+gratuita de SheetJS no escribe estilos de celda, listas desplegables ni paneles
+fijos. La plantilla tiene unas 1,460 celdas con estilo, 7 reglas de validación y
+el encabezado fijo en cuatro hojas. Además, su hoja INSTRUCCIONES le dice al
+cliente «solo escriba en las celdas de letra azul» y que la fila de fondo verde es
+el ejemplo.
+
+**Decisión.** No se escribe el generador. La plantilla se edita a mano sobre su
+XML, conservando estilos, listas y paneles (GOBERNANZA.md §7, paso 2). La
+herramienta de generación se decide con el rediseño de la plantilla v2 (§11).
+
+**Alternativa descartada.** El generador con SheetJS más un inyector de XML que
+agregue estilos, listas y paneles. No quita piezas: cambia sincronizar
+`ENCABEZADOS` con un .xlsx por sincronizar `ENCABEZADOS`, una tabla de estilos y
+un inyector, con el mismo riesgo de deriva.
+
+**Consecuencia.** La sincronización sigue dependiendo de la prueba de encabezados
+(`src/lib/parse/__tests__/plantilla.test.ts`), no de una sola fuente, y
+`/terminado` reporta el paso 2 como pendiente humana. Para que una edición a mano
+no vuelva a romper el archivo sin que nadie lo note, la misma prueba exige ahora
+que cada parte XML esté bien formada. La plantilla versionada tenía 1,297 filas sin
+cerrar en ventas, cobranza y gastos: SheetJS las leía sin quejarse, y probablemente
+Excel pedía reparar el archivo al abrirlo. Editar el XML a mano, además, acumula basura
+invisible: las cadenas de `sharedStrings.xml` que quedaron huérfanas al quitar la lista
+de modelos y al sustituir textos de la plantilla lo prueban. Es una razón más para que
+la plantilla v2 no se haga a mano.
+
+---
+
+## 2026-09-13 — Modelo es texto libre: la plantilla no trae lista de modelos
+
+**Contexto.** `_listas` traía una columna de modelos (T100, T70P, T55, T25P y
+accesorios) con su lista desplegable en `ventas.modelo`. Son los productos del
+cliente de drones, y la plantilla debe ser agnóstica al giro (CLAUDE.md,
+«Contexto»).
+
+**Decisión.** Se quitan la lista de modelos y su validación: modelo es texto libre.
+Las seis listas que quedan son las enumeraciones de `schema.ts`, y una prueba
+exige que coincidan y que cada lista desplegable apunte a la suya.
+
+**Alternativa descartada.** Conservar la lista como ejemplo editable. Cualquier
+otro giro la encontraría llena de drones, y la lista desplegable de Excel le
+sugeriría productos que no vende.
+
+**Consecuencia.** La plantilla ya no previene los errores de dedo en modelo
+(`T70p` / `T70P`). Los absorbe la normalización a mayúsculas antes de agrupar, que
+ya existía (CLAUDE.md, «Trampas de parseo»).
+
+---
+
+## 2026-09-13 — `linea` se canoniza en el esquema, no en el motor
+
+**Contexto.** Una venta con `linea` escrita «demo» o «DEMO» se contaba como venta,
+mientras el panel de validación afirmaba que se había excluido. La regla del
+validador comparaba sin distinguir mayúsculas; el motor comparaba exacto contra
+`"Demo"` (`base.ts`, `insights.ts`) y nada normalizaba el campo antes. El tipo
+`Dataset` ya declaraba `linea` como enumeración, pero `VentaSchema` solo hacía un
+*cast*: el tipo afirmaba algo que nadie comprobaba.
+
+**Decisión.** `VentaSchema` canoniza `linea` contra `LINEA` con `canonizar()`, que
+compara con `norm()`. La regla `filas-demo` del validador usa la misma función, de
+modo que el panel y el motor no pueden volver a juzgar distinto la misma celda.
+
+**Alternativa descartada.** Normalizar en el motor, comparando `norm(linea)` en
+`base.ts` y en `insights.ts`. Son dos puntos de comparación, y cada consumidor
+futuro tendría que acordarse. El `Dataset` seguiría diciendo «demo» en la interfaz,
+en la exportación a Excel y en el tipo. Y contradice AD-06: el motor recibe el
+esquema canónico, no lo reconstruye.
+
+**Consecuencia.** La frontera de `CLAUDE.md` queda intacta: el parser canoniza la
+grafía y conserva la fila; excluirla sigue siendo trabajo exclusivo del motor. Una
+fuente futura (Odoo) tiene que pasar por el esquema para heredar la corrección. Un
+valor que no es de la lista («Accesorio») se conserva tal como vino, así que el tipo
+todavía miente para esos valores: queda pendiente decidir si son error o advertencia.
+
+---
+
+## 2026-09-13 — Arreglar el código para que cumpla la especificación es PARCHE, aunque mueva cifras
+
+**Contexto.** El arreglo anterior mueve las cifras de cualquier cliente que haya
+escrito «demo»: su costo y su utilidad bruta dejan de incluir una unidad que no
+vendió. La regla crítica de GOBERNANZA.md §3 dice MAYOR cuando un cambio altera un
+número ya reportado, y leída sola lo clasificaría así.
+
+**Decisión.** PARCHE (1.1.1). §3 pide MAYOR cuando cambia una definición de cálculo.
+Aquí la definición no cambió: `CLAUDE.md` siempre dijo que las filas Demo se
+excluyen de todo cálculo de venta, y el código por fin lo hace. Se agregó la
+distinción a §3, con este caso como ejemplo.
+
+**Alternativa descartada.** MAYOR (2.0.0) por el solo hecho de mover cifras.
+Equipararía el arreglo de un defecto con un cambio de criterio y vaciaría de
+significado el número mayor, que existe para avisar que decidimos calcular distinto.
+
+**Consecuencia.** Lo que protege la regla crítica es el criterio, no la cifra. El
+arreglo se anuncia igual, porque un número que el cliente vio cambia, pero no se
+presenta como incompatible.
+
+---
+
+## 2026-09-13 — Un valor de lista no reconocido recibe lo de la celda vacía, y se avisa
+
+**Contexto.** `comision_base` «utilidad» cobraba la comisión sobre el precio, y «no
+aplica» la cobraba en vez de anularla: el motor compara exacto y nadie canonizaba
+el campo. En parámetros, un `comision_base_default` «utilidad» se descartaba sin
+aviso y quedaba «Venta». Y quedaba abierto lo que registra la entrada sobre `linea`:
+un valor fuera de la lista («Accesorio») llegaba al motor tal cual, con un tipo que
+prometía la enumeración.
+
+**Decisión.** `ENUMERACIONES` (`schema.ts`) declara las seis columnas de lista con
+lo que recibe su celda vacía. El esquema canoniza mayúsculas, espacios y acentos. Un
+valor que aun así no es de la lista recibe lo mismo que la celda vacía, y la regla
+`enumeracion-no-reconocida` lo avisa como **advertencia**, con hoja, fila, lo
+capturado, lo aplicado y las opciones válidas. `comision_base_default` sigue el
+mismo criterio con la regla `parametro-no-reconocido`: se aplica «Venta» y se dice.
+
+**Alternativa descartada.** Rechazar la fila con error. Un error saca la fila del
+Dataset. Por escribir «Accesorio» desaparecería una venta entera de la venta total,
+del costo y de la cartera, y un gasto con «Nomina» mal escrito saldría del estado de
+resultados. Castiga un error de clasificación borrando importes que sí se leyeron,
+y rompería archivos que hoy cargan bien (GOBERNANZA.md §7). El nivel error de
+CLAUDE.md es para lo que impide calcular: importe ilegible, fecha inválida, llaves
+rotas. Una clasificación no reconocida no lo impide si se declara qué se aplicó.
+Para el parámetro tampoco sirve el error. El panel no bloquea módulos por un
+parámetro, así que un error que igual calcula con «Venta» mentiría sobre lo que
+pasó. Bloquear de verdad los módulos que usan la comisión apagaría medio reporte
+por una celda.
+
+**Consecuencia.** Nunca llega al motor un valor fuera de la lista, y nunca se
+sustituye uno sin aviso. `comision_base`, `condicion`, `metodo`, `categoria` y
+`tipo` conservan el tipo `string | null`: el esquema ya garantiza el valor, y
+estrechar el tipo tocaría selectores y pruebas de la interfaz, fuera de este
+parche. Es la versión 1.1.2, PARCHE por la distinción de §3: la fórmula de comisión
+de CLAUDE.md no cambió. El mismo patrón de valor por omisión silencioso sigue en
+otros parámetros numéricos y de fecha, y queda sin arreglar aquí.
+
+---
+
+## 2026-09-14 — La hoja `parametros` se valida como capa, con la severidad de las listas
+
+**Contexto.** La hoja `parametros` nunca recibió el tratamiento de las hojas de
+datos. Un valor que no se podía leer caía a su valor por omisión sin ningún
+hallazgo: `provision_91_180` «30%» aplicaba 25%, `tasa_iva` «16» se leía como
+1600%, `periodo_inicio` «2026-01-01» se perdía e `importes_incluyen_iva` «Sí
+incluye» quedaba sin contestar. Y los parámetros son lo único que el usuario
+configura a mano para ajustar el reporte a su criterio.
+
+**Decisión.** `src/lib/parse/parametros.ts` declara, para cada parámetro del
+contrato, cómo se lee y qué formatos acepta. `validate()` lee con esa declaración,
+y la regla `parametro-no-reconocido` avisa, con la misma declaración, de todo
+valor capturado que no se pudo leer: qué se capturó, qué se aplicó y qué formatos
+se aceptan. Tres reglas más cierran lo que el lector descartaba antes de llegar
+ahí: `parametro-desconocido` (un nombre que no es del contrato),
+`parametro-repetido` (gana la última fila) y `valor-sin-parametro`. Las lecturas
+se amplían a lo que escribe una persona:
+
+- Porcentajes con `parsePct`, la misma regla de `comision_pct`: «30%», «30», «0.30»
+  y «0,30» son 30%. El caso ambiguo se resuelve así: un número mayor que 1 se lee
+  como por ciento, nunca como 3000%, y «1» solo es 100%. La regla está escrita en
+  INSTRUCCIONES y en las notas de la plantilla. Fuera de 0–100% no se lee.
+- Fechas con `parseFecha`, entre 1990 y 2100: un serial de Excel fuera de ese
+  rango es un número que cayó en la celda equivocada.
+- Booleanos con `parseBool` (SI, NO, Sí, sí, true, 1…).
+- `moneda_base` contra `MONEDA_BASE`, que en v1 solo tiene MXN.
+- Días como entero no negativo; tipo de cambio mayor que cero.
+
+**Severidad: advertencia, la misma que un valor de lista.** Un parámetro mal leído
+sí mueve cifras, y una `linea` mal escrita solo reclasifica. Pero en este proyecto
+la severidad no mide importancia: mide qué se deja de calcular. «Error» significa
+que bloquea el módulo afectado, y el panel lo dice textualmente («N errores
+bloquean los módulos afectados»). Un parámetro que no se pudo leer no bloquea
+nada: el reporte se calcula con el valor por omisión, y el aviso lo dice.
+
+**Alternativa descartada.** Error para los parámetros que mueven cifras. Sin
+bloquear, el panel mentiría: diría que el módulo está bloqueado mientras muestra
+la provisión. Bloquear de verdad apagaría la cartera entera —aging, DSO,
+detalle— por una tasa que solo afecta a la provisión. La diferencia de impacto se
+atiende donde importa: haciendo visible la sustitución junto a la cifra que
+afecta, que queda por acordar. Subir la severidad no la atiende.
+
+**Consecuencia.** Ningún valor capturado en `parametros` se descarta sin un
+hallazgo. El demo y la plantilla tienen los parámetros bien escritos y no producen
+ninguno, así que las cifras de referencia no se mueven. Es la versión 1.1.3,
+PARCHE por la distinción de §3: el contrato siempre prometió leer lo que el
+usuario configura. Queda sin cerca la fila de encabezados: si el cliente la borra,
+la primera fila de datos se toma por encabezado y su valor se pierde.
+
+---
+
+## 2026-09-14 — Cierre de la serie del contrato: las sustituciones llegan al papel y toda coerción vive en el esquema
+
+**Contexto.** La 1.1.3 hizo que el panel avisara de todo parámetro que no se pudo
+leer, pero el panel no viaja con el PDF. Un socio podía recibir un reporte
+calculado al 25% cuando el dueño había capturado un 30% ilegible, sin nada en el
+papel que lo dijera. Y en las hojas de datos seguía el patrón de la serie:
+- `dias_credito` se coercionaba con `Number()`: «30dias» entraba al dataset como NaN, y
+  «-5» o «30.5» se usaban tal cual en el aging. Corrección posterior: esta entrada decía que
+  el NaN llegaba al aging, y no es así. `diasDeVenta` ya descartaba lo no finito y medía esa
+  venta por antigüedad.
+- `comision_pct` aceptaba 150%.
+- Un importe con otra gramática se leía en silencio: «1,234.56» como $1.23 y
+  «1234.56» como $123,456.
+- Un serial de fecha sin rango daba 1900 o 2173, y con la hora incluida.
+
+**Decisión.**
+- `validate()` entrega las sustituciones de parámetros como datos
+  (`{clave, capturado, aplicado, fila}`). El store las guarda con el dataset y la
+  interfaz las pinta junto a la cifra que afectan: provisiones, periodo y DSO,
+  tarjeta de IVA y comisión. También las pinta en el bloque Alcance de la portada
+  del PDF. Lo hace la interfaz, no el motor, que recibe el esquema canónico y no
+  razona sobre la procedencia de sus entradas (AD-06).
+- Cuando el usuario ajusta un parámetro desde la interfaz, su aviso desaparece: el
+  valor ya es decisión suya. Volver a validar no lo revive; cargar otro archivo
+  empieza de cero.
+- En las hojas de datos, las coerciones del esquema validan el dominio: importes
+  solo con la gramática europea del contrato, porcentajes entre 0 y 100%, días como
+  entero no negativo y fechas entre 1990 y 2100, sin hora.
+- La severidad sigue a la consecuencia, con el criterio de la 1.1.3. Un importe o
+  una fecha que no se pueden leer siguen siendo **error**: sin importe la operación
+  no se suma, y sin fecha no se ubica. Un porcentaje o unos días de crédito
+  ilegibles son **advertencia**, porque la venta se calcula como con la celda vacía.
+  `comision_pct` ilegible era error y pasa a advertencia: el panel afirmaba un
+  bloqueo mientras la venta se calculaba igual.
+
+**Alternativas descartadas.**
+- **Adivinar la gramática de un importe.** «1,234.56» tiene coma de miles y punto
+  decimal, y adivinarlo resuelve ese caso; «1.500» no: en el contrato es mil
+  quinientos, y para quien escribe con punto decimal es uno y medio. Adivinar a
+  veces es peor que no adivinar nunca. El contrato dice formato europeo, y lo que no
+  lo cumple se rechaza con un hallazgo.
+- **Pasar las sustituciones al motor** en `OpcionesInsights` para que él redactara
+  la tarjeta de IVA. Pondría al motor a razonar sobre la calidad de sus propios
+  datos.
+
+**Consecuencia.** Los cuatro defectos de la serie 1.1.1–1.1.4 eran el mismo error de
+diseño. Queda escrito como restricción aprendida en CLAUDE.md: toda coerción y toda
+canonización del contrato viven en el esquema, y ningún consumidor interpreta
+valores crudos. El demo tiene sus importes, fechas, porcentajes y días como números
+válidos, así que las cifras de referencia no se mueven. Es la versión 1.1.4, PARCHE.
+Quedan en el backlog (GOBERNANZA.md §11) las columnas fuera del contrato, la hoja
+`parametros` sin encabezados y la coherencia entre parámetros.
+
+---
+
+## 2026-09-14 — Al guardar el PDF se recomienda desactivar los encabezados y pies del navegador
+
+**Contexto.** La primera corrida de `/verificar todo` guardó el reporte con la casilla
+«Encabezados y pies de página» de Chrome activada. En el margen de cada hoja salieron la fecha y
+hora de impresión («9/14/26, 2:05 AM»), el título, la dirección de la aplicación
+(`localhost:5174/?fixture=demo`) y el número de hoja («4/15»). La aplicación todavía no imprime
+sus propios números de hoja (GOBERNANZA.md §11).
+
+**Decisión.** Se recomienda desactivarla. La recomendación está en `docs/linea-base-pdf.md`
+(«Opciones del diálogo de impresión») y en la ayuda junto al botón «Descargar PDF», y la corrida
+canónica de la línea base se guarda así.
+
+**Alternativa descartada.** Recomendar activarla, porque hoy es lo único que numera las hojas. La
+dirección de la aplicación en el encabezado del reporte de un cliente es peor que perder el número
+de hoja, que ya está en el backlog. Además, la fecha de impresión en el formato del navegador
+compite con la fecha de corte.
+
+**Consecuencia.** El reporte impreso no lleva número de hoja hasta que la aplicación lo imprima.
+Que desactivar la casilla no mueva los saltos de página no está verificado: la corrida que fijó la
+paginación se guardó con la casilla activada.
+
+---
+
+## 2026-09-14 — «Sale en claro» se juzga sobre la hoja completa, y mirando el papel
+
+**Contexto.** Desde v1.1 el invariante «la impresión siempre sale en claro» se daba por
+verificado. Se había comprobado leyendo `data-tema` y los tokens del contenido, no mirando una hoja
+impresa. La primera corrida de `/verificar` que abrió el PDF encontró las 15 hojas pintadas de
+`#121212`, con un rectángulo blanco solo en el área de contenido: el contenido salía claro y la
+hoja no.
+
+**Decisión.** La línea base agrega el invariante «la hoja completa sale en claro, márgenes
+incluidos», y deja escrito cómo se verificaba el anterior.
+
+**Alternativa descartada.** Seguir juzgando el invariante sobre el contenido, que es lo que el
+código controla directamente. El margen también es papel: es lo primero que ve quien recibe el
+reporte, y lo que se imprime en cada hoja.
+
+**Consecuencia.** Un invariante que solo se verifica por código puede estar incumplido sin que
+nadie lo note. El defecto queda abierto, candidato a 1.1.5, y sin diagnosticar: no se sabe si pasa
+también imprimiendo con el tema claro.

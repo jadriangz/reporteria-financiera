@@ -1,11 +1,18 @@
 import {
+  ANIO_MAXIMO,
+  ANIO_MINIMO,
+  ENUMERACIONES,
   type Hallazgo,
+  LINEA,
   type Severidad,
+  canonizar,
+  parseEnteroNoNegativo,
   parseFecha,
   parseMonto,
   parsePct,
 } from "../schema";
 
+import { CLAVES_PARAMETROS, LECTURAS, type ParametroSustituido, REGLA_PORCENTAJE, sinCapturar } from "./parametros";
 import { COLUMNAS_MONTO, HOJAS_TABULARES, type NombreHoja, type RawCelda, type RawSheets } from "./tipos";
 
 /**
@@ -34,6 +41,8 @@ export interface ContextoValidacion {
   readonly ventas: readonly FilaEvaluada[];
   readonly cobranza: readonly FilaEvaluada[];
   readonly gastos: readonly FilaEvaluada[];
+  /** Parametros que no se pudieron leer. `validate()` los calcula una vez; de ahi salen el aviso y la interfaz. */
+  readonly sustituciones: readonly ParametroSustituido[];
 }
 
 // --------------------------- Utilidades de las reglas ---------------------------
@@ -84,14 +93,16 @@ function hallazgo(
 // --------------------------- Reglas de ERROR ---------------------------
 
 /**
- * Un valor que el cliente SI escribio pero que no se pudo interpretar como
- * numero. Se distingue de la celda vacia comparando el crudo contra el
- * resultado de la coercion del contrato: si habia texto y salio null, es basura.
+ * Un importe que el cliente SI escribio pero que no se pudo leer: texto que no
+ * es numero, o un numero con otra gramatica que la europea del contrato
+ * ("1,234.56", "1234.56"). Se distingue de la celda vacia preguntandole al
+ * esquema: si habia texto y la coercion devolvio null, no se pudo leer. Error
+ * por su consecuencia: sin importe, la venta, el abono o el gasto no se suman.
  */
 const valorNoNumerico: Regla = {
   id: "valor-no-numerico",
   severidad: "error",
-  descripcion: "Celda de importe o porcentaje con contenido no interpretable como numero.",
+  descripcion: "Celda de importe con contenido que no se puede leer como importe.",
   evaluar(ctx) {
     const out: Hallazgo[] = [];
     for (const hoja of HOJAS_TABULARES) {
@@ -103,18 +114,9 @@ const valorNoNumerico: Regla = {
             hallazgo("error", hoja, `El importe "${texto(crudo)}" no es un numero valido.`, {
               fila: f.fila,
               campo,
-              accion: `Escriba solo cifras en ${campo}, por ejemplo 444800 o $ 444.800,00. Borre el texto si no aplica.`,
-            }),
-          );
-        }
-        for (const campo of COLUMNAS_PCT[hoja]) {
-          const crudo = f.valores[campo] ?? null;
-          if (vacia(crudo) || parsePct(crudo) !== null) continue;
-          out.push(
-            hallazgo("error", hoja, `El porcentaje "${texto(crudo)}" no es un numero valido.`, {
-              fila: f.fila,
-              campo,
-              accion: `Escriba ${campo} como 5% o 0.05. Deje la celda vacia si no aplica.`,
+              accion:
+                `Escriba ${campo} con punto para miles y coma para decimales: 444800, 444.800 o ` +
+                `$ 444.800,00. Un importe como 1,234.56 o 1234.56 no se adivina. Borre el texto si no aplica.`,
             }),
           );
         }
@@ -124,7 +126,7 @@ const valorNoNumerico: Regla = {
   },
 };
 
-/** Fecha escrita pero ilegible. La celda vacia es advertencia, no error. */
+/** Fecha escrita pero ilegible, o fuera de 1990–2100. La celda vacia es advertencia, no error. */
 const fechaInvalida: Regla = {
   id: "fecha-invalida",
   severidad: "error",
@@ -140,7 +142,7 @@ const fechaInvalida: Regla = {
             hallazgo("error", hoja, `La fecha "${texto(crudo)}" no es valida.`, {
               fila: f.fila,
               campo,
-              accion: `Escriba ${campo} en formato dd/mm/aaaa, por ejemplo 31/01/2026.`,
+              accion: `Escriba ${campo} en formato dd/mm/aaaa, por ejemplo 31/01/2026, entre ${ANIO_MINIMO} y ${ANIO_MAXIMO}.`,
             }),
           );
         }
@@ -267,6 +269,67 @@ const ventaSinDiasCredito: Regla = {
           },
         ),
       );
+    }
+    return out;
+  },
+};
+
+/**
+ * dias_credito capturado que no es un entero no negativo. Antes entraba como NaN
+ * ("30dias") o como -5 y alimentaba el aging sin aviso; ahora el esquema lo deja
+ * vacio y aqui se dice. Advertencia por su consecuencia: sin dias de credito la
+ * venta se mide por antiguedad, igual que con la celda vacia.
+ */
+const diasCreditoIlegible: Regla = {
+  id: "dias-credito-ilegible",
+  severidad: "advertencia",
+  descripcion: "dias_credito que no es un numero entero de dias: la venta se mide por antiguedad.",
+  evaluar(ctx) {
+    const out: Hallazgo[] = [];
+    for (const f of ctx.ventas) {
+      const crudo = f.valores["dias_credito"] ?? null;
+      if (!f.aceptada || vacia(crudo) || parseEnteroNoNegativo(crudo) !== null) continue;
+      out.push(
+        hallazgo(
+          "advertencia",
+          "ventas",
+          `dias_credito dice "${texto(crudo)}", que no es un numero entero de dias: el aging de esta ` +
+            `venta se calcula por antiguedad, igual que sin dias_credito.`,
+          { fila: f.fila, campo: "dias_credito", accion: "Escriba los dias de credito pactados como numero entero, por ejemplo 90." },
+        ),
+      );
+    }
+    return out;
+  },
+};
+
+/**
+ * Porcentaje capturado que no se puede leer, o fuera de 0–100% ("150" se aceptaba
+ * como 150%). Advertencia por su consecuencia: la venta se calcula sin comision,
+ * igual que con la celda vacia; nada queda bloqueado.
+ */
+const porcentajeIlegible: Regla = {
+  id: "porcentaje-ilegible",
+  severidad: "advertencia",
+  descripcion: "Porcentaje que no se puede leer o fuera de 0-100%: se toma como celda vacia.",
+  evaluar(ctx) {
+    const out: Hallazgo[] = [];
+    for (const hoja of HOJAS_TABULARES) {
+      for (const f of filasDe(ctx, hoja)) {
+        for (const campo of COLUMNAS_PCT[hoja]) {
+          const crudo = f.valores[campo] ?? null;
+          if (!f.aceptada || vacia(crudo) || parsePct(crudo) !== null) continue;
+          out.push(
+            hallazgo(
+              "advertencia",
+              hoja,
+              `${campo} dice "${texto(crudo)}", que no se pudo leer como un porcentaje entre 0% y 100%: ` +
+                `la venta se calcula sin comision, igual que con la celda vacia.`,
+              { fila: f.fila, campo, accion: `Escriba ${campo} como porcentaje: ${REGLA_PORCENTAJE}.` },
+            ),
+          );
+        }
+      }
     }
     return out;
   },
@@ -426,7 +489,9 @@ const filasDemo: Regla = {
   evaluar(ctx) {
     const out: Hallazgo[] = [];
     for (const f of ctx.ventas) {
-      if (texto(f.valores["linea"]).toLowerCase() !== "demo") continue;
+      // La misma canonizacion que VentaSchema: lo que este panel anuncia como
+      // excluido tiene que ser exactamente lo que el motor excluye.
+      if (canonizar(LINEA, f.valores["linea"]) !== "Demo") continue;
       out.push(
         hallazgo("info", "ventas", `Venta marcada como Demo: se excluye del analisis de venta.`, {
           fila: f.fila,
@@ -470,6 +535,150 @@ const hojaAusente: Regla = {
   },
 };
 
+// --------------------------- Valores de lista no reconocidos ---------------------------
+
+/** Lo que recibe una columna de lista vacia, dicho para quien captura. */
+function loQueSeAplica(campo: string, siVacia: string | null): string {
+  if (siVacia !== null) return `se clasifico como "${siVacia}", igual que una celda vacia`;
+  if (campo === "comision_base") {
+    return "se aplica la base por omision de la hoja parametros (comision_base_default), igual que con la celda vacia";
+  }
+  if (campo === "tipo") return "se trata como gasto Fijo, igual que una celda vacia";
+  return "se tomo como celda vacia";
+}
+
+/**
+ * Un valor de una columna de lista que no es ninguna de sus opciones, ni
+ * ignorando mayusculas, espacios y acentos. El esquema le da lo mismo que a la
+ * celda vacia (ENUMERACIONES, en schema.ts); esta regla existe para que esa
+ * sustitucion nunca sea silenciosa. Advertencia y no error: ver
+ * docs/decisiones.md (2026-09-13).
+ */
+const enumeracionNoReconocida: Regla = {
+  id: "enumeracion-no-reconocida",
+  severidad: "advertencia",
+  descripcion: "Valor de una columna de lista que no es ninguna de sus opciones: se toma como celda vacia.",
+  evaluar(ctx) {
+    const out: Hallazgo[] = [];
+    for (const hoja of HOJAS_TABULARES) {
+      for (const [campo, e] of Object.entries(ENUMERACIONES[hoja])) {
+        const opciones: readonly string[] = e.opciones;
+        for (const f of filasDe(ctx, hoja)) {
+          const crudo = f.valores[campo];
+          if (!f.aceptada || vacia(crudo) || canonizar(opciones, crudo) !== null) continue;
+          out.push(
+            hallazgo(
+              "advertencia",
+              hoja,
+              `${campo} dice "${texto(crudo)}", que no es una opcion de la lista: ${loQueSeAplica(campo, e.siVacia)}.`,
+              { fila: f.fila, campo, accion: `Escriba una de: ${opciones.join(", ")}.` },
+            ),
+          );
+        }
+      }
+    }
+    return out;
+  },
+};
+
+// --------------------------- Hoja parametros ---------------------------
+//
+// La hoja parametros se valida como capa, igual que las de datos: ningun valor
+// capturado se descarta sin un hallazgo que cite hoja y fila. Advertencia y no
+// error, tambien cuando el parametro mueve cifras: ver docs/decisiones.md
+// (2026-09-14).
+
+/**
+ * Un parametro capturado que no se puede leer. Antes caia en silencio a su valor
+ * por omision: quien decidio provisionar al 30% veia un reporte al 25%. Se sigue
+ * aplicando el valor por omision —el reporte se puede calcular—, y el panel dice
+ * que se capturo, que se aplico y que formatos se aceptan. La lectura es la misma
+ * que usa validate() (`LECTURAS`, en parametros.ts).
+ */
+const parametroNoReconocido: Regla = {
+  id: "parametro-no-reconocido",
+  severidad: "advertencia",
+  descripcion: "Parametro capturado que no se puede leer: se aplica su valor por omision, y se dice.",
+  evaluar(ctx) {
+    // Las sustituciones las calcula validate() una sola vez: este aviso y los de
+    // la interfaz salen de la misma lista y no pueden decir cosas distintas.
+    return ctx.sustituciones.map((s) =>
+      hallazgo(
+        "advertencia",
+        "parametros",
+        `${s.clave} dice "${s.capturado}", que no se pudo leer: se aplica ${s.aplicado}.`,
+        {
+          ...(s.fila === null ? {} : { fila: s.fila }),
+          campo: s.clave,
+          accion: `Escriba ${LECTURAS[s.clave].formatos}.`,
+        },
+      ),
+    );
+  },
+};
+
+/** Una fila con un nombre que no es parametro del contrato: su valor nunca se aplica. */
+const parametroDesconocido: Regla = {
+  id: "parametro-desconocido",
+  severidad: "advertencia",
+  descripcion: "Fila de parametros con un nombre que no es del contrato: su valor no se aplica.",
+  evaluar(ctx) {
+    const p = ctx.raw.parametros;
+    if (!p.presente) return [];
+    const conocidas = new Set<string>(CLAVES_PARAMETROS);
+    const out: Hallazgo[] = [];
+    for (const [clave, crudo] of Object.entries(p.valores)) {
+      if (conocidas.has(clave) || sinCapturar(crudo)) continue;
+      const fila = p.filaDe[clave];
+      out.push(
+        hallazgo("advertencia", "parametros", `${clave} no es un parametro del contrato: su valor "${texto(crudo)}" no se aplica.`, {
+          ...(fila === undefined ? {} : { fila }),
+          campo: clave,
+          accion: `Revise el nombre. Los parametros son: ${CLAVES_PARAMETROS.join(", ")}.`,
+        }),
+      );
+    }
+    return out;
+  },
+};
+
+/** Un parametro en mas de una fila: gana la ultima, y las demas se pierden si nadie lo dice. */
+const parametroRepetido: Regla = {
+  id: "parametro-repetido",
+  severidad: "advertencia",
+  descripcion: "Parametro escrito en mas de una fila: se aplica la ultima.",
+  evaluar(ctx) {
+    const p = ctx.raw.parametros;
+    if (!p.presente) return [];
+    return Object.entries(p.filasRepetidas).map(([clave, filas]) => {
+      const ultima = filas.at(-1);
+      return hallazgo(
+        "advertencia",
+        "parametros",
+        `${clave} aparece en las filas ${filas.join(", ")}: se aplica la fila ${ultima ?? "?"} y las demas no.`,
+        { ...(ultima === undefined ? {} : { fila: ultima }), campo: clave, accion: "Deje una sola fila por parametro." },
+      );
+    });
+  },
+};
+
+/** Un valor escrito en una fila sin nombre de parametro: no hay a que aplicarlo. */
+const valorSinParametro: Regla = {
+  id: "valor-sin-parametro",
+  severidad: "advertencia",
+  descripcion: "Fila de parametros con valor pero sin nombre: el valor no se aplica.",
+  evaluar(ctx) {
+    const p = ctx.raw.parametros;
+    if (!p.presente) return [];
+    return p.filasSinClave.map((fila) =>
+      hallazgo("advertencia", "parametros", `La fila ${fila} trae un valor sin nombre de parametro: no se aplica.`, {
+        fila,
+        accion: "Escriba el nombre del parametro en la columna parametro, o borre el valor.",
+      }),
+    );
+  },
+};
+
 /** Orden de evaluacion: errores primero, luego advertencias, luego info. */
 export const REGLAS: readonly Regla[] = [
   valorNoNumerico,
@@ -479,8 +688,15 @@ export const REGLAS: readonly Regla[] = [
   filaRechazada,
   filaSinFecha,
   ventaSinDiasCredito,
+  diasCreditoIlegible,
+  porcentajeIlegible,
   abonoExcedePrecio,
   margenUniforme,
+  enumeracionNoReconocida,
+  parametroNoReconocido,
+  parametroDesconocido,
+  parametroRepetido,
+  valorSinParametro,
   hojaAusente,
   filasEjemplo,
   filasVacias,
