@@ -10,6 +10,7 @@ import {
   ParametrosSchema,
   type Venta,
   VentaSchema,
+  canonizar,
   parseBool,
   parseFecha,
   parseNumero,
@@ -62,8 +63,11 @@ function coercionarParametros(raw: RawParametros): Parametros {
 
   const monedaBase = String(crudo("moneda_base") ?? "").trim();
   const nombreCliente = String(crudo("nombre_cliente") ?? "").trim();
-  const baseComision = String(crudo("comision_base_default") ?? "").trim();
-  const comisionValida = (COMISION_BASE as readonly string[]).includes(baseComision);
+  const baseComision = crudo("comision_base_default");
+  // ParametrosSchema lo canoniza («utilidad» → "Utilidad"). Uno que ni asi es de la
+  // lista se omite y toma el valor por omision, pero NO en silencio: lo avisa la
+  // regla `parametro-no-reconocido`.
+  const comisionValida = canonizar(COMISION_BASE, baseComision) !== null;
 
   const entrada: Record<string, unknown> = {
     importes_incluyen_iva: parseBool(crudo("importes_incluyen_iva")),

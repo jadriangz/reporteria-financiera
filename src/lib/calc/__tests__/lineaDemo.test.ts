@@ -82,14 +82,16 @@ describe("canonizar", () => {
     expect(canonizar(LINEA, "Accesorio")).toBeNull();
   });
 
-  it("en VentaSchema: canoniza lo reconocible, conserva lo demas y el vacio cae a Equipo", () => {
+  it("en VentaSchema: canoniza lo reconocible, y lo no reconocido recibe lo de la celda vacia", () => {
     // Todas las columnas presentes, como las entrega el lector: Zod exige la clave.
     const vacia = Object.fromEntries(ENCABEZADOS.ventas.map((c) => [c, null]));
     const linea = (valor: unknown) =>
       VentaSchema.parse({ ...vacia, folio: "V-1", cliente: "Cliente", modelo: "Modelo A", linea: valor }).linea;
     expect(linea("capacitacion")).toBe("Capacitacion");
-    // Un valor fuera de la lista no se inventa: se queda como vino.
-    expect(linea("Accesorio")).toBe("Accesorio");
+    // Fuera de la lista: recibe lo mismo que la celda vacia y el validador lo
+    // avisa (enumeraciones.test.ts). Antes se conservaba "Accesorio" y el tipo
+    // prometia una enumeracion que el dato no cumplia.
+    expect(linea("Accesorio")).toBe("Equipo");
     expect(linea("")).toBe("Equipo");
   });
 });

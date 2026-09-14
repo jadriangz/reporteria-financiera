@@ -459,3 +459,41 @@ significado el número mayor, que existe para avisar que decidimos calcular dist
 **Consecuencia.** Lo que protege la regla crítica es el criterio, no la cifra. El
 arreglo se anuncia igual, porque un número que el cliente vio cambia, pero no se
 presenta como incompatible.
+
+---
+
+## 2026-09-13 — Un valor de lista no reconocido recibe lo de la celda vacía, y se avisa
+
+**Contexto.** `comision_base` «utilidad» cobraba la comisión sobre el precio, y «no
+aplica» la cobraba en vez de anularla: el motor compara exacto y nadie canonizaba
+el campo. En parámetros, un `comision_base_default` «utilidad» se descartaba sin
+aviso y quedaba «Venta». Y quedaba abierto lo que registra la entrada sobre `linea`:
+un valor fuera de la lista («Accesorio») llegaba al motor tal cual, con un tipo que
+prometía la enumeración.
+
+**Decisión.** `ENUMERACIONES` (`schema.ts`) declara las seis columnas de lista con
+lo que recibe su celda vacía. El esquema canoniza mayúsculas, espacios y acentos. Un
+valor que aun así no es de la lista recibe lo mismo que la celda vacía, y la regla
+`enumeracion-no-reconocida` lo avisa como **advertencia**, con hoja, fila, lo
+capturado, lo aplicado y las opciones válidas. `comision_base_default` sigue el
+mismo criterio con la regla `parametro-no-reconocido`: se aplica «Venta» y se dice.
+
+**Alternativa descartada.** Rechazar la fila con error. Un error saca la fila del
+Dataset. Por escribir «Accesorio» desaparecería una venta entera de la venta total,
+del costo y de la cartera, y un gasto con «Nomina» mal escrito saldría del estado de
+resultados. Castiga un error de clasificación borrando importes que sí se leyeron,
+y rompería archivos que hoy cargan bien (GOBERNANZA.md §7). El nivel error de
+CLAUDE.md es para lo que impide calcular: importe ilegible, fecha inválida, llaves
+rotas. Una clasificación no reconocida no lo impide si se declara qué se aplicó.
+Para el parámetro tampoco sirve el error. El panel no bloquea módulos por un
+parámetro, así que un error que igual calcula con «Venta» mentiría sobre lo que
+pasó. Bloquear de verdad los módulos que usan la comisión apagaría medio reporte
+por una celda.
+
+**Consecuencia.** Nunca llega al motor un valor fuera de la lista, y nunca se
+sustituye uno sin aviso. `comision_base`, `condicion`, `metodo`, `categoria` y
+`tipo` conservan el tipo `string | null`: el esquema ya garantiza el valor, y
+estrechar el tipo tocaría selectores y pruebas de la interfaz, fuera de este
+parche. Es la versión 1.1.2, PARCHE por la distinción de §3: la fórmula de comisión
+de CLAUDE.md no cambió. El mismo patrón de valor por omisión silencioso sigue en
+otros parámetros numéricos y de fecha, y queda sin arreglar aquí.

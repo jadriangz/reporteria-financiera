@@ -1,4 +1,7 @@
 import {
+  COMISION_BASE,
+  COMISION_BASE_POR_OMISION,
+  ENUMERACIONES,
   type Hallazgo,
   LINEA,
   type Severidad,
@@ -474,6 +477,83 @@ const hojaAusente: Regla = {
   },
 };
 
+// --------------------------- Valores de lista no reconocidos ---------------------------
+
+/** Lo que recibe una columna de lista vacia, dicho para quien captura. */
+function loQueSeAplica(campo: string, siVacia: string | null): string {
+  if (siVacia !== null) return `se clasifico como "${siVacia}", igual que una celda vacia`;
+  if (campo === "comision_base") {
+    return "se aplica la base por omision de la hoja parametros (comision_base_default), igual que con la celda vacia";
+  }
+  if (campo === "tipo") return "se trata como gasto Fijo, igual que una celda vacia";
+  return "se tomo como celda vacia";
+}
+
+/**
+ * Un valor de una columna de lista que no es ninguna de sus opciones, ni
+ * ignorando mayusculas, espacios y acentos. El esquema le da lo mismo que a la
+ * celda vacia (ENUMERACIONES, en schema.ts); esta regla existe para que esa
+ * sustitucion nunca sea silenciosa. Advertencia y no error: ver
+ * docs/decisiones.md (2026-09-13).
+ */
+const enumeracionNoReconocida: Regla = {
+  id: "enumeracion-no-reconocida",
+  severidad: "advertencia",
+  descripcion: "Valor de una columna de lista que no es ninguna de sus opciones: se toma como celda vacia.",
+  evaluar(ctx) {
+    const out: Hallazgo[] = [];
+    for (const hoja of HOJAS_TABULARES) {
+      for (const [campo, e] of Object.entries(ENUMERACIONES[hoja])) {
+        const opciones: readonly string[] = e.opciones;
+        for (const f of filasDe(ctx, hoja)) {
+          const crudo = f.valores[campo];
+          if (!f.aceptada || vacia(crudo) || canonizar(opciones, crudo) !== null) continue;
+          out.push(
+            hallazgo(
+              "advertencia",
+              hoja,
+              `${campo} dice "${texto(crudo)}", que no es una opcion de la lista: ${loQueSeAplica(campo, e.siVacia)}.`,
+              { fila: f.fila, campo, accion: `Escriba una de: ${opciones.join(", ")}.` },
+            ),
+          );
+        }
+      }
+    }
+    return out;
+  },
+};
+
+/**
+ * `comision_base_default` con un valor que no es de la lista. Antes se descartaba
+ * sin aviso y quedaba "Venta": el usuario configuraba una base y la aplicacion
+ * calculaba con otra. Sigue aplicandose el valor por omision —el reporte se puede
+ * calcular—, pero el panel dice que se capturo, que no se reconocio y que se aplico.
+ */
+const parametroNoReconocido: Regla = {
+  id: "parametro-no-reconocido",
+  severidad: "advertencia",
+  descripcion: "comision_base_default con un valor que no es de la lista: se aplica el valor por omision, y se dice.",
+  evaluar(ctx) {
+    const p = ctx.raw.parametros;
+    const crudo = p.valores["comision_base_default"];
+    if (!p.presente || vacia(crudo) || canonizar(COMISION_BASE, crudo) !== null) return [];
+    const fila = p.filaDe["comision_base_default"];
+    return [
+      hallazgo(
+        "advertencia",
+        "parametros",
+        `comision_base_default dice "${texto(crudo)}", que no es una base de comision reconocida: ` +
+          `se aplica "${COMISION_BASE_POR_OMISION}", el valor por omision, a toda venta sin base propia.`,
+        {
+          ...(fila === undefined ? {} : { fila }),
+          campo: "comision_base_default",
+          accion: `Escriba una de: ${COMISION_BASE.join(", ")}.`,
+        },
+      ),
+    ];
+  },
+};
+
 /** Orden de evaluacion: errores primero, luego advertencias, luego info. */
 export const REGLAS: readonly Regla[] = [
   valorNoNumerico,
@@ -485,6 +565,8 @@ export const REGLAS: readonly Regla[] = [
   ventaSinDiasCredito,
   abonoExcedePrecio,
   margenUniforme,
+  enumeracionNoReconocida,
+  parametroNoReconocido,
   hojaAusente,
   filasEjemplo,
   filasVacias,

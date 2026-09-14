@@ -77,7 +77,9 @@ Al cargar, mostrar un **panel de resultados de validación** con tres niveles:
 - **Error** (bloquea el módulo afectado): folio duplicado, `cobranza.folio_venta` sin venta
   correspondiente, monto no numérico, fecha inválida.
 - **Advertencia** (no bloquea): fila sin fecha, venta sin `dias_credito`, abono que excede el
-  precio de venta, margen exactamente uniforme en más del 80% de las filas.
+  precio de venta, margen exactamente uniforme en más del 80% de las filas, valor de una
+  columna de lista que no es ninguna de sus opciones (se toma como celda vacía y se dice qué
+  se aplicó), `comision_base_default` no reconocido (se aplica `Venta` y se dice).
 - **Info**: filas ignoradas por estar vacías, filas con `linea = "Demo"` excluidas del análisis.
 
 Cada mensaje debe indicar **hoja, número de fila y qué corregir**. Un validador que solo dice
@@ -95,12 +97,15 @@ las "simplifica" sin leer el porqué, rompe el reporte en silencio.
 - **El parser CONSERVA las filas con `linea = "Demo"`.** Excluirlas es trabajo exclusivo
   del motor de cálculo. Si el lector las tira, el motor pierde la capacidad de listarlas
   aparte y el usuario nunca se entera de que existen.
-- **`linea` llega al motor con la grafía del contrato.** `VentaSchema` la canoniza contra
-  `LINEA` sin distinguir mayúsculas ni espacios («demo», « DEMO » → `Demo`), y la regla del
-  validador que anuncia la exclusión usa la misma función (`canonizar`). El motor compara
-  exacto: una fila «demo» se contó como venta mientras el panel afirmaba haberla excluido.
-  Canonizar no es excluir: la fila se conserva, y un valor que no es de la lista se queda
-  como vino.
+- **Las columnas de lista llegan al motor con la grafía del contrato o vacías, nunca con
+  otro valor.** `ENUMERACIONES` (`schema.ts`) declara las seis —`linea`, `comision_base`,
+  `condicion`, `metodo`, `categoria`, `tipo`— con lo que recibe su celda vacía. `canonizar`
+  ignora mayúsculas, espacios y acentos («demo» → `Demo`, «Crédito» → `Credito`); lo que ni
+  así es de la lista recibe lo de la celda vacía, y una advertencia dice qué se capturó y qué
+  se aplicó. `comision_base_default` sigue el mismo criterio. El motor compara exacto: sin
+  esto, una fila «demo» se contó como venta y «utilidad» cobró la comisión sobre el precio,
+  mientras el panel callaba o afirmaba lo contrario. Canonizar no es excluir: la fila se
+  conserva.
 - **`fecha_corte` nunca tiene valor por omisión dentro del motor.** Es un campo obligatorio
   de `OpcionesCartera` y `OpcionesInsights`, y ninguna función de `calc/` llama a
   `new Date()`. El default de "hoy" vive en la UI (`hoyUTC()`), no en el cálculo: si el

@@ -104,20 +104,60 @@ export function parseNumero(raw: unknown): number | null {
 /** Normaliza claves de agrupación: "  t70p " → "T70P" */
 export const norm = (s: unknown): string => String(s ?? "").trim().replace(/\s+/g, " ").toUpperCase();
 
+/** Rango de diacríticos combinantes que deja `normalize("NFD")`. */
+const DIACRITICOS = new RegExp("[̀-ͯ]", "g");
+
 /**
- * Grafía del contrato de un valor de enumeración escrito con otra capitalización
- * o con espacios de más: " demo " → "Demo". null si no corresponde a ninguna
- * opción. Compara con `norm()`, la misma normalización con la que agrupa el motor.
+ * Grafía del contrato de un valor de enumeración escrito con otra capitalización,
+ * con espacios de más o con acentos: " demo " → "Demo", "Crédito" → "Credito".
+ * null si no corresponde a ninguna opción. Parte de `norm()`, la misma
+ * normalización con la que agrupa el motor, y además ignora los acentos: las
+ * opciones del contrato se escriben sin ellos y quien captura a mano los pone.
  */
 export function canonizar<T extends string>(opciones: readonly T[], valor: unknown): T | null {
-  const clave = norm(valor);
-  return opciones.find((o) => norm(o) === clave) ?? null;
+  const clave = (s: unknown): string => norm(s).normalize("NFD").replace(DIACRITICOS, "");
+  const buscada = clave(valor);
+  return opciones.find((o) => clave(o) === buscada) ?? null;
 }
+
+/** Base de comisión cuando `parametros` no la fija, o la fija con un valor que no es de la lista. */
+export const COMISION_BASE_POR_OMISION = "Venta" satisfies (typeof COMISION_BASE)[number];
+
+/**
+ * Las columnas de lista de cada hoja, con lo que recibe su celda vacía.
+ *
+ * Un valor que tras `canonizar()` sigue sin ser de la lista recibe LO MISMO QUE LA
+ * CELDA VACÍA, y la regla `enumeracion-no-reconocida` del validador lo avisa con
+ * hoja, fila, lo capturado y lo aplicado. Así nunca llega al motor un valor fuera
+ * de la lista, y nunca se sustituye uno sin aviso. Esquema y regla leen esta misma
+ * declaración. Ver docs/decisiones.md (2026-09-13).
+ */
+export const ENUMERACIONES = {
+  ventas: {
+    linea:         { opciones: LINEA,           siVacia: "Equipo" },
+    comision_base: { opciones: COMISION_BASE,   siVacia: null },
+    condicion:     { opciones: CONDICION,       siVacia: null },
+  },
+  cobranza: {
+    metodo:        { opciones: METODO_PAGO,     siVacia: null },
+  },
+  gastos: {
+    categoria:     { opciones: CATEGORIA_GASTO, siVacia: null },
+    tipo:          { opciones: TIPO_GASTO,      siVacia: null },
+  },
+} as const;
 
 const zMonto  = z.unknown().transform(parseMonto);
 const zFecha  = z.unknown().transform(parseFecha);
 const zPct    = z.unknown().transform(parsePct);
 const zTexto  = z.unknown().transform((v) => { const s = String(v ?? "").trim(); return s === "" ? null : s; });
+
+/**
+ * Columna de lista que puede quedar vacía. El tipo sigue siendo `string | null`:
+ * el esquema garantiza el valor, y estrechar el tipo es otro cambio.
+ */
+const zLista = (e: { readonly opciones: readonly string[]; readonly siVacia: null }) =>
+  z.unknown().transform((v): string | null => canonizar(e.opciones, v) ?? e.siVacia);
 
 // ─────────────────────────── Esquemas de hoja ───────────────────────────
 
@@ -125,18 +165,17 @@ export const VentaSchema = z.object({
   folio:          z.unknown().transform((v) => String(v ?? "").trim()).pipe(z.string().min(1, "folio requerido")),
   fecha:          zFecha,
   // Grafia del contrato («demo» → "Demo"): el motor compara exacto. Canonizar no
-  // excluye; un valor fuera de la lista se conserva como vino. Ver CLAUDE.md,
-  // «Restricciones aprendidas».
-  linea:          zTexto.transform((v) => (v === null ? "Equipo" : canonizar(LINEA, v) ?? v) as (typeof LINEA)[number]),
+  // excluye. Ver ENUMERACIONES y CLAUDE.md, «Restricciones aprendidas».
+  linea:          z.unknown().transform((v): (typeof LINEA)[number] => canonizar(LINEA, v) ?? ENUMERACIONES.ventas.linea.siVacia),
   cliente:        zTexto.pipe(z.string({ message: "cliente requerido" })),
   modelo:         zTexto.pipe(z.string({ message: "modelo requerido" })),
   serie:          zTexto,
   costo_unitario: zMonto,
   precio_venta:   zMonto,
   comision_pct:   zPct,
-  comision_base:  zTexto,
+  comision_base:  zLista(ENUMERACIONES.ventas.comision_base),
   dias_credito:   z.unknown().transform((v) => (v == null || v === "" ? null : Number(v))),
-  condicion:      zTexto,
+  condicion:      zLista(ENUMERACIONES.ventas.condicion),
   vendedor:       zTexto,
   notas:          zTexto,
 });
@@ -146,7 +185,7 @@ export const CobranzaSchema = z.object({
   folio_venta: z.unknown().transform((v) => String(v ?? "").trim()).pipe(z.string().min(1, "folio_venta requerido")),
   fecha_pago:  zFecha,
   monto:       zMonto,
-  metodo:      zTexto,
+  metodo:      zLista(ENUMERACIONES.cobranza.metodo),
   cliente_ref: zTexto,
   notas:       zTexto,
 });
@@ -154,11 +193,11 @@ export const CobranzaSchema = z.object({
 export const GastoSchema = z.object({
   folio_gasto:  zTexto,
   fecha:        zFecha,
-  categoria:    zTexto,
+  categoria:    zLista(ENUMERACIONES.gastos.categoria),
   subcategoria: zTexto,
   descripcion:  zTexto,
   monto:        zMonto,
-  tipo:         zTexto,
+  tipo:         zLista(ENUMERACIONES.gastos.tipo),
   proveedor:    zTexto,
   notas:        zTexto,
 });
@@ -171,7 +210,12 @@ export const ParametrosSchema = z.object({
   tasa_iva:              z.number().default(0.16),
   periodo_inicio:        z.date().nullable().default(null),
   periodo_fin:           z.date().nullable().default(null),
-  comision_base_default: z.enum(COMISION_BASE).default("Venta"),
+  // Canonizado como las columnas de lista («utilidad» → "Utilidad"). Un valor que ni
+  // asi es de la lista no llega aqui: validate() lo omite y la regla
+  // `parametro-no-reconocido` avisa que se aplico el valor por omision.
+  comision_base_default: z
+    .preprocess((v) => canonizar(COMISION_BASE, v) ?? v, z.enum(COMISION_BASE))
+    .default(COMISION_BASE_POR_OMISION),
   dias_credito_default:  z.number().nullable().default(null),
   provision_91_180:      z.number().default(0.25),
   provision_mas_180:     z.number().default(0.5),
