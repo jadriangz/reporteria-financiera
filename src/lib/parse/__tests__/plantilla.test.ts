@@ -25,7 +25,8 @@ import { fallaXml, hojasXml, partesXml } from "./xmlXlsx";
  * El CONTRATO DE DATOS contra la plantilla real que descarga el cliente.
  *
  * Esta plantilla esta VACIA a proposito: encabezados, la fila verde de ejemplo
- * con sus formulas y las filas de relleno del formato, y nada mas. Ningun archivo con datos
+ * con sus formulas —las unicas de la plantilla— y las filas de relleno del
+ * formato, que no traen formulas, y nada mas. Ningun archivo con datos
  * de un cliente entra al repositorio (GOBERNANZA.md, seccion 10), asi que el
  * comportamiento del lector frente a datos reales se prueba con el archivo de
  * demostracion ficticio, en `demo.test.ts`.
@@ -95,8 +96,9 @@ describe("la plantilla que descarga el cliente", () => {
   });
 
   it("descarta como vacias las filas de relleno del formato", () => {
-    // Las formulas de las columnas calculadas devuelven 0 y "" en esas filas:
-    // si se tomaran en cuenta, la plantilla en blanco pareceria traer 299 ventas.
+    // En la plantilla estas filas solo traen formato: sus columnas calculadas no
+    // tienen formula. Las filas de relleno CON formulas estan en el demo y en el
+    // archivo del cliente, y esa vacuidad la prueba `demo.test.ts`.
     expect(raw.ventas.filasVacias).toBeGreaterThan(200);
     const info = conId(res.hallazgos, "info");
     expect(info.some((h) => h.hoja === "ventas" && h.mensaje.includes("filas vacias"))).toBe(true);
