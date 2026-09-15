@@ -18,12 +18,17 @@ import {
   paletaDelElemento,
 } from "../../lib/tema/paleta";
 import {
-  ALTO_EJE_INCLINADO,
+  ALTO_EJE_HORIZONTAL,
   ALTO_MINIMO,
   ANCHO_IMPRESION,
+  TAMANO_ROTULO_IMPRESION,
+  TAMANO_ROTULO_PANTALLA,
+  abreviar,
+  altoEje,
   anchoUtil,
   rotuloEje,
 } from "./ejeGrafica";
+import { familiaDeLetra, medirRotulos } from "./medirTexto";
 import {
   type NombresRecorte,
   recortarCategorias,
@@ -109,11 +114,33 @@ export function Grafica({
   const filas = useMemo(() => filasRecharts(visibles, series), [visibles, series]);
   const etiquetas = useMemo(() => etiquetasEje(visibles), [visibles]);
 
-  // Con las etiquetas inclinadas hay que dar mas alto, o el eje se come el area
-  // de dibujo y las barras quedan aplastadas justo cuando menos espacio hay.
-  const inclinado =
-    rotuloEje({ ancho, categorias: filas.length, categorica: esCategorica(visibles) }).angulo !== 0;
-  const altoUtil = Math.max(ALTO_MINIMO, alto) + (inclinado && !imprimiendo ? ALTO_EJE_INCLINADO - 30 : 0);
+  // Como se rotula el eje sale del ancho MEDIDO de cada etiqueta, con la
+  // tipografia real (ver `ejeGrafica.ts`). Y el alto del eje sale de la etiqueta
+  // mas larga tal como se va a dibujar: ya abreviada, medida otra vez.
+  const categorica = esCategorica(visibles);
+  const rotulo = useMemo(() => {
+    const tamano = imprimiendo ? TAMANO_ROTULO_IMPRESION : TAMANO_ROTULO_PANTALLA;
+    const familia = familiaDeLetra();
+    const anchos = medirRotulos(etiquetas, tamano, familia);
+    const decidido = rotuloEje({
+      ancho: imprimiendo ? ANCHO_IMPRESION : ancho,
+      categorica,
+      tamanoLetra: tamano,
+      rotulos: etiquetas.map((texto, i) => ({ texto, ancho: anchos[i] ?? 0 })),
+    });
+    const dibujadas = medirRotulos(
+      etiquetas.map((t) => abreviar(t, decidido.maximoCaracteres)),
+      tamano,
+      familia,
+    );
+    return { ...decidido, alto: altoEje(decidido.angulo, Math.max(0, ...dibujadas), tamano) };
+  }, [etiquetas, categorica, ancho, imprimiendo]);
+
+  // El alto que el eje necesita por encima del base se SUMA a la grafica, en
+  // pantalla y en papel. Si no, el eje se come el area de dibujo y las barras se
+  // aplastan, o los rotulos se salen por abajo: lo que pasaba al imprimir hasta
+  // la 1.1.4, cuando en papel no se sumaba nada.
+  const altoUtil = Math.max(ALTO_MINIMO, alto) + (rotulo.alto - ALTO_EJE_HORIZONTAL);
 
   if (filas.length === 0) {
     return (
@@ -133,10 +160,9 @@ export function Grafica({
             series={series}
             filas={filas}
             etiquetas={etiquetas}
-            categorica={esCategorica(visibles)}
             imprimiendo={imprimiendo}
             alto={altoUtil}
-            ancho={ancho}
+            rotulo={rotulo}
             paleta={paleta}
           />
         </Suspense>

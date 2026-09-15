@@ -74,14 +74,22 @@ vacío. Si aparece, algo dejó de habilitarse y hay que averiguar qué antes de 
 
 Ninguna depende de las cifras; todas son regresiones si se rompen.
 
-- **Sale en claro aunque la pantalla esté en oscuro.** `VistaImpresion` marca su raíz con el
-  tema de impresión y `@media print` fuerza los tokens claros.
+- **Sale en claro aunque la pantalla esté en oscuro.** El tema oscuro solo existe bajo
+  `@media screen`, así que en papel no hay nada oscuro que ganar; `VistaImpresion` marca su raíz
+  con el tema de impresión y `@media print` fija los valores claros.
 - **La hoja completa sale en claro, márgenes incluidos.** No basta con que el contenido salga
   claro: el margen también es papel, y es lo primero que ve quien recibe el documento.
-  **Incumplido en la corrida del 2026-09-14**: las 15 hojas salieron pintadas de `#121212`, con un
-  rectángulo blanco superpuesto solo en el área de contenido. El primer relleno de cada hoja del
-  PDF es `#121212`. Es un defecto abierto, candidato a 1.1.5. No está verificado si pasa también
-  imprimiendo con el tema claro.
+  **Cumplido desde v1.1.5**, verificado en el papel el 2026-09-14: los dos PDF de la corrida,
+  impresos con la pantalla en oscuro, tienen cero rellenos `#121212` de hoja completa en sus 15
+  hojas. En la corrida anterior, con la 1.1.4, las 15 hojas salieron pintadas de `#121212` con un
+  rectángulo blanco solo bajo el contenido. Con el tema claro no pasaba.
+- **Ningún borde queda fuera del área imprimible.** Desde v1.1.5 el área impresa mide 726 px
+  (966 apaisada) y termina en 578.25 pt (758.25): ningún borde gris la pasa. Hasta la 1.1.4 los
+  marcos quedaban hasta 0.69 px fuera y se veían abiertos a la derecha.
+- **Los rótulos de la gráfica de modelos salen completos.** Desde v1.1.5, en la hoja de
+  Rendimiento por producto los 12 rótulos van girados, sin abreviar y dentro del recorte de la
+  gráfica: el más bajo, «Curso piloto certificado», apoya su línea base a 705.6 pt contra un
+  recorte en 709.5. Hasta la 1.1.4 tres salían cortados por abajo.
 - **Las gráficas también salen claras**: ejes, rejilla, rótulos y tooltip toman los tokens del
   contexto donde se pintan, no los del `<html>`.
 - **Ninguna regla responsiva alcanza al papel**: la impresión es un contexto de ancho fijo y el
@@ -132,6 +140,16 @@ y pies de página» activado**. Que desactivarlo no mueva los saltos de página 
 verificado**: la casilla escribe en el margen y no en el área de contenido, pero no se ha
 comparado.
 
+**Segunda corrida, 2026-09-14, con la v1.1.5.** Dos PDF guardados a mano con la pantalla en
+oscuro y el corte fijo: el demo limpio y la copia con `provision_91_180` ilegible. **La paginación
+no se movió**: 15 hojas con el mismo reparto por módulo en los dos, y las mismas tres tablas
+continúan repitiendo su encabezado, aunque la gráfica de modelos creció para alojar sus rótulos.
+**La pregunta de la casilla sigue sin respuesta**: se pidió desactivarla en los dos, y en el
+segundo la persona comprobó en la vista previa que estaba desmarcada, pero **los dos PDF salieron
+con encabezados y pies del navegador** en las 15 hojas —fecha de impresión, título,
+`localhost:5173/?fixture=demo` y «n/15»—. Comparar los dos compara casilla activada contra casilla
+activada. Cerrarla exige un PDF que de verdad salga sin ellos, comprobado en el PDF.
+
 - [x] **Total de páginas** del reporte completo: **15**. Vertical, 612 × 792 pt, salvo las
   cuatro del Estado de resultados, apaisadas a 792 × 612 pt.
 - [x] Dónde cae cada salto de página, y si algún módulo parte una tabla a media fila:
@@ -155,23 +173,22 @@ comparado.
   **`Reporte_2026-01-01-a-2026-12-31_2026-09-09`**. El diálogo agrega `.pdf`, y es también el
   `/Title` del documento.
 - [x] Notas por módulo: qué tabla o gráfica queda cerca del borde:
-  - **Todas las hojas de módulo**: el texto derecho del encabezado y del pie («Corte al
-    09/09/2026 · DEMO_Agrodrones_Bajio_FICTICIO.xlsx») termina a 0.1 pt del límite imprimible.
-    Un archivo de origen con nombre más largo no tendría holgura (GOBERNANZA.md, sección 11).
+  - **Todas las hojas de módulo**: el texto derecho del encabezado («Corte al 09/09/2026 ·
+    DEMO_Agrodrones_Bajio_FICTICIO.xlsx») termina a **0.006 pt** del límite imprimible, medido
+    con la v1.1.5 sumando los anchos de glifo (con la 1.1.4 eran 0.1 pt). Un archivo de origen
+    con nombre más largo no tendría holgura (GOBERNANZA.md, sección 11).
   - **Rendimiento por producto (hoja 13)**: la gráfica muestra las 12 categorías sin recortar.
     **Es lo esperado en papel** (ver «Invariantes del papel»).
-  - **No es línea base: defectos abiertos, candidatos a 1.1.5.**
-    - En todas las hojas, los marcos de sección y la cuarta columna de tarjetas KPI quedan con
-      el borde derecho menos de 1 px fuera del área imprimible, y se ven abiertos a la derecha.
-      El texto no se corta.
-    - En la gráfica de la hoja 13, tres rótulos girados quedan cortados por el borde inferior:
-      «Curso piloto certificado», «Bomba de aspersion» y «Cargador rapido 80W».
-    - Los márgenes oscuros (ver «Invariantes del papel»).
-- [ ] **El aviso de un parámetro ilegible en el Alcance de la portada impresa**: **no
-  verificado**. Se preparó una copia del demo con `provision_91_180` escrito «treinta por
-  ciento», y el aviso se confirmó en pantalla el 2026-09-14. La impresión se disparó, pero el PDF
-  nunca se guardó. Queda para la siguiente corrida: es donde importa, porque el panel de
-  validación no viaja con el documento.
+  - Los tres defectos que esta nota registraba con la 1.1.4 —marcos abiertos a la derecha, tres
+    rótulos cortados en la hoja 13 y márgenes oscuros— están corregidos en la v1.1.5 y
+    verificados en el papel. Ahora son invariantes (ver «Invariantes del papel»).
+- [x] **El aviso de un parámetro ilegible en el Alcance de la portada impresa**: **verificado
+  el 2026-09-14** con la v1.1.5, en un PDF de una copia del demo con `provision_91_180` escrito
+  «treinta por ciento». La portada trae, dentro del Alcance, «Parámetros que no se pudieron
+  leer», «El reporte se calculó con el valor indicado, no con el capturado.» y el renglón
+  «provision_91_180 dice «treinta por ciento», que no se pudo leer: se aplica 25% (valor por
+  omisión)». La ficha dice «Archivo de origen: DEMO_provision_ilegible.xlsx». Es donde importa,
+  porque el panel de validación no viaja con el documento.
 
 ## Opciones del diálogo de impresión
 

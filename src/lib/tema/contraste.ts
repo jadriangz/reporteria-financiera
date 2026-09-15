@@ -204,39 +204,57 @@ function normalizar(selector: string): string {
   return selector.replace(/\s+/g, " ").trim();
 }
 
+/** Una regla de `index.css`, con los bloques que la contienen. */
+export interface ReglaCss {
+  /** Selector con los espacios colapsados: `:root, [data-tema]`, `@media screen`. */
+  readonly selector: string;
+  /** Selectores de los bloques que la envuelven, del más externo al más interno. */
+  readonly envolturas: readonly string[];
+  readonly cuerpo: string;
+}
+
 /**
- * Cuerpo de la regla cuyo selector coincide, buscando también dentro de
- * `@media`. Recorre el archivo llevando la cuenta de llaves en vez de usar una
- * expresión regular: los bloques anidados de `@media print` la romperían, y un
+ * Todas las reglas del archivo, incluidas las anidadas en `@media`, en el orden
+ * en que se cierran. Recorre llevando la cuenta de llaves en vez de usar una
+ * expresión regular: los bloques anidados de `@media` la romperían, y un
  * comentario que mencione un selector —este archivo tiene varios— haría que una
  * búsqueda por texto encontrara la prosa en lugar de la regla.
+ *
+ * Saber qué bloque envuelve a cada regla es lo que permite probar que el tema
+ * oscuro solo existe en pantalla, en vez de confiar en que la impresión le gane.
  */
-function cuerpoDeRegla(css: string, selector: string): string | null {
+export function reglasDeCss(css: string): ReglaCss[] {
   const limpio = css.replace(/\/\*[\s\S]*?\*\//g, "");
-  const buscado = normalizar(selector);
-
-  let inicioSelector = 0;
-  let profundidad = 0;
+  const reglas: ReglaCss[] = [];
   const pila: { selector: string; inicio: number }[] = [];
+  let inicioSelector = 0;
 
   for (let i = 0; i < limpio.length; i += 1) {
     const c = limpio[i];
     if (c === "{") {
       pila.push({ selector: normalizar(limpio.slice(inicioSelector, i)), inicio: i + 1 });
-      profundidad += 1;
       inicioSelector = i + 1;
     } else if (c === "}") {
       const abierto = pila.pop();
-      profundidad -= 1;
-      if (abierto !== undefined && abierto.selector === buscado) {
-        return limpio.slice(abierto.inicio, i);
+      if (abierto !== undefined) {
+        reglas.push({
+          selector: abierto.selector,
+          envolturas: pila.map((p) => p.selector),
+          cuerpo: limpio.slice(abierto.inicio, i),
+        });
       }
       inicioSelector = i + 1;
-    } else if (c === ";" && profundidad === 0) {
+    } else if (c === ";" && pila.length === 0) {
       inicioSelector = i + 1;
     }
   }
-  return null;
+  return reglas;
+}
+
+/** Cuerpo de la primera regla que cierra con ese selector, también dentro de `@media`. */
+function cuerpoDeRegla(css: string, selector: string): string | null {
+  const buscado = normalizar(selector);
+  return reglasDeCss(css).find((r) => r.selector === buscado)?.cuerpo ?? null;
 }
 
 /** Los tokens de cada tema tal como los declara `index.css`. */

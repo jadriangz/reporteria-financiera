@@ -12,7 +12,15 @@ import {
 
 import { moneda, monedaCompacta } from "../../lib/format";
 import type { PaletaGrafica } from "../../lib/tema/paleta";
-import { ANCHO_EJE_Y, ANCHO_IMPRESION, abreviar, rotuloEje } from "./ejeGrafica";
+import {
+  ANCHO_EJE_Y,
+  ANCHO_IMPRESION,
+  MARGEN_IZQUIERDO,
+  type RotuloEje,
+  TAMANO_ROTULO_IMPRESION,
+  TAMANO_ROTULO_PANTALLA,
+  abreviar,
+} from "./ejeGrafica";
 import {
   type FilaRecharts,
   type SerieGrafica,
@@ -39,7 +47,8 @@ import {
  * - Lineas rectas entre puntos: una curva suavizada inventa valores entre meses.
  */
 
-const MARGEN = { top: 8, right: 12, bottom: 0, left: 4 } as const;
+/** `left` es el mismo que usa `rotuloEje` para saber cuánto espacio tiene el primer rótulo girado. */
+const MARGEN = { top: 8, right: 12, bottom: 0, left: MARGEN_IZQUIERDO } as const;
 
 /**
  * TODO color de esta grafica sale de `paleta`, que viene resuelta contra el
@@ -49,8 +58,9 @@ const MARGEN = { top: 8, right: 12, bottom: 0, left: 4 } as const;
  * clara aunque la pantalla este en oscuro.
  */
 function tick(paleta: PaletaGrafica, imprimiendo: boolean) {
-  // En papel las etiquetas bajan de tamaño, igual que el resto del reporte.
-  return { fontSize: imprimiendo ? 9 : 11, fill: paleta.rotulo } as const;
+  // En papel las etiquetas bajan de tamaño, igual que el resto del reporte. Es el
+  // mismo tamaño con el que `Grafica` las midió para decidir cómo rotularlas.
+  return { fontSize: imprimiendo ? TAMANO_ROTULO_IMPRESION : TAMANO_ROTULO_PANTALLA, fill: paleta.rotulo } as const;
 }
 
 /*
@@ -68,31 +78,26 @@ export function GraficaLienzo({
   series,
   filas,
   etiquetas,
-  categorica,
   imprimiendo,
   alto,
-  ancho,
+  rotulo,
   paleta,
 }: {
   readonly tipo: TipoGrafica;
   readonly series: readonly SerieGrafica[];
   readonly filas: readonly FilaRecharts[];
   readonly etiquetas: readonly string[];
-  readonly categorica: boolean;
   readonly imprimiendo: boolean;
   readonly alto: number;
-  /** Ancho medido del contenedor. Decide como se rotula el eje X. */
-  readonly ancho: number;
+  /**
+   * Cómo se rotula el eje X. Lo decide `Grafica` con las etiquetas medidas, y
+   * con él calcula también el alto: aquí solo se dibuja.
+   */
+  readonly rotulo: RotuloEje;
   readonly paleta: PaletaGrafica;
 }) {
   const esLinea = tipo === "linea";
   const marca = tick(paleta, imprimiendo);
-  // En papel el ancho es fijo y conocido; en pantalla, el que se midio.
-  const rotulo = rotuloEje({
-    ancho: imprimiendo ? ANCHO_IMPRESION : ancho,
-    categorias: filas.length,
-    categorica,
-  });
 
   return (
     <Contenedor imprimiendo={imprimiendo} alto={alto}>

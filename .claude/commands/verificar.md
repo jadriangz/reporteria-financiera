@@ -49,19 +49,23 @@ algo, no tratarlo como verificado».
 ## Paso 0 — Conseguir el navegador, antes que todo
 
 Llama a `tabs_context_mcp` (herramienta `mcp__claude-in-chrome__tabs_context_mcp`, con
-`createIfEmpty: true`). Es la prueba de que hay navegador. No hay otra: el nombre «@browser» que
-usaba este comando no existe en este entorno.
+`createIfEmpty: true`). Es la prueba de que hay navegador, y la primera llamada de toda sesión
+de navegador.
 
-Dos resultados distintos son **el mismo caso**, y se tratan igual:
+Hay dos casos distintos en los que no responde, y se tratan distinto:
 
-- la herramienta no está disponible —ninguna `mcp__claude-in-chrome__*` aparece, ni con
-  `ToolSearch`—, o
-- la herramienta responde «Browser extension is not connected».
+- **Las herramientas `mcp__claude-in-chrome__*` no aparecen, ni con `ToolSearch`.** Eso **no
+  prueba que falte el navegador**. Observado el 2026-09-14 en la extensión de VS Code: con la
+  extensión de Chrome conectada, las herramientas no estaban cargadas en la sesión, y buscarlas
+  otra vez no las cargó. Aparecieron en cuanto el usuario escribió `@browser` en su mensaje.
+  Pídele que vuelva a invocar el comando mencionando `@browser`.
+- **La herramienta responde «Browser extension is not connected».** Aquí sí falta la conexión.
+  Pídele que reconecte la extensión (en la CLI, `/chrome` → «Reconnect extension») y que vuelva a
+  invocar el comando.
 
-En ese caso **detente de inmediato, sin correr la Fase A**. Dile al usuario que ejecute `/chrome`
-y vuelva a invocar el comando, y reporta las tres fases como `no verificado`. La Fase A corre
-completa en la siguiente invocación; correrla ahora solo retrasa dos minutos el aviso de que
-falta el navegador.
+En los dos casos **detente de inmediato, sin correr la Fase A**, y reporta las tres fases como
+`no verificado`. La Fase A corre completa en la siguiente invocación; correrla ahora solo retrasa
+dos minutos el aviso de que falta el navegador.
 
 No sustituyas el recorrido por capturas imaginadas ni por lectura del código: el recorrido
 visual es visual.
@@ -69,9 +73,17 @@ visual es visual.
 Si hay navegador, crea tu propia pestaña con `tabs_create_mcp` y ciérrala al terminar. Mientras
 corre la Fase A puedes adelantar B.1: son independientes.
 
-Dos particularidades de la extensión, observadas en la primera corrida (2026-09-14). Cada una
-cuesta media hora si no se sabe:
+Tres particularidades de la extensión, observadas el 2026-09-14. Cada una cuesta media hora si no
+se sabe:
 
+- **Mide solo con la pestaña visible.** Con `document.visibilityState` en `hidden` —la ventana de
+  Chrome detrás de otra, u otra pestaña activa en esa ventana— Chrome no pinta. El
+  `ResizeObserver` no se dispara, y las gráficas se quedan con ancho 0: salen girando y abreviando
+  rótulos que a su ancho real no tocarían. Parecen defectos y no lo son. Engaña porque
+  `getBoundingClientRect` y la medición de texto sí funcionan con la pestaña oculta, así que las
+  cifras parecen coherentes. Antes de medir, comprueba que `document.visibilityState` sea
+  `visible`. Si no, pide al usuario que traiga al frente **la pestaña del grupo de Claude**, no
+  otra pestaña de la misma aplicación.
 - **Una corrida larga de JavaScript no cabe en una sola llamada**: `browser_batch` vence el
   tiempo. Lánzala sin esperar, guarda el resultado en `window.__resultado` y consúltalo en otra
   llamada.
@@ -249,16 +261,32 @@ Esto es diseño deliberado y está documentado en `CLAUDE.md` («Layout (v1.1)»
 
 ### C.1 Generar
 
-Con el tema **oscuro** activo en pantalla —a propósito: es lo que prueba la inversión—, dispara
-el reporte completo desde la interfaz. Vale también para el recorrido de humo: aunque la Fase B
+Con el tema **oscuro** activo en pantalla —a propósito: es lo que prueba la inversión—, el reporte
+completo se dispara desde la interfaz. Vale también para el recorrido de humo: aunque la Fase B
 haya corrido en claro, cambia a oscuro antes de generar.
+
+**El clic en «Descargar PDF» lo da la persona, a mano. No dispares la impresión con clics ni
+scripts automatizados.** Observado el 2026-09-14: un PDF disparado así mientras la extensión
+actuaba sobre la pestaña salió con los indicadores visuales de la extensión dentro, 115 imágenes
+rasterizadas de hoja completa y un cursor dibujado en cada hoja. Pesó 3.7 MB, contra 0.7 MB del
+mismo reporte impreso a mano, que no tenía ninguna de las dos cosas. Parecían defectos de la
+aplicación y no lo eran. Tú dejas la pestaña lista (datos, corte y tema) y se lo pides.
 
 ### C.2 Guardar (esto es manual, y no hay manera de que no lo sea)
 
 El diálogo de impresión de Chrome es nativo y no se automatiza. Pide al usuario que lo cierre
 guardando el PDF y que te dé la ruta. Si no lo hace, la Fase C queda `no verificado`. Pídele
 también que desactive «Encabezados y pies de página», como dice la corrida canónica de
-`docs/linea-base-pdf.md`.
+`docs/linea-base-pdf.md`. **Y compruébalo en el PDF, no en lo que te digan**: busca en su texto
+la fecha de impresión y la dirección `localhost`. El 2026-09-14 la casilla se pidió desactivada
+en dos impresiones, en la segunda la persona la vio desmarcada en la vista previa, y los dos PDF
+salieron con encabezados en las 15 hojas.
+
+**Dale el nombre del archivo sin extensión:** el diálogo agrega `.pdf`, y si la persona la escribe
+queda `.pdf.pdf`. **Y comprueba el corte en el título interno del PDF** (`/Title`, que sale de
+`nombreArchivoReporte()`), no en el nombre del archivo. Observado el 2026-09-14: un PDF
+renombrado a mano con corte 2026-09-09 traía corte 2026-09-14 y una hoja menos, porque se había
+impreso sin el corte fijo.
 
 **Mientras el diálogo está abierto, la pestaña no responde**: las capturas vencen y la extensión
 puede desconectarse. No es un defecto de la aplicación ni una señal de que algo falló. Espera a

@@ -103,10 +103,12 @@ Cada mensaje debe indicar **hoja, número de fila y qué corregir**. Un validado
 Reglas que ya costaron una sesión descubrir. Parecen arbitrarias y no lo son: si alguien
 las "simplifica" sin leer el porqué, rompe el reporte en silencio.
 
-- **La vacuidad de una fila se juzga SOLO sobre columnas de entrada.** Las columnas
-  calculadas de la plantilla (`utilidad_bruta`, `margen_pct`, `cobrado`, `saldo`) son
-  fórmulas que devuelven `0` y `""` en las ~280 filas de relleno: si se toman en cuenta,
-  el lector cree que hay 300 ventas capturadas donde hay 21.
+- **La vacuidad de una fila se juzga SOLO sobre columnas de entrada.** En los archivos
+  llenos, las columnas calculadas (`utilidad_bruta`, `margen_pct`, `cobrado`, `saldo`) traen
+  fórmulas estiradas que devuelven `0` y `""` en las ~280 filas de relleno: si se toman en
+  cuenta, el lector cree que hay 300 ventas capturadas donde hay 21. Así vienen el archivo de
+  demostración (1,200 fórmulas) y el del cliente. La plantilla descargable solo trae fórmula en
+  la fila de ejemplo, pero la regla no depende de eso: el lector recibe lo que el cliente mande.
 - **El parser CONSERVA las filas con `linea = "Demo"`.** Excluirlas es trabajo exclusivo
   del motor de cálculo. Si el lector las tira, el motor pierde la capacidad de listarlas
   aparte y el usuario nunca se entera de que existen.
@@ -254,8 +256,13 @@ siempre el **resuelto**, nunca "sistema". Con "sistema" elegido la aplicación s
 - **Contraste WCAG AA obligatorio** (4.5:1 texto, 3:1 objetos gráficos) en **los dos temas**,
   verificado por prueba sobre `index.css`. La tabla vive en `docs/contraste.md` y la regenera
   `npm run test`.
-- **La impresión siempre sale en claro**, sea cual sea el tema de la pantalla. `VistaImpresion`
-  marca su raíz con `data-tema="claro"` y `@media print` fuerza los tokens claros.
+- **La impresión siempre sale en claro**, sea cual sea el tema de la pantalla, y la hoja completa,
+  márgenes incluidos. **El tema oscuro solo existe bajo `@media screen` y nadie escribe
+  `color-scheme` en línea**: en papel no hay nada oscuro con qué competir, así que no depende de
+  ganar por especificidad. `VistaImpresion` marca su raíz con `data-tema="claro"` y
+  `@media print` fija los valores claros exactos para el Ctrl+P directo. Una prueba exige esa
+  estructura. Hasta la 1.1.4 un `color-scheme: dark` en línea le ganaba a la impresión y Chrome
+  pintaba la hoja entera de oscuro (ver `docs/decisiones.md`).
 - **Las gráficas reciben los tokens resueltos** del tema que rige **donde se pintan** —no los
   del `<html>`—, incluidos ejes, rejilla, rótulos y tooltip. Es lo que hace que el PDF salga
   claro aunque la pantalla esté en oscuro.
@@ -277,11 +284,18 @@ lo que manda es el espacio que tiene, no el que tiene la ventana.
 - **Una gráfica de categorías recorta a las que caben legibles y declara lo omitido** con su
   número y su proporción del ingreso. El eje de tiempo no se recorta nunca: se bajan las
   marcas. Ver `docs/decisiones.md`.
+- **Los rótulos del eje de categorías se deciden con su ancho MEDIDO** —con canvas y la tipografía
+  real, nunca contando caracteres—, en cascada: horizontales si el más ancho cabe en su columna;
+  girados si caben en 80 px de alto y el primero no se sale a la izquierda del eje Y; abreviados
+  si no. El alto del eje sale del rótulo más largo tal como se dibuja, y se suma a la gráfica
+  también en papel. Recortar categorías va antes: los rótulos se deciden sobre las que quedan.
 - **Objetivo táctil**: 44 px reales en barra de herramientas y navegación; dentro de las
   tablas, 44 px solo con `pointer: coarse`, porque con renglones de 26 px dos áreas de 44 se
   pisan y el toque abre la fila equivocada.
 - **La impresión es un contexto de ancho fijo**: ninguna regla responsiva la alcanza. En
-  `@media print` el layout es el de escritorio y la gráfica no recorta.
+  `@media print` el layout es el de escritorio y la gráfica no recorta. Los márgenes laterales
+  de `@page` van en píxeles enteros (45 px), para que el ancho imprimible sea entero y ningún
+  borde derecho quede fuera del área impresa.
 
 ## Pruebas
 

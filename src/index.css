@@ -177,36 +177,50 @@
   --color-emerald-50: #ECFDF5;
 }
 
-html[data-tema="oscuro"] {
-  color-scheme: dark;
+/*
+ * EL TEMA OSCURO SOLO EXISTE EN PANTALLA.
+ *
+ * Va dentro de `@media screen` para que en papel no haya ningún oscuro contra el
+ * que competir. Hasta la 1.1.4 este bloque valía para todos los medios, y la
+ * impresión quedaba en claro solo si `@media print` le ganaba en especificidad y
+ * en orden. Además `color-scheme` se escribía en línea en el <html>, y un estilo
+ * en línea le gana a cualquier hoja de estilos: imprimiendo desde oscuro, Chrome
+ * pintaba la hoja completa con su fondo oscuro por omisión, márgenes incluidos,
+ * debajo de un contenido que sí salía claro. Una prueba exige que cualquier regla
+ * con el tema oscuro, y todo `color-scheme: dark`, viva dentro de este bloque.
+ */
+@media screen {
+  html[data-tema="oscuro"] {
+    color-scheme: dark;
 
-  /* Tonos semánticos aclarados: ver la nota de arriba. */
-  --color-marino: #8FB3E0;
-  --color-positivo: #4FBE7B;
-  --color-riesgo: #F07167;
-  --color-advertencia: #E0A93B;
+    /* Tonos semánticos aclarados: ver la nota de arriba. */
+    --color-marino: #8FB3E0;
+    --color-positivo: #4FBE7B;
+    --color-riesgo: #F07167;
+    --color-advertencia: #E0A93B;
 
-  --color-papel: #0D141F;        /* fondo de la página */
-  --color-superficie: #161F2E;   /* tarjetas y barras, un peldaño por encima */
-  --color-tinta: #E6EAF2;
-  --color-sobre-color: #0D141F;  /* se invierte: casi negro sobre tono claro */
+    --color-papel: #0D141F;        /* fondo de la página */
+    --color-superficie: #161F2E;   /* tarjetas y barras, un peldaño por encima */
+    --color-tinta: #E6EAF2;
+    --color-sobre-color: #0D141F;  /* se invierte: casi negro sobre tono claro */
 
-  /* Rampa neutra invertida: 50 es superficie, 900 es el texto más fuerte. */
-  --color-slate-50: #18202D;
-  --color-slate-100: #1E2838;
-  --color-slate-200: #2A3648;
-  --color-slate-300: #3A4860;
-  --color-slate-400: #8592A8;
-  --color-slate-500: #9FACC2;
-  --color-slate-600: #B8C2D4;
-  --color-slate-700: #CDD6E4;
-  --color-slate-800: #DFE6F0;
-  --color-slate-900: #EFF3F9;
+    /* Rampa neutra invertida: 50 es superficie, 900 es el texto más fuerte. */
+    --color-slate-50: #18202D;
+    --color-slate-100: #1E2838;
+    --color-slate-200: #2A3648;
+    --color-slate-300: #3A4860;
+    --color-slate-400: #8592A8;
+    --color-slate-500: #9FACC2;
+    --color-slate-600: #B8C2D4;
+    --color-slate-700: #CDD6E4;
+    --color-slate-800: #DFE6F0;
+    --color-slate-900: #EFF3F9;
 
-  /* Fondos teñidos de los avisos: oscuros, no pasteles. */
-  --color-red-50: #2A1518;
-  --color-amber-50: #2A2010;
-  --color-emerald-50: #0F2419;
+    /* Fondos teñidos de los avisos: oscuros, no pasteles. */
+    --color-red-50: #2A1518;
+    --color-amber-50: #2A2010;
+    --color-emerald-50: #0F2419;
+  }
 }
 
 body {
@@ -224,7 +238,17 @@ body {
  */
 @page {
   size: letter;
-  margin: 12mm 12mm 10mm;
+  /*
+   * Márgenes laterales en píxeles enteros, no en milímetros. La hoja carta mide
+   * 816 px CSS de ancho; con 12 mm por lado el ancho imprimible era de 725.3 px,
+   * pero Chrome maqueta la página a 726 px, así que el borde derecho de secciones
+   * y tarjetas caía hasta 0.7 px fuera del área impresa y se veía abierto
+   * (medido en el PDF el 2026-09-14). Con 45 px por lado, 0.09 mm menos que antes,
+   * el ancho imprimible es 726 px en vertical y 966 px en apaisado: enteros, sin
+   * redondeo que perder. Arriba y abajo no tocan ningún borde lateral y se quedan
+   * en milímetros.
+   */
+  margin: 12mm 45px 10mm;
 }
 
 /* El estado de resultados mensual tiene doce columnas: no cabe a lo alto. */
@@ -234,21 +258,21 @@ body {
 
 @media print {
   /*
-   * LA IMPRESIÓN SIEMPRE VA EN CLARO, sea cual sea el tema de la pantalla.
+   * LA IMPRESIÓN SIEMPRE VA EN CLARO, sea cual sea el tema de la pantalla, y no
+   * depende de ganarle a nadie: el tema oscuro solo existe bajo `@media screen`,
+   * así que en papel no hay nada oscuro. Un reporte con fondo negro no se lee en
+   * papel y vacía un cartucho por ejemplar.
    *
-   * Un reporte con fondo negro no se lee en papel y vacía un cartucho por
-   * ejemplar. `VistaImpresion` ya marca su raíz con data-tema="claro", lo que
-   * cubre el botón «Descargar PDF»; este bloque cubre el otro camino, el
-   * Ctrl+P directo del navegador, donde la raíz sigue siendo el <html> oscuro.
-   *
-   * Los selectores están elegidos para ganarle en especificidad y en orden a
-   * `html[data-tema="oscuro"]`. Los valores son, literalmente, los del bloque
+   * `VistaImpresion` marca su raíz con data-tema="claro", lo que cubre el botón
+   * «Descargar PDF». Este bloque fija los mismos valores en la raíz para el otro
+   * camino, el Ctrl+P directo del navegador: sin él, la rampa neutra en papel
+   * serían los valores por omisión de Tailwind y no los hexadecimales cuyo
+   * contraste mide la prueba. Los valores son, literalmente, los del bloque
    * [data-tema="claro"] de arriba, y una prueba compara los dos bloques carácter
    * por carácter: duplicarlos a mano sin red sería cuestión de tiempo.
    */
   :root,
-  [data-tema],
-  html[data-tema="oscuro"] {
+  [data-tema] {
     color-scheme: light;
 
     --color-marino: #1F3864;
