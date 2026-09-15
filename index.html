@@ -39,7 +39,6 @@
             tema = window.matchMedia("(prefers-color-scheme: dark)").matches ? "oscuro" : "claro";
           }
           document.documentElement.setAttribute("data-tema", tema);
-          document.documentElement.style.colorScheme = tema === "oscuro" ? "dark" : "light";
         } catch (e) {
           document.documentElement.setAttribute("data-tema", "claro");
         }

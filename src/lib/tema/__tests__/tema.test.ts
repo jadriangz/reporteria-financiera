@@ -107,8 +107,23 @@ describe("el script que evita el destello de tema", () => {
     expect(script).toContain("catch");
   });
 
-  it("también fija color-scheme, para los controles nativos", () => {
-    expect(script).toContain("colorScheme");
+  it("NO escribe color-scheme en línea: le ganaría a la impresión", () => {
+    // Esta prueba antes exigía lo contrario, y codificaba el defecto. Un
+    // `style.colorScheme = "dark"` en el <html> le gana a la regla de
+    // `@media print`, y Chrome imprimía la hoja completa con su fondo oscuro por
+    // omisión (#121212), márgenes incluidos. El esquema de color lo declara
+    // `index.css` desde `data-tema`, y el oscuro solo para pantalla.
+    expect(script).not.toContain("colorScheme");
+    // `prefers-color-scheme` sí aparece, y debe: es la consulta al sistema. Lo que
+    // no puede aparecer es una declaración `color-scheme:` suelta.
+    expect(script).not.toMatch(/(?<!prefers-)color-scheme\s*:/);
+  });
+
+  it("y aplicarTema tampoco lo escribe: solo el atributo", () => {
+    const fuente = readFileSync(fileURLToPath(new URL("../index.ts", import.meta.url)), "utf8");
+    const codigo = fuente.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    expect(codigo).not.toContain("colorScheme");
+    expect(codigo).toContain("setAttribute(ATRIBUTO_TEMA");
   });
 });
 

@@ -9,6 +9,7 @@ import {
   contraste,
   evaluarPares,
   luminancia,
+  reglasDeCss,
   tokensDeBloque,
   tokensDeTema,
 } from "../contraste";
@@ -75,19 +76,40 @@ describe("los dos temas declaran los mismos tokens", () => {
   });
 });
 
-describe("la impresión fuerza exactamente los tokens claros", () => {
+describe("la impresión va en claro sin tener que ganarle al tema oscuro", () => {
+  const reglas = reglasDeCss(CSS);
+
   it("el bloque de @media print es idéntico al de [data-tema=claro]", () => {
     // Los valores están escritos dos veces por una limitación de CSS (no hay
     // forma de reaplicar un bloque a otro selector). Esta prueba convierte esa
     // duplicación en un invariante verificado en vez de en una bomba de tiempo.
     const claro = tokensDeBloque(CSS, '[data-tema="claro"]');
-    const impresion = tokensDeBloque(CSS, "  :root,\n  [data-tema],\n  html[data-tema=\"oscuro\"]");
+    const impresion = tokensDeBloque(CSS, ":root,\n[data-tema]");
     expect(impresion).toEqual(claro);
   });
 
-  it("y deja el esquema de color en claro, para los controles nativos", () => {
-    const bloqueImpresion = CSS.slice(CSS.indexOf("@media print"));
-    expect(bloqueImpresion).toContain("color-scheme: light");
+  it("el tema oscuro solo existe en pantalla", () => {
+    // Antes esta sección solo exigía que `@media print` dijera
+    // `color-scheme: light`, y pasaba mientras un estilo en línea le ganaba y
+    // Chrome imprimía la hoja completa en oscuro. Lo que se fija ahora es la
+    // estructura: en papel no hay ninguna regla oscura contra la que competir.
+    const oscuras = reglas.filter((r) => r.selector.includes('data-tema="oscuro"'));
+    expect(oscuras.length).toBeGreaterThan(0);
+    for (const r of oscuras) expect(r.envolturas, r.selector).toEqual(["@media screen"]);
+  });
+
+  it("ningún color-scheme: dark vive fuera de @media screen", () => {
+    const conOscuro = reglas.filter(
+      (r) => !r.selector.startsWith("@") && /color-scheme\s*:\s*dark/.test(r.cuerpo),
+    );
+    expect(conOscuro.length).toBeGreaterThan(0);
+    for (const r of conOscuro) expect(r.envolturas, r.selector).toContain("@media screen");
+  });
+
+  it("la impresión deja el esquema en claro y no menciona el tema oscuro", () => {
+    const impresion = reglas.filter((r) => r.envolturas.includes("@media print"));
+    expect(impresion.some((r) => /color-scheme\s*:\s*light/.test(r.cuerpo))).toBe(true);
+    expect(impresion.filter((r) => r.selector.includes('data-tema="oscuro"'))).toEqual([]);
   });
 });
 

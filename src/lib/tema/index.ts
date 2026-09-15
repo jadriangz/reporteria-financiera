@@ -81,18 +81,24 @@ export function guardarTema(tema: Tema): void {
 }
 
 /**
- * Escribe el tema resuelto en el `<html>`.
+ * Escribe el tema resuelto en el `<html>`. Solo el atributo, nada más.
  *
- * Además fija `color-scheme`, que es lo que hace que los controles nativos
- * —el selector de fecha de la barra superior, los `select`, las barras de
- * desplazamiento— se pinten oscuros. Sin eso queda un calendario blanco
- * cegador sobre un reporte oscuro.
+ * `color-scheme` —lo que pinta oscuros los controles nativos: el selector de
+ * fecha, los `select`, las barras de desplazamiento— NO se escribe aquí. Lo
+ * declara `index.css` a partir de este atributo, y el oscuro solo dentro de
+ * `@media screen`.
+ *
+ * Antes se escribía en línea (`style.colorScheme`), y un estilo en línea le gana
+ * a cualquier regla de hoja de estilos: también a la de `@media print` que lo
+ * volvía claro. Imprimiendo desde oscuro, Chrome pintaba entonces la hoja
+ * completa con su fondo oscuro por omisión (#121212), márgenes incluidos, debajo
+ * del contenido claro. Sin nada en línea, en papel no hay ningún oscuro contra
+ * el que competir.
  */
 export function aplicarTema(resuelto: TemaResuelto, raiz?: HTMLElement): void {
   const el = raiz ?? (typeof document === "undefined" ? null : document.documentElement);
   if (el === null) return;
   el.setAttribute(ATRIBUTO_TEMA, resuelto);
-  el.style.colorScheme = resuelto === "oscuro" ? "dark" : "light";
 }
 
 /**
