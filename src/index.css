@@ -238,7 +238,17 @@ body {
  */
 @page {
   size: letter;
-  margin: 12mm 12mm 10mm;
+  /*
+   * Márgenes laterales en píxeles enteros, no en milímetros. La hoja carta mide
+   * 816 px CSS de ancho; con 12 mm por lado el ancho imprimible era de 725.3 px,
+   * pero Chrome maqueta la página a 726 px, así que el borde derecho de secciones
+   * y tarjetas caía hasta 0.7 px fuera del área impresa y se veía abierto
+   * (medido en el PDF el 2026-09-14). Con 45 px por lado, 0.09 mm menos que antes,
+   * el ancho imprimible es 726 px en vertical y 966 px en apaisado: enteros, sin
+   * redondeo que perder. Arriba y abajo no tocan ningún borde lateral y se quedan
+   * en milímetros.
+   */
+  margin: 12mm 45px 10mm;
 }
 
 /* El estado de resultados mensual tiene doce columnas: no cabe a lo alto. */
