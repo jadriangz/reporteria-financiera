@@ -462,6 +462,12 @@ Priorizado. Lo de arriba entra primero.
   tardaron hasta 7.4 s y fallaron por el límite de 5 s de vitest («Test timed out in 5000ms»);
   con 60 s de límite pasaron, con la aserción cumplida. Es la peor clase de prueba frágil: su
   rojo no dice nada del código, y enseña a ignorar el rojo de las pruebas que sí cuidan algo.
+- **El lockfile no está sincronizado con lo que npm genera hoy.** Observado el 2026-09-14 al
+  cerrar la 1.1.5: `npm install --package-lock-only` agrega seis entradas empaquetadas bajo
+  `@tailwindcss/oxide-wasm32-wasi` —`@emnapi/core`, `@emnapi/runtime`, `@emnapi/wasi-threads`,
+  `@napi-rs/wasm-runtime`, `@tybys/wasm-util` y `tslib`—, ajenas a esa sesión. Se restauró el
+  lockfile y solo se cambiaron sus dos líneas de versión, que decían `0.0.0`. Falta decidir, en
+  su propia sesión, si se regenera, comprobando que `npm ci` y el build no cambien.
 - Gastos por categoría en el motor, hoy solo agregados.
 - Números de página en el PDF impreso.
 
