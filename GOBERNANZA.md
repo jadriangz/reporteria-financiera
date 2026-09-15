@@ -34,8 +34,8 @@ modifica la cifra esperada para que pase la prueba.
 
 ## 2. Estado actual
 
-**v1.1.4, en producción desde el 2026-09-14.** Verificado comparando por SHA-256 los archivos que
-sirve `reporteria-financiera.vercel.app` contra el build local del commit fusionado —7 de 7
+**v1.1.5, en producción desde el 2026-09-14.** Verificado comparando por SHA-256 los archivos que
+sirve `reporteria-financiera.vercel.app` contra el build local del commit fusionado —8 de 8
 idénticos—, y no con el estado del despliegue. El método está en la sección 5, paso 6. Hasta la
 fusión del PR #1, producción servía 1.1.0 aunque la serie 1.1.1–1.1.4 ya estaba terminada: el
 trabajo sin commit no llega al cliente. Qué cambió en cada versión, para quien ya usaba la
@@ -78,7 +78,8 @@ La serie deja una restricción en `CLAUDE.md`: toda coerción del contrato vive 
 **v1.1.5 — defectos de presentación**, sin cambios de contrato ni de cifras: el PDF impreso desde
 el tema oscuro sale en claro de orilla a orilla, los rótulos de la gráfica de modelos ya no se
 enciman ni se cortan, los marcos del PDF se ven cerrados y la plantilla deja de prometer fórmulas
-que no trae. Detalle en `docs/notas-version.md`.
+que no trae. Desplegada en producción el 2026-09-14, con el PR #3 y la etiqueta `v1.1.5`. Detalle
+en `docs/notas-version.md`.
 
 Fuera de alcance en v1, por decisión: autenticación, multiusuario, persistencia,
 histórico entre cortes, conexión a Odoo, multimoneda, consolidación de varias empresas.
