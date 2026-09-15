@@ -1,34 +1,66 @@
 import { describe, expect, it } from "vitest";
 
-import { ALTO_MINIMO, abreviar, anchoUtil, rotuloEje } from "../ejeGrafica";
+import {
+  AIRE_DIAGONAL,
+  ALTO_EJE_HORIZONTAL,
+  ALTO_EJE_MAXIMO,
+  ALTO_MINIMO,
+  ANGULO_GIRO,
+  ANCHO_IMPRESION,
+  type RotuloMedido,
+  TAMANO_ROTULO_IMPRESION,
+  TAMANO_ROTULO_PANTALLA,
+  abreviar,
+  altoEje,
+  anchoUtil,
+  rotuloEje,
+} from "../ejeGrafica";
+import { medirRotulos } from "../medirTexto";
+import { anchoMinimoCategoria } from "../recorteCategorias";
 
 /**
  * El orden de las medidas cuando el eje no cabe: bajar densidad, rotar,
- * abreviar, y superponer nunca. Estas pruebas fijan ese orden, que es lo que
- * distingue una gráfica apretada de una gráfica rota.
+ * abreviar, y superponer nunca. Y desde la 1.1.5, que cada paso se decide con el
+ * LARGO MEDIDO de los rótulos, no solo con los píxeles por categoría.
+ *
+ * Estas pruebas reemplazan a las de la 1.1.4, que fijaban la regla vieja —rotar
+ * a partir de cierto ancho, un alto fijo de 48 px— y con ello el defecto: a 1024
+ * px los rótulos largos se encimaban y girados se cortaban.
  */
 
-const eje = (ancho: number, categorias: number, categorica: boolean) =>
-  rotuloEje({ ancho, categorias, categorica });
+/** Anchos medidos en Chrome el 2026-09-14, con la tipografía de la aplicación. */
+const CURSO_PANTALLA = 113.2; // «Curso piloto certificado» a 11 px
+const CURSO_PAPEL = 92.6; // el mismo, a 9 px
+
+/** Doce modelos como los del demo: once cortos y el más largo al final. */
+const doceModelos = (largo: number): RotuloMedido[] => [
+  ...Array.from({ length: 11 }, (_, i) => ({ texto: `AX-${i}0`, ancho: 30 })),
+  { texto: "Curso piloto certificado", ancho: largo },
+];
+
+const categorias = (ancho: number, rotulos: readonly RotuloMedido[], tamanoLetra = TAMANO_ROTULO_PANTALLA) =>
+  rotuloEje({ ancho, categorica: true, rotulos, tamanoLetra });
+
+const meses = (ancho: number, cuantos: number) =>
+  rotuloEje({
+    ancho,
+    categorica: false,
+    tamanoLetra: TAMANO_ROTULO_PANTALLA,
+    rotulos: Array.from({ length: cuantos }, (_, i) => ({ texto: `m${i}`, ancho: 20 })),
+  });
 
 describe("eje de tiempo", () => {
   it("con espacio de sobra pinta las marcas horizontales y sin recortar", () => {
-    const r = eje(1200, 9, false);
+    const r = meses(1200, 9);
     expect(r.angulo).toBe(0);
     expect(r.maximoCaracteres).toBeNull();
     expect(r.separacionMinima).toBe(8);
   });
 
   it("al apretarse EXIGE más separación, o sea pinta menos meses", () => {
-    // Saltarse un mes no pierde información: el eje es continuo y el lector
-    // interpola. Es la primera medida, antes de tocar el texto.
-    //
-    // La exigencia es MONÓTONA, no estrictamente creciente en cada paso: entre
-    // 1200 y 600 px nueve meses siguen cabiendo holgados y no hay nada que
-    // apretar todavía. Lo que no puede pasar es que a menos ancho se pida
-    // menos separación.
+    // La exigencia es MONÓTONA: a menos ancho nunca se pide menos separación.
     const anchos = [1200, 900, 600, 420, 360, 296, 200];
-    const exigido = anchos.map((a) => eje(a, 9, false).separacionMinima);
+    const exigido = anchos.map((a) => meses(a, 9).separacionMinima);
     for (let i = 1; i < exigido.length; i += 1) {
       expect(exigido[i] ?? 0, `${anchos[i]}px`).toBeGreaterThanOrEqual(exigido[i - 1] ?? 0);
     }
@@ -37,65 +69,106 @@ describe("eje de tiempo", () => {
 
   it("nunca rota ni abrevia un mes: se quitan marcas, no se estropean", () => {
     for (const ancho of [1200, 600, 360, 200, 0]) {
-      const r = eje(ancho, 12, false);
+      const r = meses(ancho, 12);
       expect(r.angulo, `${ancho}px`).toBe(0);
       expect(r.maximoCaracteres, `${ancho}px`).toBeNull();
     }
   });
 });
 
-describe("eje de categorías", () => {
-  it("con espacio de sobra, horizontal y completo", () => {
-    const r = eje(1200, 5, true);
+describe("eje de categorías: la cascada se decide con el largo medido", () => {
+  it("horizontal y completo cuando el rótulo más ancho cabe en su columna", () => {
+    const r = categorias(1200, doceModelos(60).slice(-5));
     expect(r.angulo).toBe(0);
     expect(r.maximoCaracteres).toBeNull();
-    expect(r.todasLasMarcas).toBe(true);
+    expect(r.alto).toBe(ALTO_EJE_HORIZONTAL);
+  });
+
+  it("EL DEFECTO DE LA 1.1.4: con 73 px por modelo gira, porque el rótulo más largo mide 113", () => {
+    // A 1024 px la figura mide 951: la regla vieja veía 73 px por modelo y dejaba
+    // los rótulos horizontales; «Curso piloto certificado» se encimaba con sus vecinos.
+    const r = categorias(951, doceModelos(CURSO_PANTALLA));
+    expect(r.angulo).toBe(ANGULO_GIRO);
+    expect(r.maximoCaracteres).toBeNull();
+  });
+
+  it("el alto sale del rótulo más largo, no de un valor fijo de 48 px", () => {
+    // A 768 px (figura de 695) y en papel, la regla vieja reservaba 48 px y el
+    // rótulo largo necesitaba 66 y 54: se cortaba por abajo.
+    const pantalla = categorias(695, doceModelos(CURSO_PANTALLA));
+    const papel = categorias(ANCHO_IMPRESION, doceModelos(CURSO_PAPEL), TAMANO_ROTULO_IMPRESION);
+    expect(pantalla.alto).toBe(altoEje(ANGULO_GIRO, CURSO_PANTALLA, TAMANO_ROTULO_PANTALLA));
+    expect(papel.alto).toBe(altoEje(ANGULO_GIRO, CURSO_PAPEL, TAMANO_ROTULO_IMPRESION));
+    expect(pantalla.alto).toBeGreaterThan(48);
+    expect(papel.alto).toBeGreaterThan(48);
+    expect(pantalla.alto).toBeLessThanOrEqual(ALTO_EJE_MAXIMO);
+    expect(papel.alto).toBeLessThanOrEqual(ALTO_EJE_MAXIMO);
+  });
+
+  it("un rótulo más largo pide más alto, nunca menos", () => {
+    const altos = [40, 80, 100, 120].map((w) => altoEje(ANGULO_GIRO, w, TAMANO_ROTULO_PANTALLA));
+    for (let i = 1; i < altos.length; i += 1) expect(altos[i] ?? 0).toBeGreaterThanOrEqual(altos[i - 1] ?? 0);
+    expect(altoEje(0, 500, TAMANO_ROTULO_PANTALLA)).toBe(ALTO_EJE_HORIZONTAL);
+  });
+
+  it("solo abrevia cuando ni girado cabe en el alto máximo, y abreviado cabe", () => {
+    const r = categorias(951, doceModelos(200));
+    expect(r.angulo).toBe(ANGULO_GIRO);
+    expect(r.maximoCaracteres).not.toBeNull();
+    expect(r.alto).toBeLessThanOrEqual(ALTO_EJE_MAXIMO);
+  });
+
+  it("el primer rótulo girado no se sale a la izquierda del eje Y", () => {
+    // Girado con `textAnchor="end"`, el rótulo crece hacia la izquierda desde su
+    // marca. En primera posición solo tiene el eje Y y media categoría: el mismo
+    // rótulo que al final cabe completo, al principio se abrevia.
+    const largo = { texto: "Modelo de nombre largo X1", ancho: 110 };
+    const cortos = Array.from({ length: 11 }, (_, i) => ({ texto: `AX-${i}0`, ancho: 30 }));
+    expect(categorias(695, [...cortos, largo]).maximoCaracteres).toBeNull();
+    expect(categorias(695, [largo, ...cortos]).maximoCaracteres).not.toBeNull();
+  });
+
+  it("a menos ancho nunca vuelve a horizontal ni abrevia menos", () => {
+    const anchos = [1200, 951, 695, 500, 300, 150];
+    const decisiones = anchos.map((a) => categorias(a, doceModelos(CURSO_PANTALLA)));
+    for (let i = 1; i < decisiones.length; i += 1) {
+      const antes = decisiones[i - 1];
+      const ahora = decisiones[i];
+      if (antes === undefined || ahora === undefined) continue;
+      expect(Math.abs(ahora.angulo), `${anchos[i]}px`).toBeGreaterThanOrEqual(Math.abs(antes.angulo));
+      expect(ahora.maximoCaracteres ?? Infinity, `${anchos[i]}px`).toBeLessThanOrEqual(
+        antes.maximoCaracteres ?? Infinity,
+      );
+    }
   });
 
   it("SIEMPRE pinta todas las marcas, por apretado que esté", () => {
-    // Saltarse un modelo deja una barra sin nombre, y una barra sin nombre no
-    // se puede leer. Aquí no se baja la densidad: se ajusta el texto.
     for (const ancho of [1200, 600, 360, 200, 0]) {
-      expect(eje(ancho, 12, true).todasLasMarcas, `${ancho}px`).toBe(true);
+      expect(categorias(ancho, doceModelos(CURSO_PANTALLA)).todasLasMarcas, `${ancho}px`).toBe(true);
     }
   });
 
-  it("cuando el texto horizontal ya no cabe, rota antes que recortar", () => {
-    const r = eje(700, 12, true);
-    expect(r.angulo).toBeLessThan(0);
-    expect(r.maximoCaracteres).toBeNull();
-  });
-
-  it("y solo cuando ni rotado alcanza, abrevia", () => {
-    const apretado = eje(296, 12, true);
-    expect(apretado.angulo).toBeLessThan(0);
-    expect(apretado.maximoCaracteres).not.toBeNull();
-    expect(apretado.maximoCaracteres ?? 99).toBeLessThanOrEqual(12);
-  });
-
-  it("cuanto menos espacio, más corto el recorte: la escalera no retrocede", () => {
-    const anchos = [900, 700, 500, 360, 250];
-    const cortes = anchos.map((a) => eje(a, 12, true).maximoCaracteres ?? Infinity);
-    for (let i = 1; i < cortes.length; i += 1) {
-      expect(cortes[i] ?? 0, `${anchos[i]}px`).toBeLessThanOrEqual(cortes[i - 1] ?? 0);
-    }
-  });
-
-  it("rotado reserva más alto para las etiquetas", () => {
-    expect(eje(296, 12, true).alto).toBeGreaterThan(eje(1200, 3, true).alto);
+  it("girados no se enciman en diagonal en la categoría más angosta que deja el recorte", () => {
+    const giro = (Math.abs(ANGULO_GIRO) * Math.PI) / 180;
+    // Cabe justo: 11 / sen(30°) + 2 = 24, el ancho de la categoría más angosta.
+    // La tolerancia es solo para el redondeo de coma flotante del seno.
+    expect(TAMANO_ROTULO_PANTALLA / Math.sin(giro) + AIRE_DIAGONAL).toBeLessThanOrEqual(
+      anchoMinimoCategoria(1) + 1e-9,
+    );
   });
 });
 
 describe("casos límite", () => {
   it("sin medir todavía (ancho 0) no se rompe ni supone espacio de sobra", () => {
-    const r = eje(0, 10, true);
+    const r = categorias(0, doceModelos(CURSO_PANTALLA));
     expect(r.todasLasMarcas).toBe(true);
     expect(Number.isFinite(r.alto)).toBe(true);
+    expect(r.angulo).not.toBe(0);
   });
 
   it("sin categorías no divide entre cero", () => {
-    expect(() => eje(500, 0, true)).not.toThrow();
-    expect(eje(500, 0, true).angulo).toBe(0);
+    expect(() => categorias(500, [])).not.toThrow();
+    expect(categorias(500, []).angulo).toBe(0);
   });
 
   it("el ancho útil nunca es negativo aunque el eje Y no quepa", () => {
@@ -107,6 +180,11 @@ describe("casos límite", () => {
 
   it("hay un alto mínimo por debajo del cual la gráfica deja de comunicar", () => {
     expect(ALTO_MINIMO).toBeGreaterThanOrEqual(160);
+  });
+
+  it("fuera del navegador, sin canvas, la medición estima por caracteres", () => {
+    // En el navegador mide con canvas; esta rama solo existe para node.
+    expect(medirRotulos(["abcd"], 10, "sans-serif")).toEqual([24]);
   });
 });
 
