@@ -68,6 +68,13 @@ estiradas hasta la fila 301 para comodidad de quien captura. En las ~280 filas
 sin capturar, `IFERROR(H-G,"")` devuelve `0` y `""`. Una fila vacía **no se ve
 vacía** para un lector ingenuo.
 
+*Corrección posterior (2026-09-14).* Las fórmulas estiradas hasta la fila 301 no
+están en la plantilla descargable: desde v1.0.0 esa plantilla solo trae fórmula en
+la fila de ejemplo, verificado con dos lectores XML. Están en los archivos llenos,
+el de demostración (1,200 fórmulas) y el del cliente. La decisión no cambia: el
+lector recibe esos archivos y tiene que juzgar su vacuidad sin las columnas
+calculadas.
+
 **Decisión.** Las columnas calculadas se descartan al leer
 (`COLUMNAS_CALCULADAS`, en `src/lib/parse/readWorkbook.ts`) y la vacuidad de una
 fila se juzga **solo** sobre las columnas de entrada. Se descartan además la fila
@@ -680,3 +687,87 @@ cuando el token vence lo renueva con un gesto. La v1.3 no carga con la sección 
 persistencia, pero sí con el aviso de privacidad y la verificación de la app ante Google, porque
 pide acceso a documentos del cliente. Leer sin el usuario presente sería una decisión nueva que
 reabre esta entrada.
+
+---
+
+## 2026-09-14 — El tema oscuro solo existe en pantalla
+
+**Contexto.** Desde v1.1.0, el PDF impreso con la pantalla en oscuro salía con la hoja completa
+pintada de `#121212`, márgenes incluidos, y un rectángulo blanco solo bajo el contenido. El tema
+escribía `color-scheme: dark` en línea en el `<html>`, desde `aplicarTema` y desde el script de
+`index.html`. Un estilo en línea le gana a cualquier hoja de estilos, también a la regla de
+`@media print` que lo volvía claro, y Chrome pintaba el lienzo de la hoja con su fondo oscuro por
+omisión. El invariante se daba por cumplido porque se había verificado leyendo el código, y las
+pruebas de entonces exigían justamente el estilo en línea y un texto en `@media print`.
+Imprimiendo con el tema claro no pasaba: los márgenes quedaban sin pintar.
+
+**Decisión.** El bloque del tema oscuro, con su `color-scheme: dark` y sus tokens, va dentro de
+`@media screen`, y nadie escribe `color-scheme` en línea. En papel no existe ninguna regla oscura,
+así que la impresión no tiene que ganarle a nada. El bloque de `@media print` se queda solo para
+fijar en la raíz los valores claros exactos en el Ctrl+P directo, sin nombrar el tema oscuro. Las
+pruebas fijan la estructura: toda regla oscura y todo `color-scheme: dark` viven en
+`@media screen`, y ni `aplicarTema` ni el script escriben el esquema.
+
+**Alternativa descartada.** Que la impresión sobrescribiera el estilo en línea desde el mismo
+nivel, con `beforeprint` y `afterprint`. Evita la especificidad, pero deja dos escritores del mismo
+valor sincronizados por eventos, más piezas móviles que el problema, y la corrección depende de que
+los eventos se disparen en cada navegador y en cada camino de impresión.
+
+**Consecuencia.** Verificado el 2026-09-14 en un PDF impreso a mano desde oscuro: ningún relleno
+oscuro de hoja completa, contra 15 en el PDF anterior al arreglo. En pantalla, sin estilo en línea,
+el esquema calculado sigue al tema. Un invariante del papel se verifica en el papel.
+
+---
+
+## 2026-09-14 — Los rótulos del eje se deciden con su largo medido
+
+**Contexto.** «Ingreso contra utilidad por modelo» mostraba en pantalla los 12 modelos con los
+rótulos encimados a 1024 px y cortados a 768 px, y en papel cortados. Se sospechó que el recorte de
+categorías estaba desactivado; no lo estaba: las barras caben y recortar no toca. El defecto estaba
+en `rotuloEje`, desde v1.1.0. Decidía solo con los píxeles por categoría (horizontal desde 64,
+abreviar por debajo de 34) y reservaba un alto fijo de 48 px para los girados. A 1024 px tocaban 73
+px por modelo y quedaban horizontales, pero «Curso piloto certificado» mide 113 px. Girado necesita
+66 px en pantalla y 54 en papel. Además, al imprimir `Grafica` no sumaba alto por el eje.
+
+**Decisión.** `rotuloEje` sigue pura y recibe cada rótulo con su ancho medido con
+`canvas.measureText` y la tipografía real. Decide en cascada: horizontal si el más ancho, con 8 px
+de aire, cabe en su columna; girado a −30° si cabe en un alto máximo de 80 px y el primer rótulo no
+se sale a la izquierda del eje Y; abreviado si no. `Grafica` vuelve a medir las etiquetas ya
+abreviadas, calcula con ellas el alto del eje y suma el exceso a la gráfica, en pantalla y en papel.
+Los 80 px y el margen de 10 px bajo el eje se calibraron midiendo la gráfica pintada: el eje reserva
+77 px y el rótulo más bajo llega a 73.9 a 1440, 1024 y 768 px. A 360 px el recorte deja 4 modelos,
+con su nota, y sus rótulos quedan horizontales. Canvas y SVG coincidieron hasta 0.02 px.
+
+**Alternativa descartada.** Estimar el ancho contando caracteres. «Curso piloto certificado» mide
+0.43 veces el tamaño de letra por carácter, y una estimación de 0.6 se equivoca un 40%, justo el
+margen que produce el defecto. Descartado también subir el alto máximo cada vez que un rótulo no
+quepa: un eje que crece sin límite se come la gráfica, y ahí la respuesta es abreviar.
+
+**Consecuencia.** Las pruebas de `rotuloEje` se reescribieron: las anteriores fijaban la regla por
+píxeles y el alto de 48 px, es decir, el defecto. La gráfica de modelos crece unos píxeles, también
+en el PDF. Con el demo eso no movió ningún salto de página, verificado en el papel el 2026-09-14;
+con otros datos podría moverlos. En ese PDF, los 12 rótulos salen girados, completos y dentro del
+recorte de la gráfica. Una prueba nueva, que lee el JSX con el analizador de
+TypeScript, fija que Producto le pasa el recorte a su gráfica.
+
+---
+
+## 2026-09-14 — Márgenes laterales del PDF en píxeles enteros
+
+**Contexto.** Desde v1.0.0, en el PDF, los marcos de sección y la cuarta tarjeta de indicadores se
+veían abiertos a la derecha. Medido en el PDF: con 12 mm por lado sobre los 816 px CSS de la hoja
+carta, el área impresa medía 725.3 px (965.3 en apaisado), pero Chrome maquetaba la página a 726 px
+(965.5), y los bordes derechos quedaban hasta 0.69 px fuera.
+
+**Decisión.** Márgenes laterales de 45 px en `@page`, 0.09 mm menos por lado que antes. El ancho
+imprimible queda en 726 px en vertical y 966 en apaisado: enteros, sin redondeo que perder. Arriba y
+abajo se quedan en milímetros porque no tocan ningún borde lateral.
+
+**Alternativa descartada.** Una sangría de 1 px en la vista imprimible. Aparta los bordes del filo,
+pero deja el contenido más ancho que el área impresa, así que los fondos a ancho completo seguirían
+perdiendo 0.7 px. Es un número mágico que compensa un redondeo que no controlamos, en vez de quitar
+el desajuste.
+
+**Consecuencia.** Verificado el 2026-09-14 en los dos PDF de la corrida de la 1.1.5: el área
+impresa termina en 578.25 pt (758.25 apaisada) y ningún borde gris la pasa. La paginación no se
+movió: 15 hojas con el mismo reparto por módulo.

@@ -75,6 +75,11 @@ por su cuenta.
 
 La serie deja una restricción en `CLAUDE.md`: toda coerción del contrato vive en el esquema.
 
+**v1.1.5 — defectos de presentación**, sin cambios de contrato ni de cifras: el PDF impreso desde
+el tema oscuro sale en claro de orilla a orilla, los rótulos de la gráfica de modelos ya no se
+enciman ni se cortan, los marcos del PDF se ven cerrados y la plantilla deja de prometer fórmulas
+que no trae. Detalle en `docs/notas-version.md`.
+
 Fuera de alcance en v1, por decisión: autenticación, multiusuario, persistencia,
 histórico entre cortes, conexión a Odoo, multimoneda, consolidación de varias empresas.
 
@@ -401,9 +406,12 @@ Priorizado. Lo de arriba entra primero.
   aceptan sin aviso: «-500» se lee como −$500. Los importes negativos de `cobranza.monto` se
   quedan sin aviso a propósito, porque pueden ser notas de crédito. La severidad se decide al
   implementarlo, con el criterio de consecuencia (`docs/decisiones.md`, 2026-09-14).
-- Plantilla v2 con hojas como tablas de Excel, para eliminar las filas de relleno con
-  fórmulas y el renglón de nota que el lector tiene que descartar. Ese rediseño hay que hacerlo
-  igual, y es el momento de decidir con qué herramienta se genera la plantilla, que hoy se
+- Plantilla v2 con hojas como tablas de Excel, para eliminar las filas de relleno y el
+  renglón de nota que el lector tiene que descartar. Las fórmulas de las columnas calculadas
+  (`utilidad_bruta`, `margen_pct`, `cobrado`, `saldo`) hoy solo están en la fila de ejemplo,
+  desde v1.0.0: se escriben en v1.2, ya a nivel de folio, con el rango `cobranza!$B$3:$B$1000`
+  de la fila de ejemplo y del demo, y desaparecen con Google Sheets en v1.3 (ROADMAP.md §3).
+  Ese rediseño hay que hacerlo igual, y es el momento de decidir con qué herramienta se genera la plantilla, que hoy se
   edita a mano (sección 7). Opciones evaluadas el 2026-09-13:
   1. **SheetJS más un inyector de XML** que agregue estilos, listas y paneles. No compensa hoy:
      cambia sincronizar `ENCABEZADOS` con un .xlsx por sincronizar `ENCABEZADOS`, una tabla de
@@ -434,7 +442,8 @@ Priorizado. Lo de arriba entra primero.
   un problema real. Falta decidir qué distingue el nombre.
 - **El texto derecho del encabezado y del pie del PDF no tiene holgura.** Observado el
   2026-09-14: en las hojas de módulo, «Corte al 09/09/2026 · DEMO_Agrodrones_Bajio_FICTICIO.xlsx»
-  termina a 0.1 pt del límite imprimible. Con un archivo de origen de nombre más largo no cabría.
+  termina a 0.1 pt del límite imprimible; re-medido con la v1.1.5, a 0.006 pt. Con un archivo
+  de origen de nombre más largo no cabría.
   No está verificado qué pasa entonces.
 - **Dos pruebas guardián pueden fallar por el disco y no por el código.** Observado el
   2026-09-14: «ningun otro archivo lo importa» (`src/dev/__tests__/fixtureDesarrollo.test.ts`) y
