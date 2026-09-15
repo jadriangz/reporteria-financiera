@@ -118,6 +118,14 @@ versión que lo explica.
 La versión vive en `package.json` y se muestra en el pie de la aplicación y en el PDF
 exportado. Un reporte sin versión no es auditable.
 
+**La etiqueta va sobre el último commit de la versión, no sobre el que cambia `package.json`.**
+Quien saque la etiqueta debe obtener la versión entera, con la documentación que la explica, y
+no el código sin ella. `v1.1.5` está sobre `158dd0b`, el commit de documentación que cierra la
+versión, y no sobre `9e8f85a`, el que sube el número. Las etiquetas `v1.1.1` a `v1.1.4` son
+anteriores a la regla y no se mueven: `v1.1.4` apunta al commit del parche y no al de
+documentación que vino después, pero ya están publicadas, y mover una etiqueta publicada causa
+más problemas de los que resuelve.
+
 ---
 
 ## 4. Ramas
