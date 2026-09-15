@@ -11,6 +11,45 @@ La más reciente va arriba. El razonamiento de cada decisión está en `docs/dec
 
 ---
 
+## 1.1.5 — PARCHE — 2026-09-14
+
+Defectos de presentación, y una instrucción de la plantilla que prometía algo que no hace.
+Ninguna cifra cambia.
+
+### Qué estaba mal
+
+- **El PDF impreso con la pantalla en tema oscuro salía con la hoja entera oscura.** El contenido
+  era claro, pero los márgenes salían casi negros: imprimirlo gastaba tinta de más en cada hoja.
+  Existe desde la **1.1.0**, cuando llegó el tema oscuro. Con el tema claro no pasaba.
+- **Los nombres largos de la gráfica de modelos se encimaban o se cortaban.** En pantalla, a unos
+  1024 px de ancho se montaban unos sobre otros, y a unos 768 px se cortaban por abajo. En el PDF
+  también se cortaban. Existe desde la **1.1.0**, cuando llegó la regla que decide cómo se escriben
+  esos nombres.
+- **En el PDF, los marcos de las secciones y la cuarta tarjeta de indicadores se veían abiertos a
+  la derecha.** El borde quedaba menos de 1 px fuera del área impresa. Existe desde la **1.0.0**.
+- **La hoja INSTRUCCIONES de la plantilla decía que las columnas de letra negra se calculan
+  solas.** Solo la fila de ejemplo trae fórmula; en las demás filas esas columnas no calculan nada
+  en Excel. Existe desde la **1.0.0**.
+
+### Qué cambia si ya usaba la aplicación
+
+- **El PDF sale en claro de orilla a orilla**, con cualquier tema en pantalla.
+- **Los márgenes laterales del PDF bajan 0.09 mm por lado**, de 12 mm a 45 px, y los marcos se ven
+  cerrados.
+- **En la gráfica de modelos, los nombres largos se escriben en diagonal con el espacio que
+  necesitan**, y solo se abrevian cuando ni así caben. La gráfica crece unos píxeles para
+  alojarlos, también en el PDF.
+- **INSTRUCCIONES explica que esas columnas no se capturan** y que la aplicación las calcula al
+  cargar el archivo. Si descargó la plantilla antes, su copia conserva el texto anterior, y la
+  aplicación la lee igual.
+
+### ¿Pueden moverse sus cifras?
+
+No. Solo cambia la presentación. Lo que sí puede cambiar es dónde caen los saltos de página del
+PDF, porque la gráfica de modelos es un poco más alta.
+
+---
+
 ## 1.1.4 — PARCHE — 2026-09-14
 
 Cierra la serie de parches del contrato de datos (1.1.1 a 1.1.4).
