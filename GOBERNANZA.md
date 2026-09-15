@@ -34,8 +34,8 @@ modifica la cifra esperada para que pase la prueba.
 
 ## 2. Estado actual
 
-**v1.1.4, en producción desde el 2026-09-14.** Verificado comparando por SHA-256 los archivos que
-sirve `reporteria-financiera.vercel.app` contra el build local del commit fusionado —7 de 7
+**v1.1.5, en producción desde el 2026-09-14.** Verificado comparando por SHA-256 los archivos que
+sirve `reporteria-financiera.vercel.app` contra el build local del commit fusionado —8 de 8
 idénticos—, y no con el estado del despliegue. El método está en la sección 5, paso 6. Hasta la
 fusión del PR #1, producción servía 1.1.0 aunque la serie 1.1.1–1.1.4 ya estaba terminada: el
 trabajo sin commit no llega al cliente. Qué cambió en cada versión, para quien ya usaba la
@@ -78,7 +78,8 @@ La serie deja una restricción en `CLAUDE.md`: toda coerción del contrato vive 
 **v1.1.5 — defectos de presentación**, sin cambios de contrato ni de cifras: el PDF impreso desde
 el tema oscuro sale en claro de orilla a orilla, los rótulos de la gráfica de modelos ya no se
 enciman ni se cortan, los marcos del PDF se ven cerrados y la plantilla deja de prometer fórmulas
-que no trae. Detalle en `docs/notas-version.md`.
+que no trae. Desplegada en producción el 2026-09-14, con el PR #3 y la etiqueta `v1.1.5`. Detalle
+en `docs/notas-version.md`.
 
 Fuera de alcance en v1, por decisión: autenticación, multiusuario, persistencia,
 histórico entre cortes, conexión a Odoo, multimoneda, consolidación de varias empresas.
@@ -116,6 +117,14 @@ versión que lo explica.
 
 La versión vive en `package.json` y se muestra en el pie de la aplicación y en el PDF
 exportado. Un reporte sin versión no es auditable.
+
+**La etiqueta va sobre el último commit de la versión, no sobre el que cambia `package.json`.**
+Quien saque la etiqueta debe obtener la versión entera, con la documentación que la explica, y
+no el código sin ella. `v1.1.5` está sobre `158dd0b`, el commit de documentación que cierra la
+versión, y no sobre `9e8f85a`, el que sube el número. Las etiquetas `v1.1.1` a `v1.1.4` son
+anteriores a la regla y no se mueven: `v1.1.4` apunta al commit del parche y no al de
+documentación que vino después, pero ya están publicadas, y mover una etiqueta publicada causa
+más problemas de los que resuelve.
 
 ---
 
@@ -453,6 +462,12 @@ Priorizado. Lo de arriba entra primero.
   tardaron hasta 7.4 s y fallaron por el límite de 5 s de vitest («Test timed out in 5000ms»);
   con 60 s de límite pasaron, con la aserción cumplida. Es la peor clase de prueba frágil: su
   rojo no dice nada del código, y enseña a ignorar el rojo de las pruebas que sí cuidan algo.
+- **El lockfile no está sincronizado con lo que npm genera hoy.** Observado el 2026-09-14 al
+  cerrar la 1.1.5: `npm install --package-lock-only` agrega seis entradas empaquetadas bajo
+  `@tailwindcss/oxide-wasm32-wasi` —`@emnapi/core`, `@emnapi/runtime`, `@emnapi/wasi-threads`,
+  `@napi-rs/wasm-runtime`, `@tybys/wasm-util` y `tslib`—, ajenas a esa sesión. Se restauró el
+  lockfile y solo se cambiaron sus dos líneas de versión, que decían `0.0.0`. Falta decidir, en
+  su propia sesión, si se regenera, comprobando que `npm ci` y el build no cambien.
 - Gastos por categoría en el motor, hoy solo agregados.
 - Números de página en el PDF impreso.
 
