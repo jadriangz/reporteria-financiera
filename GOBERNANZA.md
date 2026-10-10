@@ -384,6 +384,18 @@ noción de rango, que es su razón de existir.
 Sin esto, en seis meses nadie recuerda por qué el motor conserva las filas `Demo` y
 alguien las borra "para simplificar".
 
+**Una decisión que no está en `docs/decisiones.md` no existe.** Se escribe en el repositorio **en
+la misma sesión en que se toma**, no al implementarla. Si todavía no está implementada, la entrada
+lo dice.
+
+*Caso (v1.2.0).* El alcance completo de la fase de partidas —once decisiones, con sus casos límite
+y su fixture— se tomó el 2026-09-14 y se guardó en un archivo de memoria fuera del repositorio,
+para registrarlo al implementar. Un formateo del equipo borró la memoria. El repositorio sobrevivió
+intacto. La sesión siguiente, con solo la documentación, encontró cinco viñetas en `ROADMAP.md` y
+ninguna entrada en el registro, y no pudo arrancar la fase: hubo que reconstruir las decisiones de
+lo que una persona recordaba, y cuatro llegaron sin su alternativa descartada. Lo que estaba en el
+repositorio no perdió una coma.
+
 ---
 
 ## 10. Manejo de datos
@@ -488,6 +500,10 @@ Priorizado. Lo de arriba entra primero.
   `@napi-rs/wasm-runtime`, `@tybys/wasm-util` y `tslib`—, ajenas a esa sesión. Se restauró el
   lockfile y solo se cambiaron sus dos líneas de versión, que decían `0.0.0`. Falta decidir, en
   su propia sesión, si se regenera, comprobando que `npm ci` y el build no cambien.
+- **AD-01 a AD-06 están en `ROADMAP.md` §4 y no en el registro de decisiones.** Observado el
+  2026-10-10 al escribir la regla de la sección 9. Están en el repositorio, así que no corren el
+  riesgo de la memoria perdida, pero quien busque una decisión en `docs/decisiones.md` no las
+  encuentra. Falta migrarlas con su formato o referenciarlas desde el registro.
 - Gastos por categoría en el motor, hoy solo agregados.
 - Números de página en el PDF impreso.
 

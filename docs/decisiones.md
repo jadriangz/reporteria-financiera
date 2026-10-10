@@ -1046,3 +1046,26 @@ existe: 4,496,900 / 22 = 204,404.55; hay 13 folios con equipo y 2 traen accesori
 comparte cliente, fecha y vendedor, así que su saldo cae en el mismo tramo que hoy y el aging no
 se mueve; el attach rate por cliente sigue en 3 de 10. Los abonos P-012 y P-021 apuntan hoy a
 V-009 y V-016 y hay que reapuntarlos al folio que sobreviva.
+
+---
+
+## 2026-10-10 — Una decisión se escribe en el repositorio en la misma sesión en que se toma
+
+**Contexto.** El alcance completo de la v1.2.0 —las once entradas anteriores— se decidió el
+2026-09-14 y se guardó en un archivo de memoria fuera del repositorio, para escribirlo aquí al
+implementar. Un formateo del equipo borró esa memoria. El repositorio sobrevivió intacto. Una
+sesión nueva, con solo la documentación, encontró cinco viñetas en ROADMAP.md y ninguna entrada
+aquí: no pudo arrancar la fase.
+
+**Decisión.** Una decisión que no está en `docs/decisiones.md` no existe. Se escribe en el
+repositorio **en la misma sesión en que se toma**, no al implementarla. Queda en GOBERNANZA.md §9.
+
+**Alternativa descartada.** Registrarla al implementar, que era la práctica: ROADMAP.md §4 decía
+«registrar en `docs/decisiones.md` al implementarlas». Deja la decisión, durante semanas, en el
+único lugar que no tiene respaldo ni historial.
+
+**Consecuencia.** Lo reconstruido salió de la memoria de una persona, y tiene huecos: cuatro
+entradas no traen su alternativa descartada. Una entrada puede describir algo todavía no
+implementado; lo dice, y CLAUDE.md lo marca igual. ROADMAP.md §4 ya no dice «al implementarlas»;
+sus seis decisiones, AD-01 a AD-06, siguen fuera de este registro y migrarlas queda en el backlog
+(GOBERNANZA.md §11).

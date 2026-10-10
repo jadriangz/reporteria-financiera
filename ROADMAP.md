@@ -283,7 +283,9 @@ reescritura**. Ese es el criterio de diseño de toda la v2.0, aunque v3 nunca se
 
 ## 4. Decisiones arquitectónicas
 
-Registrar en `docs/decisiones.md` al implementarlas.
+Una decisión se registra en `docs/decisiones.md` al **decidirla**, no al implementarla
+(GOBERNANZA.md §9). Estas seis están escritas aquí y todavía no en el registro: migrarlas o
+referenciarlas desde ahí está en el backlog (GOBERNANZA.md §11).
 
 **AD-01. El tipo de cambio se congela con la transacción.** Consultarlo al generar el
 reporte haría que el mismo reporte diera números distintos con el tiempo. Inaceptable en
