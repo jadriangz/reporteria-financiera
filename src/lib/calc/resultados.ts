@@ -7,6 +7,7 @@ import {
   aCentavos,
   claveMes,
   compararClaveMes,
+  contarFolios,
   divSegura,
   particionarVentas,
 } from "./base";
@@ -34,10 +35,23 @@ export interface Cascada {
   readonly gastosVariables: Centavos;
   readonly gastosTotal: Centavos;
   readonly resultadoOperativo: Centavos;
+  /**
+   * En el TOTAL, folios: una venta con tres partidas es una operacion. En un
+   * MES, entregas: partidas con fecha en ese mes, porque un folio puede
+   * entregarse en dos meses y no pertenece a ninguno de los dos. Por eso la suma
+   * de los meses no da el total cuando hay folios con varias partidas.
+   */
   readonly operaciones: number;
   /**
-   * venta_total / numero_operaciones, redondeado a centavo entero como todo
-   * importe del motor. null si no hubo operaciones.
+   * Partidas computables: filas de venta. Es la unidad de todo lo que se mide
+   * por producto, y lo que suman las «unidades» de las lineas y los modelos. En
+   * un mes coincide con `operaciones`; en el total no, si hay folios con varias.
+   */
+  readonly partidas: number;
+  /**
+   * venta_total / operaciones, redondeado a centavo entero como todo importe del
+   * motor. null si no hubo operaciones. En el total es el ticket por folio; en
+   * un mes, el importe promedio por entrega.
    */
   readonly ticketPromedio: Centavos | null;
 }
@@ -79,6 +93,7 @@ interface Acumulador {
   gastosFijos: number;
   gastosVariables: number;
   operaciones: number;
+  partidas: number;
 }
 
 function nuevoAcumulador(): Acumulador {
@@ -91,6 +106,7 @@ function nuevoAcumulador(): Acumulador {
     gastosFijos: 0,
     gastosVariables: 0,
     operaciones: 0,
+    partidas: 0,
   };
 }
 
@@ -108,6 +124,7 @@ function cerrar(a: Acumulador): Cascada {
     gastosTotal,
     resultadoOperativo: a.utilidadContribucion - gastosTotal,
     operaciones: a.operaciones,
+    partidas: a.partidas,
     ticketPromedio: redondear(divSegura(a.ventaTotal, a.operaciones)),
   };
 }
@@ -168,15 +185,19 @@ export function calcularResultados(dataset: Dataset): Resultados {
       monto: c.comisionMonto,
     });
 
-    for (const a of [total, mes(claveMes(venta.fecha))]) {
+    const delMes = mes(claveMes(venta.fecha));
+    for (const a of [total, delMes]) {
       a.ventaTotal += precio;
       a.costoTotal += costo;
       a.utilidadBruta += c.utilidadBruta;
       a.comisionTotal += c.comisionMonto;
       a.utilidadContribucion += c.utilidadContribucion;
-      a.operaciones += 1;
+      a.partidas += 1;
     }
+    // Por mes se cuentan entregas; el total cuenta folios, abajo.
+    delMes.operaciones += 1;
   }
+  total.operaciones = contarFolios(incluidas);
 
   for (const gasto of dataset.gastos) {
     const monto = gasto.monto ?? 0;

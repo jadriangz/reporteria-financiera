@@ -69,7 +69,8 @@ describe("tabla por linea y modelo", () => {
     const modelos = filas.filter((f) => f.nivel === "modelo");
     expect(modelos.reduce((t, f) => t + f.ingreso, 0)).toBe(ESPERADO.ventaTotal);
     expect(modelos.reduce((t, f) => t + f.costo, 0)).toBe(ESPERADO.costoTotal);
-    expect(modelos.reduce((t, f) => t + f.unidades, 0)).toBe(ESPERADO.operaciones);
+    // Las unidades son partidas. Hasta la 1.1.5 coincidian con las operaciones.
+    expect(modelos.reduce((t, f) => t + f.unidades, 0)).toBe(ESPERADO.partidas);
   });
 
   it("reproduce el archivo: Equipo primero y las cinco lineas computables", () => {

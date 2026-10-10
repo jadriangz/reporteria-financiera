@@ -339,7 +339,7 @@ describe("regla: mes de mayor venta", () => {
     const i = buscar(d, "mes-pico");
     expect(i?.nivel).toBe("nota");
     expect(i?.detalle).toContain("jul 2026");
-    expect(i?.detalle).toContain("2 de 4 operaciones");
+    expect(i?.detalle).toContain("2 de 4 entregas");
     expect(i?.detalle).toContain("$1,000,000");
     // 1M de 2M: la venta sin fecha cuenta en el denominador.
     expect(i?.detalle).toContain("50%");
@@ -519,7 +519,7 @@ describe("insights sobre el archivo de demostracion", () => {
   it("el mes pico es julio, con el formato de mes de la capa de formato", () => {
     const i = encontrados().find((x) => x.id === "mes-pico");
     expect(i?.detalle).toMatch(/^jul 2026 concentra/);
-    expect(i?.detalle).toContain("5 de 24 operaciones");
+    expect(i?.detalle).toContain("5 de 24 entregas");
     expect(i?.detalle).toContain("$1,187,400");
     expect(i?.detalle).toContain("26%");
   });

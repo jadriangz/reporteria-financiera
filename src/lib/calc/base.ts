@@ -99,6 +99,46 @@ export function ventasComputables(dataset: Dataset): readonly Venta[] {
   return particionarVentas(dataset.ventas).incluidas;
 }
 
+// --------------------------- Folios ---------------------------
+
+/**
+ * Una operacion: las partidas computables que comparten folio.
+ *
+ * Desde la v1.2.0 una fila de `ventas` es una PARTIDA y el folio las agrupa. El
+ * cobro, el saldo, la antiguedad y el ticket son del folio; la utilidad, el
+ * margen, la comision y el producto siguen siendo de la partida.
+ *
+ * La cabecera —cliente, dias de credito, condicion, vendedor— llega resuelta
+ * desde `src/lib/parse/`: todas las partidas de un folio la traen igual, y por
+ * eso se puede leer de cualquiera.
+ */
+export interface Folio {
+  readonly folio: string;
+  /** Partidas computables, en el orden en que vienen en el archivo. Nunca vacio. */
+  readonly partidas: readonly Venta[];
+}
+
+/**
+ * Agrupa partidas YA computables por folio, en orden de primera aparicion.
+ *
+ * Recibe las `incluidas` de `particionarVentas`: un folio cuyas partidas son
+ * todas Demo o sin precio no produce grupo, y sus abonos no se aplican a nada.
+ */
+export function agruparFolios(partidas: readonly Venta[]): readonly Folio[] {
+  const grupos = new Map<string, Venta[]>();
+  for (const partida of partidas) {
+    const grupo = grupos.get(partida.folio);
+    if (grupo === undefined) grupos.set(partida.folio, [partida]);
+    else grupo.push(partida);
+  }
+  return [...grupos].map(([folio, grupo]): Folio => ({ folio, partidas: grupo }));
+}
+
+/** Numero de operaciones: folios distintos entre partidas ya computables. */
+export function contarFolios(partidas: readonly Venta[]): number {
+  return new Set(partidas.map((p) => p.folio)).size;
+}
+
 // --------------------------- Tiempo ---------------------------
 
 /**

@@ -128,11 +128,14 @@ describe("operaciones de un cliente", () => {
   it("une linea y modelo, y va en orden cronologico", () => {
     const coop = clientes.detalle.find((c) => c.nombre === "Cooperativa Rio Verde");
     const ops = operacionesDe(coop?.clave ?? "", cartera, fixture, true);
-    expect(ops.map((o) => [o.folio, o.linea, o.modelo])).toEqual([
-      ["V-015", "Equipo", "AX-100"],
-      ["V-016", "Accesorios", "Bateria BX-30"],
-      ["V-024", "Accesorios", "Bateria BX-30"],
-    ]);
+    // Dos operaciones: V-015 es un folio con equipo y accesorio (hasta la 1.1.5
+    // eran V-015 y V-016), y V-024 es otra compra.
+    expect(ops.map((o) => o.folio)).toEqual(["V-015", "V-024"]);
+    expect(ops.map((o) => o.precioVenta)).toEqual([53_150_000, 1_150_000]);
+    // Linea y modelo se afirman solo del folio de una partida. Que rotulo lleva
+    // un folio con varias es de la sesion de interfaz de la v1.2.0: hoy el
+    // selector le pone los de una sola de sus partidas.
+    expect([ops[1]?.linea, ops[1]?.modelo]).toEqual(["Accesorios", "Bateria BX-30"]);
   });
 
   it("el sobrecobro de una operacion se marca en advertencia, no en riesgo", () => {

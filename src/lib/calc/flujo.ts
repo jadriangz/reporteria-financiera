@@ -27,6 +27,11 @@ export interface MesFlujo {
   readonly brecha: Centavos;
   /** cobrado / facturado del mes. null si no se facturo nada ese mes. */
   readonly cobertura: number | null;
+  /**
+   * ENTREGAS del mes: partidas con fecha en el, no folios. Un folio puede
+   * entregarse en dos meses, asi que la suma de los meses no es el numero de
+   * operaciones del periodo cuando hay folios con varias partidas.
+   */
   readonly operaciones: number;
 }
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
 
 import { calcularCartera } from "../../calc/cobranza";
-import { CORTE } from "../../calc/__tests__/fixture";
+import { bufferFixture, ARCHIVO_FIXTURE, CORTE, FOLIO_CONFLICTO, FOLIO_HEREDA } from "../../calc/__tests__/fixture";
 import { ENCABEZADOS } from "../../exportar";
 import type { Hallazgo } from "../../schema";
 import { readWorkbookFromBuffer } from "../readWorkbook";
@@ -274,5 +274,42 @@ describe("abonos contra el precio del folio", () => {
     const abonos: Fila[] = [{ folio_pago: "P-001", folio_venta: "V-001", fecha_pago: "20/01/2026", monto: 110001 }];
     const { hallazgos } = leer([EQUIPO, ACCESORIO], abonos);
     expect(hallazgos.filter((h) => h.mensaje.includes("suman mas que su precio"))).toHaveLength(1);
+  });
+});
+
+describe("los dos folios con varias partidas del archivo de demostracion", () => {
+  const { dataset, hallazgos } = validate(readWorkbookFromBuffer(bufferFixture(), ARCHIVO_FIXTURE, XLSX));
+  const partidasDe = (folio: string) => dataset.ventas.filter((v) => v.folio === folio);
+
+  it("el archivo no tiene ni un error", () => {
+    expect(hallazgos.filter((h) => h.severidad === "error")).toEqual([]);
+  });
+
+  it("V-008: el accesorio deja vacias condicion y dias de credito, y las hereda del equipo", () => {
+    expect(partidasDe(FOLIO_HEREDA).map((v) => [v.linea, v.condicion, v.dias_credito, v.cliente])).toEqual([
+      ["Equipo", "Credito", 90, "Ing. Ramon Tellez"],
+      ["Accesorios", "Credito", 90, "Ing. Ramon Tellez"],
+    ]);
+    expect(hallazgos.filter((h) => h.mensaje.includes(`folio ${FOLIO_HEREDA}`))).toEqual([]);
+  });
+
+  it("V-015: el accesorio dice «Contado» contra el «Credito» del equipo, y se avisa", () => {
+    expect(partidasDe(FOLIO_CONFLICTO).map((v) => [v.linea, v.condicion, v.dias_credito])).toEqual([
+      ["Equipo", "Credito", 60],
+      ["Accesorios", "Credito", 60],
+    ]);
+    const aviso = hallazgos.filter((h) => h.campo === "condicion");
+    expect(aviso).toHaveLength(1);
+    expect(aviso[0]?.severidad).toBe("advertencia");
+    // V-015 esta en la fila 17 del archivo y su accesorio en la 18.
+    expect(aviso[0]?.fila).toBe(18);
+    expect(aviso[0]?.mensaje).toContain('fila 17: "Credito"; fila 18: "Contado"');
+  });
+
+  it("los abonos que eran de V-009 y V-016 apuntan al folio que sobrevive", () => {
+    const folioDe = (pago: string) => dataset.cobranza.find((c) => c.folio_pago === pago)?.folio_venta;
+    expect(folioDe("P-012")).toBe(FOLIO_HEREDA);
+    expect(folioDe("P-021")).toBe(FOLIO_CONFLICTO);
+    expect(dataset.ventas.some((v) => v.folio === "V-009" || v.folio === "V-016")).toBe(false);
   });
 });

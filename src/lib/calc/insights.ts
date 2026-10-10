@@ -138,14 +138,26 @@ const carteraVencida: ReglaInsight = {
     if (participacion === null || participacion <= UMBRAL_MAS_180) return null;
 
     const monto = ctx.cartera.aging.porBucket["+180"];
+    // Lo que cada folio tiene en ESTE tramo, que puede ser menos que su saldo: un
+    // folio con entregas de fechas distintas reparte su pendiente en dos tramos.
     const afectados = ctx.cartera.detalle
-      .filter((s) => s.bucket === "+180" && s.saldo > 0)
+      .map((s) => {
+        const viejas = s.partidas.filter((p) => p.bucket === "+180" && p.saldo > 0);
+        let saldo = 0;
+        let dias = 0;
+        for (const p of viejas) {
+          saldo += p.saldo;
+          dias = Math.max(dias, p.dias ?? 0);
+        }
+        return { folio: s.folio, cliente: s.cliente.trim(), saldo, dias };
+      })
+      .filter((s) => s.saldo > 0)
       .sort((a, b) => b.saldo - a.saldo);
 
-    const nombres = [...new Set(afectados.map((s) => s.cliente.trim()))];
+    const nombres = [...new Set(afectados.map((s) => s.cliente))];
     const detalleClientes = afectados
       .slice(0, 3)
-      .map((s) => `${s.cliente.trim()} ${pesos(s.saldo)} (${s.dias ?? 0} dias, folio ${s.folio})`);
+      .map((s) => `${s.cliente} ${pesos(s.saldo)} (${s.dias} dias, folio ${s.folio})`);
 
     return crear(
       this,
@@ -303,12 +315,14 @@ const mesPico: ReglaInsight = {
     if (pico === undefined || pico.facturado <= 0) return null;
 
     const participacion = divSegura(pico.facturado, ctx.flujo.facturadoTotal);
-    const operaciones = ctx.resultados.total.operaciones;
+    // Entregas en los dos lados. El mes cuenta entregas —un folio puede abarcar
+    // dos meses—, asi que compararlo contra el total de folios mezclaria unidades.
+    const entregas = ctx.resultados.total.partidas;
 
     return crear(
       this,
       "Mes de mayor venta",
-      `${mes(pico.mes)} concentra ${pico.operaciones} de ${operaciones} operaciones y ` +
+      `${mes(pico.mes)} concentra ${pico.operaciones} de ${entregas} entregas y ` +
         `${pesos(pico.facturado)} facturados: el ${pct(participacion)} del ingreso del periodo.`,
       [pico.mes],
     );

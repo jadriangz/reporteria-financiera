@@ -86,8 +86,8 @@ describe("los ocho indicadores", () => {
       ["Utilidad bruta", "$1,218,900"],
       ["Margen bruto", "27.1%"],
       ["Saldo por cobrar", "$1,955,800"],
-      ["Operaciones", "24"],
-      ["Ticket promedio", "$187,371"],
+      ["Operaciones", "22"],
+      ["Ticket promedio", "$204,405"],
       ["Efectivo cobrado", "$2,541,100"],
       ["Cartera +180 días", "$670,000"],
     ]);
@@ -119,7 +119,7 @@ describe("los ocho indicadores", () => {
         expect(`${k.valor ?? ""} ${k.nota}`).not.toMatch(/NaN|Infinity|undefined/);
       }
     }
-    expect(valor("ticket")).toBe("$187,371");
+    expect(valor("ticket")).toBe("$204,405");
   });
 });
 

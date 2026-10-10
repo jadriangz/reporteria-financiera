@@ -102,9 +102,10 @@ describe("lectura del archivo de demostracion", () => {
     const sinCredito = conId(res.hallazgos, "advertencia").filter(
       (h) => h.campo === "dias_credito",
     );
-    // 25 ventas, 8 con plazo capturado: las otras 17 se miden por antiguedad.
-    expect(sinCredito).toHaveLength(17);
-    expect(res.dataset.ventas.filter((v) => v.dias_credito !== null)).toHaveLength(8);
+    // 25 partidas, 8 con plazo capturado y 2 que lo heredan de su folio (los
+    // accesorios de V-008 y V-015): las otras 15 se miden por antiguedad.
+    expect(sinCredito).toHaveLength(15);
+    expect(res.dataset.ventas.filter((v) => v.dias_credito !== null)).toHaveLength(10);
   });
 
   it("NO advierte margen uniforme: los costos del archivo no derivan del precio", () => {

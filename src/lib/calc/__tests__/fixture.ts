@@ -25,6 +25,13 @@ import type { Dataset } from "../../schema";
  *   - Las seis lineas de producto, incluida la Demo que el motor excluye.
  *   - Un SOBRECOBRO (V-018: abonos por encima del precio, saldo negativo).
  *   - Una venta SIN FECHA (V-025) y abonos con fecha y metodo.
+ *   - Dos FOLIOS CON VARIAS PARTIDAS (v1.2.0): V-008 y V-015, cada uno con su
+ *     equipo y un accesorio. En V-008 el accesorio deja vacia la cabecera y la
+ *     hereda; en V-015 trae `condicion` "Contado" contra el "Credito" del
+ *     equipo, a proposito, para ejercitar la cabecera en conflicto.
+ *
+ * V-017 y V-018 NO se unieron: dentro de un folio el sobrecobro de V-018 se
+ * netearia contra el saldo de V-017 y el caso limite desapareceria.
  */
 const RUTA = fileURLToPath(
   new URL("../../../../docs/DEMO_Agrodrones_Bajio_FICTICIO.xlsx", import.meta.url),
@@ -60,7 +67,13 @@ export const CORTE = new Date(Date.UTC(2026, 8, 9));
  * verifican, no se ajustan (GOBERNANZA.md, seccion 1).
  */
 export const ESPERADO = {
-  operaciones: 24,
+  /**
+   * FOLIOS, desde la v1.2.0. Hasta la 1.1.5 valia 24 y contaba filas. No se
+   * ajusto la cifra: cambio la unidad, y el demo unio cuatro filas en dos folios.
+   */
+  operaciones: 22,
+  /** Filas de venta computables: lo que antes se llamaba operaciones. No se movio. */
+  partidas: 24,
   ventaTotal: 449_690_000,
   costoTotal: 327_800_000,
   utilidadBruta: 121_890_000,
@@ -75,8 +88,11 @@ export const ESPERADO = {
   resultadoOperativo: 7_185_000,
   /** Punto de equilibrio por mes: el del periodo entre los 9 meses del eje. */
   puntoEquilibrioMensual: 29_846_589,
-  /** venta_total / operaciones, redondeado a centavo entero. */
-  ticketPromedio: 18_737_083,
+  /**
+   * venta_total / operaciones, redondeado a centavo entero: $204,404.55 por
+   * folio. Hasta la 1.1.5 era $187,370.83 por fila.
+   */
+  ticketPromedio: 20_440_455,
   aging: {
     "0-30": 68_300_000,
     "31-60": 9_480_000,
@@ -89,7 +105,16 @@ export const ESPERADO = {
   attachEquipo: 10,
   /** 3 de 10 = 30%. */
   attachTasa: 0.3,
+  /** Venta cruzada por folio: de 13 folios con equipo, 2 llevan accesorio en el mismo folio. */
+  cruzadaAmbos: 2,
+  cruzadaEquipo: 13,
+  /** Folios con mas de una partida: V-008 y V-015. */
+  foliosConVariasPartidas: 2,
 } as const;
+
+/** Los dos folios del archivo con varias partidas: equipo y accesorio. */
+export const FOLIO_HEREDA = "V-008";
+export const FOLIO_CONFLICTO = "V-015";
 
 /** Folio de la unica fila `linea = "Demo"` del archivo. */
 export const FOLIO_DEMO = "V-006";

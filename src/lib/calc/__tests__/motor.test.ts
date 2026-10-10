@@ -42,7 +42,8 @@ describe("motor contra el archivo de demostracion", () => {
   it("parte de 25 ventas y excluye la Demo", () => {
     expect(dataset.ventas).toHaveLength(25);
     const { incluidas, excluidas } = particionarVentas(dataset.ventas);
-    expect(incluidas).toHaveLength(ESPERADO.operaciones);
+    // Filas computables: partidas, no operaciones. 24 partidas en 22 folios.
+    expect(incluidas).toHaveLength(ESPERADO.partidas);
     expect(excluidas).toHaveLength(1);
     expect(excluidas[0]?.venta.folio).toBe(FOLIO_DEMO);
     expect(excluidas[0]?.motivo).toBe("demo");
@@ -151,7 +152,8 @@ describe("motor contra el archivo de demostracion", () => {
   });
 
   it("documenta de donde salio la base de comision de cada venta", () => {
-    expect(resultados.comisiones).toHaveLength(ESPERADO.operaciones);
+    // La comision es de la partida: una por fila computable.
+    expect(resultados.comisiones).toHaveLength(ESPERADO.partidas);
     for (const c of resultados.comisiones) {
       expect(["fila", "parametro"]).toContain(c.origen);
       expect(c.base).toBeTruthy();
@@ -242,7 +244,10 @@ describe("invariantes del motor", () => {
     expect(suma((l) => l.ingreso)).toBe(total.ventaTotal);
     expect(suma((l) => l.costo)).toBe(total.costoTotal);
     expect(suma((l) => l.utilidadBruta)).toBe(total.utilidadBruta);
-    expect(suma((l) => l.unidades)).toBe(total.operaciones);
+    // Las unidades son partidas, no operaciones: un folio con equipo y accesorio
+    // es una operacion y dos unidades. Hasta la 1.1.5 las dos cuentas coincidian.
+    expect(suma((l) => l.unidades)).toBe(total.partidas);
+    expect(total.partidas).toBe(ESPERADO.partidas);
   });
 
   it("el desglose por modelo reproduce las unidades e ingreso de cada equipo", () => {
