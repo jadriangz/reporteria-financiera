@@ -632,7 +632,10 @@ compite con la fecha de corte.
 
 **Consecuencia.** El reporte impreso no lleva número de hoja hasta que la aplicación lo imprima.
 Que desactivar la casilla no mueva los saltos de página no está verificado: la corrida que fijó la
-paginación se guardó con la casilla activada.
+paginación se guardó con la casilla activada. *Cierre (2026-10-10).* Verificado: el PDF sin
+encabezados y el PDF con ellos tienen las mismas 15 hojas con la misma primera y última línea de
+contenido en cada una. Se imprimieron con Chrome 154 por su protocolo de depuración, no con el
+diálogo a mano (`docs/linea-base-pdf.md`, tercera corrida).
 
 ---
 
@@ -1202,3 +1205,69 @@ aging de arriba ya está repartido, y Clientes rotula un folio de varias partida
 modelo de una sola. En el mismo sentido, por mes se cuentan **entregas** y en el total **folios**: la
 suma de los meses no da el total cuando hay folios con varias partidas, y hay que decirlo donde se
 muestre. La cascada trae además `partidas`, que es lo que suman las unidades por línea y modelo.
+
+---
+
+## 2026-10-10 — Cobranza lista un renglón por folio, con el reparto por tramo a la vista
+
+**Contexto.** Desde el motor de partidas el aging reparte el saldo de un folio entre los tramos de
+sus entregas, pero la tabla de saldos ponía cada folio en un solo tramo, el de su pendiente más
+antiguo. La barra de antigüedad y la tabla decían cosas distintas del mismo dinero: un folio con
+$60,000 de enero y $10,000 de agosto aparecía con $70,000 en «Más de 180 días».
+
+**Decisión.** Un renglón por **folio**. Si todo su saldo está en un tramo, la celda de antigüedad se
+lee como siempre. Si abarca varios, la celda lista **cada tramo con su importe, sin desplegar nada**:
+los importes por tramo de la tabla suman los de la barra. «Días» y el tono del renglón son los de su
+pendiente más antiguo, que ahí es una señal de urgencia de cobro y no una clasificación del dinero;
+el título de la columna lo dice. Al desplegar: las partidas —solo si el folio trae más de una— y
+debajo los abonos.
+
+**Alternativa descartada.** Una fila por tramo cuando el folio abarca varios. Venta y cobrado son
+del folio: habría que repetirlos, y la columna sumaría doble, o dejarlos vacíos, y la tabla mezclaría
+renglones de dos niveles. Y al ordenar por cualquier columna las dos mitades del folio se separan.
+Descartado también dejar el desglose solo al desplegar: la fila cerrada seguiría afirmando un solo
+tramo, y quien no la abra concluiría lo mismo que antes.
+
+**Consecuencia.** El criterio es que un lector no pueda concluir algo falso de la tabla, y una prueba
+exige que los tramos de la tabla sumen la barra, tramo por tramo, también con el demo. En el demo los
+dos folios con varias partidas entregaron todo el mismo día, así que su saldo cae en un solo tramo:
+el reparto en dos se ve solo con archivos de entregas en fechas distintas.
+
+---
+
+## 2026-10-10 — El saldo de un folio por tramo lo suma el motor, no el selector
+
+**Contexto.** Para pintar el reparto de arriba hace falta el pendiente de cada folio sumado por
+tramo. El motor entregaba cada partida con su pendiente y su tramo, pero no el agregado. La sesión
+de interfaz tenía el motor cerrado.
+
+**Decisión.** Lo suma el motor: cada renglón de `cartera.detalle` trae `tramos`, del más antiguo al
+más fresco. Es un campo nuevo, sin cambiar ninguna cifra ni ningún campo existente. El hallazgo de
+cartera con más de 180 días, que hacía esa misma suma por su cuenta, ahora lo lee.
+
+**Alternativa descartada.** Sumarlo en el selector de Cobranza. No tocaba el motor y tenía un
+precedente (`exposicionPorCliente` acumula saldos por cliente), pero dejaba la misma agregación
+escrita en dos sitios, y si dos lugares suman lo mismo, uno va a divergir. No es preferencia: es la
+regla 3 de CLAUDE.md, ningún componente calcula.
+
+**Consecuencia.** Un invariante nuevo, probado como propiedad: los tramos de cada folio suman su
+saldo, y sumados entre folios son el aging. Las cifras de referencia no se movieron.
+
+---
+
+## 2026-10-10 — Un folio se nombra con su partida de mayor precio, y dice cuántas más trae
+
+**Contexto.** Cobranza y Clientes listan folios, y una celda tiene que decir qué se vendió. Buscaban
+el modelo por folio en el dataset: con varias partidas tomaban el de una cualquiera y callaban las
+demás. Una prueba de Clientes quedó aflojada a propósito para no fijar ese rótulo como contrato.
+
+**Decisión.** Una sola regla para los dos módulos (`rotuloDeFolio`): la línea y el modelo de la
+partida de **mayor precio**, seguidos de cuántas más trae: «AX-55 + 1 más». En un empate, la primera
+del archivo. La prueba aflojada vuelve a exigir el rótulo completo.
+
+**Alternativa descartada.** El modelo principal a secas. Un «AX-55» en un folio de tres partidas
+afirma que la venta fue solo eso: es el mismo problema con otra cara.
+
+**Consecuencia.** El rótulo no depende del orden de las filas ni de qué esté pagado. Es presentación:
+elige qué partida nombrar y no suma nada. El desglose completo está al desplegar el folio en
+Cobranza.

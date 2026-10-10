@@ -516,6 +516,31 @@ Priorizado. Lo de arriba entra primero.
   módulo, o la especificación para que deje de prometerlo? Cualquiera de las dos mueve cosas: la
   primera apaga módulos que hoy se muestran, la segunda obliga a revisar las dos decisiones que
   eligieron severidad con ese criterio. Va en su propia sesión.
+- **El hallazgo «Cartera sin antigüedad determinable» puede omitir folios, y calla.** Observado
+  el 2026-10-10 **leyendo el código, no ejecutándolo**. La regla `cartera-sin-fecha`
+  (`src/lib/calc/insights.ts`) toma el monto del tramo «sin fecha» del aging, que desde la v1.2.0
+  suma pendientes de partida, pero arma su lista de folios con `s.bucket === "sin-fecha"`, que es
+  el tramo del **renglón** del folio: el de su pendiente más antiguo. Un folio con una partida
+  fechada pendiente y otra sin fecha pendiente se resume en el tramo fechado, así que su importe
+  entra al monto y su folio no aparece en la lista. El texto diría «$X de saldo… Folios: A, B» con
+  un folio de menos, sin nada que lo delate. Debe leer `s.tramos`, como ya hace la regla de más de
+  180 días. Con el demo no se manifiesta: su única partida sin fecha (V-025) está sola en su folio
+  y pagada. Falta reproducirlo con datos armados y corregirlo, con su prueba. Toca el motor.
+- **El aviso de medición mixta de Cobranza cita una columna que no existe.** Observado el
+  2026-10-10. `TEXTO_BASE.mixta` (`src/modules/cobranza/selectores.ts`) termina con «La columna
+  «base» lo indica fila por fila», y la tabla de saldos no tiene esa columna: el dato está en el
+  motor (`base`), pero no se pinta. Es anterior a la v1.2.0. Falta decidir si se agrega la columna
+  o se quita la frase.
+- **La venta cruzada por folio no se muestra en ninguna pantalla.** El motor la calcula desde la
+  v1.2.0 (`clientes.ventaCruzadaFolio`; con el demo, 2 de 13), pero ningún módulo la pinta ni hay
+  hallazgo que la juzgue: su umbral y su texto siguen sin decidir (CLAUDE.md, «Partidas por
+  folio»). Mientras tanto es una cifra calculada que nadie ve.
+- **Los días de una partida que aún no vence se muestran en negativo.** Observado el 2026-10-10
+  en Cobranza: un accesorio entregado el 20/08 con 90 días de crédito aparece con «-70» al corte del
+  09/09. Es correcto —faltan 70 días para que venza— y los renglones de folio usan el mismo
+  formato desde la v1.0, pero en la tabla de partidas se nota más, junto a un «65» de la partida
+  vencida del mismo folio. Es decisión de presentación, no defecto: falta decidir si se dice de
+  otro modo («vence en 70 días», una raya, otra columna).
 - **AD-01 a AD-06 están en `ROADMAP.md` §4 y no en el registro de decisiones.** Observado el
   2026-10-10 al escribir la regla de la sección 9. Están en el repositorio, así que no corren el
   riesgo de la memoria perdida, pero quien busque una decisión en `docs/decisiones.md` no las
