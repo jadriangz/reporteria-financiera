@@ -15,7 +15,8 @@ export { CAMPOS, type CampoCaptura, type Entradas, type TipoCampo, aCelda, aCeld
  * - Los esquemas Zod del contrato (`schema.ts`) deciden si la fila es valida.
  * - Los mensajes son los del panel de carga, porque los producen las mismas
  *   reglas (`parse/reglas.ts`).
- * - Un folio repetido se detecta contra el archivo Y contra otras capturas.
+ * - Un folio repetido es una partida mas de esa venta, del archivo o de otra
+ *   captura; lo que se detecta contra los dos es que cambie de cliente.
  * - La exportacion a Excel escribe capturas y archivo por igual.
  *
  * Todo es puro: el store guarda el estado y llama a estas funciones.
@@ -112,8 +113,9 @@ export function nuevaCaptura(id: string, fila: number, hoja: NombreHoja, entrada
  *
  * Corre el validador completo sobre archivo + capturas + la candidata, y
  * devuelve solo los hallazgos que hablan de la candidata. La candidata va al
- * FINAL de su hoja: asi, si repite un folio, el hallazgo de duplicado cae en
- * ella ("ya se uso en la fila 7") y no en la fila original.
+ * FINAL de su hoja: asi, si repite un folio con otro cliente, el hallazgo del
+ * conflicto cae en ella y no en la fila original. Repetir el folio sin mas no es
+ * un error: la fila entra como partida de esa venta (v1.2.0).
  *
  * `reemplaza` es el id de la captura que se esta editando, que se retira para
  * que no choque consigo misma.

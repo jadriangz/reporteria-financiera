@@ -77,7 +77,7 @@ describe("degradacion elegante", () => {
 });
 
 describe("deteccion de errores del contrato", () => {
-  it("detecta folio duplicado, cobranza huerfana, monto y fecha invalidos", () => {
+  it("detecta folio con dos clientes, cobranza huerfana, monto y fecha invalidos", () => {
     const ventas = [
       VENTAS[0] as unknown[],
       ["V-001", "31/01/2026", "Equipo", "Uno", "T70P", "S1", 400000, 500000, 0.05, "Venta", 90, "Credito", null, 0, 0, 0, 0, null],
@@ -94,10 +94,14 @@ describe("deteccion de errores del contrato", () => {
 
     // Esta hoja NO lleva fila de ejemplo, asi que los datos arrancan en la 2:
     // el descarte del ejemplo es por folio, no por posicion.
-    const dup = errores.find((h) => h.mensaje.includes("ya se uso"));
+    // Hasta la 1.1.5 esto era "folio duplicado". Repetir el folio ya no es el
+    // error; lo es que sus dos filas digan clientes distintos.
+    const dup = errores.find((h) => h.campo === "cliente");
     expect(dup?.fila).toBe(3);
-    expect(dup?.mensaje).toContain("fila 2");
+    expect(dup?.mensaje).toContain('fila 2: "Uno"; fila 3: "Dos"');
     expect(dup?.accion).toBeTruthy();
+    expect(res.dataset.ventas.some((v) => v.folio === "V-001")).toBe(false);
+    expect(errores.some((h) => h.mensaje.includes("ya se uso"))).toBe(false);
 
     const huerfana = errores.find((h) => h.hoja === "cobranza");
     expect(huerfana?.mensaje).toContain("V-999");

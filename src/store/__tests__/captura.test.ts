@@ -112,10 +112,26 @@ describe("capturar sobre un archivo ya cargado", () => {
     expect(s().hallazgos.some((h) => h.hoja === "ventas" && h.fila === 28)).toBe(true);
   });
 
-  it("un folio repetido contra el archivo queda como error, con el mensaje del panel de carga", () => {
+  // Hasta la 1.1.5 aqui se exigia "El folio V-001 ya se uso en la fila 3".
+  // Desde la 1.2.0 repetir el folio agrega una partida a esa venta.
+  it("un folio del archivo capturado sin cliente entra como partida de esa venta", () => {
+    s().guardarFila("ventas", venta({ folio: "V-001", cliente: "" }), null);
+    expect(s().hallazgos.filter((h) => h.severidad === "error")).toEqual([]);
+    expect(s().dataset?.ventas).toHaveLength(26);
+    expect(s().dataset?.ventas.filter((v) => v.folio === "V-001").map((v) => v.cliente)).toEqual([
+      "Agricola San Lorenzo",
+      "Agricola San Lorenzo",
+    ]);
+  });
+
+  it("un folio del archivo capturado con otro cliente queda como error, y el folio completo sale", () => {
     s().guardarFila("ventas", venta({ folio: "V-001" }), null);
-    const error = s().hallazgos.find((h) => h.fila === 28 && h.campo === "folio");
-    expect(error?.mensaje).toBe("El folio V-001 ya se uso en la fila 3.");
+    const error = s().hallazgos.find((h) => h.fila === 28 && h.campo === "cliente");
+    expect(error?.severidad).toBe("error");
+    expect(error?.mensaje).toContain("El folio V-001 trae clientes distintos");
+    // Sus dos abonos del archivo (P-001 y P-002, $200,000) se nombran: no quedan mudos.
+    expect(error?.mensaje).toContain("Sus 2 abonos por $200,000");
+    expect(s().dataset?.ventas.some((v) => v.folio === "V-001")).toBe(false);
   });
 
   it("volver a cargar un archivo descarta las capturas: no se mezclan con otro origen", async () => {
