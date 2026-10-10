@@ -494,21 +494,6 @@ Priorizado. Lo de arriba entra primero.
   tardaron hasta 7.4 s y fallaron por el límite de 5 s de vitest («Test timed out in 5000ms»);
   con 60 s de límite pasaron, con la aserción cumplida. Es la peor clase de prueba frágil: su
   rojo no dice nada del código, y enseña a ignorar el rojo de las pruebas que sí cuidan algo.
-- **El lockfile no está sincronizado con lo que npm genera hoy.** Observado el 2026-09-14 al
-  cerrar la 1.1.5: `npm install --package-lock-only` agrega seis entradas empaquetadas bajo
-  `@tailwindcss/oxide-wasm32-wasi` —`@emnapi/core`, `@emnapi/runtime`, `@emnapi/wasi-threads`,
-  `@napi-rs/wasm-runtime`, `@tybys/wasm-util` y `tslib`—, ajenas a esa sesión. Se restauró el
-  lockfile y solo se cambiaron sus dos líneas de versión, que decían `0.0.0`. Falta decidir, en
-  su propia sesión, si se regenera, comprobando que `npm ci` y el build no cambien.
-- **`source-map-js` 1.2.1 tiene una vulnerabilidad de severidad alta**, y va en la misma sesión
-  que el lockfile: las dos tocan `package-lock.json`. Observado el 2026-10-10 con `npm audit`:
-  GHSA-68fv-2mgg-jv7q, denegación de servicio al procesar un source map malicioso, CVSS 7.5. Es
-  transitiva y solo de desarrollo, vía `vite → postcss` y `@tailwindcss/vite → @tailwindcss/node`.
-  **No llega a lo que se sirve**, comprobado el mismo día de dos formas: `npm ls source-map-js
-  --omit=dev` sale vacío, y en el `dist/` de la 1.1.5 no aparece `source-map-js`,
-  `SourceMapConsumer` ni `SourceMapGenerator` en ningún archivo. El riesgo es de la máquina que
-  construye, no del cliente. `npm audit fix` la sube a 1.2.2 o posterior; no se corrió. `xlsx`
-  0.20.3, la dependencia del CDN de la sección 12, no aparece en ese reporte.
 - **Ningún error del panel de validación bloquea un módulo, y la especificación dice que sí.**
   Observado el 2026-10-10. No es solo un texto de la interfaz:
   - `CLAUDE.md`, «Validación», **define** Error como «bloquea el módulo afectado».

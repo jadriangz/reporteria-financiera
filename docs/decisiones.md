@@ -1069,3 +1069,44 @@ entradas no traen su alternativa descartada. Una entrada puede describir algo to
 implementado; lo dice, y CLAUDE.md lo marca igual. ROADMAP.md §4 ya no dice «al implementarlas»;
 sus seis decisiones, AD-01 a AD-06, siguen fuera de este registro y migrarlas queda en el backlog
 (GOBERNANZA.md §11).
+
+---
+
+## 2026-10-10 — El lockfile se regenera con las seis entradas empaquetadas de Tailwind
+
+**Contexto.** Desde el 2026-09-14 el backlog registraba que `npm install --package-lock-only`
+agregaba seis entradas al lockfile —`@emnapi/core`, `@emnapi/runtime`, `@emnapi/wasi-threads`,
+`@napi-rs/wasm-runtime`, `@tybys/wasm-util` y `tslib`—, que entonces se tomaron por ajenas y se
+descartaron. Se averiguó qué son antes de decidir:
+
+- Son las **dependencias empaquetadas** de `@tailwindcss/oxide-wasm32-wasi`, la variante en
+  WebAssembly del motor nativo de Tailwind, que es una dependencia opcional para las plataformas
+  sin binario propio. El lockfile ya la listaba, con esos seis nombres en `bundleDependencies`.
+  Las entradas nuevas llevan `inBundle: true` y no traen `resolved` ni `integrity`: no se
+  descargan aparte, vienen dentro del tarball de ese paquete, cuyo hash no cambia.
+- **Depende del comando, no de la plataforma.** `npm install` completo deja el lockfile sin ellas,
+  porque nunca desempaca un paquete que no es para este procesador. `--package-lock-only` sí lo
+  resuelve y las escribe. Pedir el lockfile para `win32/x64` desde WSL2 (`--os`, `--cpu`) dio el
+  mismo archivo, byte a byte, que para Linux. No se ejecutó en un Windows real.
+- Los dos lockfiles son válidos, pero solo uno es estable. Con las seis entradas, `npm install`,
+  `npm install --package-lock-only` y `npm ci` lo dejan igual. Sin ellas, `--package-lock-only`
+  lo cambia.
+
+**Decisión.** Se regenera: el lockfile lleva las seis entradas. En la misma sesión, `npm audit fix`
+sube `source-map-js` de 1.2.1 a 1.2.2 (GHSA-68fv-2mgg-jv7q): tres líneas del lockfile, una
+dependencia transitiva y solo de desarrollo, sin tocar `package.json`.
+
+**Alternativa descartada.** Dejar el lockfile sin las seis entradas y restaurarlo cada vez que un
+comando las agregue, como se hizo el 2026-09-14. Obliga a recordar que ese diff «no cuenta», y un
+diff que se aprende a ignorar es donde se cuela el que sí importa.
+
+**Consecuencia.** Verificado el 2026-10-10 con npm 11.19.0 y Node 24.21.0: `npm ci`, las 650
+pruebas, `typecheck`, `lint` y `build` en verde, `npm audit` sin hallazgos, y los 8 archivos de
+`dist/` idénticos por SHA-256 a los del build con el lockfile anterior. Sin incremento de versión:
+son herramientas, no contrato ni cifras. Nada de esto se instala en Linux ni en Windows x64; el
+lockfile solo describe completo un paquete que ya describía a medias. Otra versión de npm podría
+escribirlo distinto: no está comprobado.
+
+**Las seis entradas no eran ajenas: faltaban.** Durante semanas se trataron como ruido. Quien las
+vea en un diff no las borra, y quien vea un diff que las **quita** desconfía de él: `npm install`
+completo no las escribe, `--package-lock-only` sí, y el lockfile correcto es el que las trae.
