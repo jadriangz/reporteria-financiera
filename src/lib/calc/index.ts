@@ -47,6 +47,7 @@ export {
   type OpcionesCartera,
   type SaldoPartida,
   type SaldoVenta,
+  type TramoFolio,
   BUCKETS,
   BUCKET_SIN_FECHA,
   CLAVES_BUCKET,
@@ -59,6 +60,7 @@ export {
   diasDelPeriodo,
   diasDeVenta,
   ordenDeEntrega,
+  tramosDeFolio,
 } from "./cobranza";
 
 export {

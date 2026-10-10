@@ -140,16 +140,11 @@ const carteraVencida: ReglaInsight = {
     const monto = ctx.cartera.aging.porBucket["+180"];
     // Lo que cada folio tiene en ESTE tramo, que puede ser menos que su saldo: un
     // folio con entregas de fechas distintas reparte su pendiente en dos tramos.
+    // La cuenta es del motor de cartera (`tramos`); aqui solo se lee.
     const afectados = ctx.cartera.detalle
-      .map((s) => {
-        const viejas = s.partidas.filter((p) => p.bucket === "+180" && p.saldo > 0);
-        let saldo = 0;
-        let dias = 0;
-        for (const p of viejas) {
-          saldo += p.saldo;
-          dias = Math.max(dias, p.dias ?? 0);
-        }
-        return { folio: s.folio, cliente: s.cliente.trim(), saldo, dias };
+      .flatMap((s) => {
+        const tramo = s.tramos.find((t) => t.bucket === "+180");
+        return tramo === undefined ? [] : [{ folio: s.folio, cliente: s.cliente.trim(), saldo: tramo.saldo, dias: tramo.dias ?? 0 }];
       })
       .filter((s) => s.saldo > 0)
       .sort((a, b) => b.saldo - a.saldo);

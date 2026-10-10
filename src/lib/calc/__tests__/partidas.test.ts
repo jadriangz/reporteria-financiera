@@ -134,6 +134,28 @@ describe("el saldo de un folio envejece por partida", () => {
     ]);
   });
 
+  it("el folio trae su saldo ya repartido por tramo, del mas antiguo al mas fresco", () => {
+    // El accesorio va primero en el archivo: el orden de los tramos no depende de eso.
+    const c = cartera(dataset([ACCESORIO, EQUIPO], [abono("V-1", 4_000_000)]));
+    expect(c.detalle[0]?.tramos).toEqual([
+      { bucket: "+180", saldo: 6_000_000, dias: 237 },
+      { bucket: "0-30", saldo: 1_000_000, dias: 20 },
+    ]);
+  });
+
+  it("dos partidas pendientes en el mismo tramo se suman en uno, con los dias de la mas antigua", () => {
+    const otraDeAgosto = partida({ folio: "V-1", fecha: dia(8, 30), modelo: "Modelo C", precio_venta: 500_000 });
+    const c = cartera(dataset([EQUIPO, ACCESORIO, otraDeAgosto], [abono("V-1", 10_000_000)]));
+    expect(c.detalle[0]?.tramos).toEqual([{ bucket: "0-30", saldo: 1_500_000, dias: 20 }]);
+  });
+
+  it("un folio sin nada pendiente no tiene tramos, y uno sobrecobrado tiene el del saldo a favor", () => {
+    expect(cartera(dataset([EQUIPO, ACCESORIO], [abono("V-1", 11_000_000)])).detalle[0]?.tramos).toEqual([]);
+    expect(cartera(dataset([EQUIPO, ACCESORIO], [abono("V-1", 11_200_000)])).detalle[0]?.tramos).toEqual([
+      { bucket: "0-30", saldo: -200_000, dias: 20 },
+    ]);
+  });
+
   it("el renglon del folio lleva el tramo de su pendiente mas antiguo", () => {
     const c = cartera(dataset([ACCESORIO, EQUIPO], [abono("V-1", 4_000_000)]));
     const folio = c.detalle[0];
