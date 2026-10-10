@@ -11,6 +11,7 @@ import {
 import {
   ESCENARIOS,
   ESTILO_BUCKET,
+  ETIQUETA_BUCKET,
   abonosDe,
   baseDeMedicion,
   bucketsVisibles,
@@ -24,6 +25,7 @@ import {
   sinFechasDePago,
   tonoDeBucket,
 } from "../selectores";
+import { sufijoOtras } from "../../compartido/rotuloFolio";
 
 const CORTE = new Date(Date.UTC(2026, 8, 9));
 
@@ -154,25 +156,33 @@ describe("orden de los saldos pendientes", () => {
   });
 
   it("ordena por dias descendente y deja las sin fecha al final", () => {
-    const filas = saldosPendientes(cartera(d), d);
+    const filas = saldosPendientes(cartera(d));
     expect(filas.map((f) => f.folio)).toEqual(["V-viejo", "V-medio", "V-nuevo", "V-sinfecha"]);
   });
 
   it("la venta sin fecha llega con dias null, para pintarse como raya", () => {
-    const filas = saldosPendientes(cartera(d), d);
+    const filas = saldosPendientes(cartera(d));
     const sinFecha = filas.find((f) => f.folio === "V-sinfecha");
     expect(sinFecha?.dias).toBeNull();
     expect(sinFecha?.bucket).toBe(BUCKET_SIN_FECHA);
   });
 
-  it("une el modelo desde el dataset sin tocar el motor", () => {
-    const filas = saldosPendientes(cartera(d), d);
+  it("un folio de una partida se rotula con su modelo, a secas", () => {
+    const filas = saldosPendientes(cartera(d));
     expect(filas[0]?.modelo).toBe("T70P");
   });
 
-  it("deja el modelo en null si no encuentra la venta", () => {
-    const filas = saldosPendientes(cartera(d), null);
-    expect(filas[0]?.modelo).toBeNull();
+  it("un folio de varias partidas se rotula con la de mayor precio, y DICE cuantas mas trae", () => {
+    // Hasta la 1.1.5 el modelo se buscaba por folio en el dataset: con folios
+    // repetidos tomaba el de una partida cualquiera y callaba las demas.
+    const varias = dataset({
+      ventas: [
+        venta({ folio: "V-1", modelo: "Bateria", linea: "Accesorios", precio_venta: 1_000_000 }),
+        venta({ folio: "V-1", modelo: "AX-55", linea: "Equipo", precio_venta: 26_500_000 }),
+        venta({ folio: "V-1", modelo: "Cargador", linea: "Accesorios", precio_venta: 500_000 }),
+      ],
+    });
+    expect(saldosPendientes(cartera(varias))[0]?.modelo).toBe(`AX-55${sufijoOtras(2)}`);
   });
 
   it("excluye las ventas totalmente pagadas, no las lista en cero", () => {
@@ -180,7 +190,7 @@ describe("orden de los saldos pendientes", () => {
       ventas: [venta({ folio: "V-1" }), venta({ folio: "V-2" })],
       cobranza: [abono({ folio_venta: "V-1", monto: 50_000_000 })],
     });
-    const filas = saldosPendientes(cartera(pagado), pagado);
+    const filas = saldosPendientes(cartera(pagado));
     expect(filas.map((f) => f.folio)).toEqual(["V-2"]);
   });
 
@@ -189,7 +199,7 @@ describe("orden de los saldos pendientes", () => {
       ventas: [venta({ folio: "V-1", precio_venta: 10_000_000 })],
       cobranza: [abono({ folio_venta: "V-1", monto: 15_000_000 })],
     });
-    const filas = saldosPendientes(cartera(sobre), sobre);
+    const filas = saldosPendientes(cartera(sobre));
     expect(filas).toHaveLength(1);
     expect(filas[0]?.saldo).toBe(-5_000_000);
   });
@@ -506,7 +516,7 @@ describe("cartera vacia", () => {
 
   it("no produce filas ni clientes expuestos, para poder mostrar el mensaje positivo", () => {
     const c = cartera(pagado);
-    expect(saldosPendientes(c, pagado)).toEqual([]);
+    expect(saldosPendientes(c)).toEqual([]);
     expect(exposicionPorCliente(c).filter((x) => x.saldo !== 0)).toEqual([]);
     expect(c.saldoTotal).toBe(0);
   });
@@ -537,7 +547,70 @@ describe("consistencia con el motor", () => {
       cobranza: [abono({ folio_venta: "V-1", monto: 20_000_000 })],
     });
     const c = cartera(d);
-    const filas: readonly SaldoVenta[] = saldosPendientes(c, d);
+    const filas: readonly SaldoVenta[] = saldosPendientes(c);
     expect(filas.reduce((t, f) => t + f.saldo, 0)).toBe(c.saldoTotal);
+  });
+});
+
+describe("un folio con el saldo en dos tramos", () => {
+  // Equipo entregado en enero y accesorio en agosto, mismo folio: $110,000 de
+  // venta y $40,000 cobrados. Quedan $60,000 de enero y $10,000 de agosto.
+  const d = dataset({
+    ventas: [
+      venta({ folio: "V-1", fecha: new Date(Date.UTC(2026, 0, 15)), precio_venta: 10_000_000 }),
+      venta({ folio: "V-1", fecha: new Date(Date.UTC(2026, 7, 20)), precio_venta: 1_000_000, linea: "Accesorios", modelo: "Bateria" }),
+    ],
+    cobranza: [abono({ folio_venta: "V-1", monto: 4_000_000 })],
+  });
+  const c = cartera(d);
+  const fila = saldosPendientes(c)[0];
+
+  it("es UN renglon, con el saldo del folio y el reparto por tramo a la vista", () => {
+    expect(saldosPendientes(c)).toHaveLength(1);
+    expect(fila?.saldo).toBe(7_000_000);
+    expect(fila?.tramos.map((t) => [ETIQUETA_BUCKET[t.bucket], t.saldo])).toEqual([
+      ["Más de 180 días", 6_000_000],
+      ["0 a 30 días", 1_000_000],
+    ]);
+  });
+
+  it("lo que la tabla dice por tramo es lo que dice la barra de antiguedad", () => {
+    // El defecto que cierra esta fila: la tabla ponia los $70,000 en «Más de 180
+    // días» mientras la barra ponia $60,000 ahi y $10,000 en «0 a 30 días».
+    const porTramo = new Map<string, number>();
+    for (const f of saldosPendientes(c)) {
+      for (const t of f.tramos) porTramo.set(t.bucket, (porTramo.get(t.bucket) ?? 0) + t.saldo);
+    }
+    for (const [bucket, saldo] of Object.entries(c.aging.porBucket)) {
+      expect(porTramo.get(bucket) ?? 0, bucket).toBe(saldo);
+    }
+  });
+
+  it("el tono y el orden del renglon siguen a su pendiente mas antiguo", () => {
+    expect(fila?.bucket).toBe("+180");
+    expect(fila?.dias).toBe(237);
+    expect(tonoDeBucket(fila?.bucket ?? "0-30")).toBe(tonoDeBucket("+180"));
+  });
+
+  it("con el archivo de demostracion, los tramos de la tabla suman la barra tramo por tramo", () => {
+    const demo = calcularCartera(cargarFixture(), { fechaCorte: CORTE });
+    const porTramo = new Map<string, number>();
+    for (const f of saldosPendientes(demo)) {
+      for (const t of f.tramos) porTramo.set(t.bucket, (porTramo.get(t.bucket) ?? 0) + t.saldo);
+    }
+    for (const [bucket, saldo] of Object.entries(ESPERADO.aging)) {
+      expect(porTramo.get(bucket) ?? 0, bucket).toBe(saldo);
+    }
+  });
+
+  it("la base de medicion se juzga por partida: una entrega sin fecha no cuenta", () => {
+    const mixto = dataset({
+      ventas: [
+        venta({ folio: "V-1", dias_credito: 30 }),
+        venta({ folio: "V-2", dias_credito: null }),
+        venta({ folio: "V-3", fecha: null, dias_credito: null }),
+      ],
+    });
+    expect(baseDeMedicion(cartera(mixto))).toBe("mixta");
   });
 });

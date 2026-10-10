@@ -26,8 +26,8 @@ export function NotaFueraDelEje({
       No aparecen en la gráfica{" "}
       {facturado && (
         <>
-          <Cifra tono="advertencia">{moneda(fuera.facturado)}</Cifra> facturados sin fecha de venta
-          ({entero(fuera.operaciones)} {fuera.operaciones === 1 ? "operación" : "operaciones"})
+          <Cifra tono="advertencia">{moneda(fuera.facturado)}</Cifra> facturados sin fecha de entrega
+          ({entero(fuera.operaciones)} {fuera.operaciones === 1 ? "entrega" : "entregas"})
         </>
       )}
       {facturado && cobrado && " y "}

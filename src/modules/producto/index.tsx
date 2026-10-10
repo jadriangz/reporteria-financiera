@@ -80,8 +80,8 @@ function Indicadores({ calculos }: { calculos: Calculos }) {
     <RejillaKPI>
       <TarjetaKPI
         etiqueta="Unidades"
-        valor={entero(total.operaciones)}
-        nota="Una por operación: la plantilla no captura cantidad por fila."
+        valor={entero(total.partidas)}
+        nota="Una por partida vendida: la plantilla no captura cantidad por fila."
       />
       <TarjetaKPI etiqueta="Ingreso" valor={moneda(total.ventaTotal)} nota="Ventas computables del periodo." />
       <TarjetaKPI

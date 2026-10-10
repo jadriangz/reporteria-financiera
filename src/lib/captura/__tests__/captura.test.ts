@@ -204,3 +204,37 @@ describe("etiqueta de origen", () => {
     expect(etiquetaOrigen(null, 5)).toBe("Captura manual");
   });
 });
+
+describe("listado: una partida capturada se juzga dentro de su folio", () => {
+  // V-001 esta en la fila 3 del archivo, a nombre de Agricola San Lorenzo.
+  it("la partida que hereda el cliente de su folio no aparece como rechazada", () => {
+    const partida = venta("c1", 28, { ...VENTA_OK, folio: "V-001", cliente: "" });
+    const capturas: Capturas = { ...SIN_CAPTURAS, ventas: [partida] };
+    const { hallazgos, dataset } = validate(combinar(archivo, capturas));
+    // Entra al reporte...
+    expect(dataset.ventas.filter((v) => v.folio === "V-001")).toHaveLength(2);
+    // ...y el listado tiene que decir lo mismo, con el cliente que heredo.
+    const fila = filasDeHoja(archivo, capturas, "ventas", hallazgos).find((f) => f.idCaptura === "c1");
+    expect(fila?.valida).toBe(true);
+    expect(fila?.detalle).toBe("Agricola San Lorenzo · AX-55");
+  });
+
+  it("si su folio sale completo, todas sus filas aparecen como fuera del reporte, no solo la que lo rompio", () => {
+    const partida = venta("c1", 28, { ...VENTA_OK, folio: "V-001" });
+    const capturas: Capturas = { ...SIN_CAPTURAS, ventas: [partida] };
+    const { hallazgos, dataset } = validate(combinar(archivo, capturas));
+    expect(dataset.ventas.some((v) => v.folio === "V-001")).toBe(false);
+    const filas = filasDeHoja(archivo, capturas, "ventas", hallazgos).filter((f) => f.folio === "V-001");
+    expect(filas.map((f) => [f.fila, f.valida])).toEqual([
+      [3, false],
+      [28, false],
+    ]);
+  });
+
+  it("una fila sin cliente y sin folio del que heredar sigue rechazada", () => {
+    const sola = venta("c1", 28, { ...VENTA_OK, cliente: "" });
+    const capturas: Capturas = { ...SIN_CAPTURAS, ventas: [sola] };
+    const { hallazgos } = validate(combinar(archivo, capturas));
+    expect(filasDeHoja(archivo, capturas, "ventas", hallazgos).find((f) => f.idCaptura === "c1")?.valida).toBe(false);
+  });
+});

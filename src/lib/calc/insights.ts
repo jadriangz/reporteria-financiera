@@ -140,16 +140,11 @@ const carteraVencida: ReglaInsight = {
     const monto = ctx.cartera.aging.porBucket["+180"];
     // Lo que cada folio tiene en ESTE tramo, que puede ser menos que su saldo: un
     // folio con entregas de fechas distintas reparte su pendiente en dos tramos.
+    // La cuenta es del motor de cartera (`tramos`); aqui solo se lee.
     const afectados = ctx.cartera.detalle
-      .map((s) => {
-        const viejas = s.partidas.filter((p) => p.bucket === "+180" && p.saldo > 0);
-        let saldo = 0;
-        let dias = 0;
-        for (const p of viejas) {
-          saldo += p.saldo;
-          dias = Math.max(dias, p.dias ?? 0);
-        }
-        return { folio: s.folio, cliente: s.cliente.trim(), saldo, dias };
+      .flatMap((s) => {
+        const tramo = s.tramos.find((t) => t.bucket === "+180");
+        return tramo === undefined ? [] : [{ folio: s.folio, cliente: s.cliente.trim(), saldo: tramo.saldo, dias: tramo.dias ?? 0 }];
       })
       .filter((s) => s.saldo > 0)
       .sort((a, b) => b.saldo - a.saldo);
@@ -201,7 +196,7 @@ const margenDerivado: ReglaInsight = {
     return crear(
       this,
       "El costo parece derivado del precio",
-      `El margen es exactamente ${pct(Number(dominante), 1)} en ${veces} de ${margenes.length} ventas ` +
+      `El margen es exactamente ${pct(Number(dominante), 1)} en ${veces} de ${margenes.length} partidas ` +
         `(${pct(proporcion)}). Un costo real casi nunca produce el mismo margen exacto: es probable que ` +
         `se haya capturado aplicando un porcentaje al precio. La utilidad reportada solo sera confiable ` +
         `cuando se capture el costo real de cada equipo.`,
@@ -386,17 +381,19 @@ const importesConIva: ReglaInsight = {
 const ventasSinFecha: ReglaInsight = {
   id: "ventas-sin-fecha",
   nivel: "advertencia",
-  descripcion: "Ventas que no pueden ubicarse en ningun mes.",
+  descripcion: "Partidas que no pueden ubicarse en ningun mes.",
   evaluar(ctx) {
     const grupo = ctx.resultados.meses.find((m) => m.mes === SIN_FECHA);
     if (grupo === undefined || grupo.operaciones === 0) return null;
 
     return crear(
       this,
-      "Ventas sin fecha",
-      `${grupo.operaciones} ${grupo.operaciones === 1 ? "venta" : "ventas"} por ${pesos(grupo.ventaTotal)} ` +
-        `no tienen fecha capturada: quedan fuera del analisis mensual y de la antiguedad de cartera. ` +
-        `Se reportan aparte, no se descartan.`,
+      "Partidas sin fecha de entrega",
+      grupo.operaciones === 1
+        ? `1 partida por ${pesos(grupo.ventaTotal)} no tiene fecha capturada: queda fuera del analisis mensual ` +
+            `y de la antiguedad de cartera. Se reporta aparte, no se descarta.`
+        : `${grupo.operaciones} partidas por ${pesos(grupo.ventaTotal)} no tienen fecha capturada: quedan fuera ` +
+            `del analisis mensual y de la antiguedad de cartera. Se reportan aparte, no se descartan.`,
     );
   },
 };
@@ -417,7 +414,7 @@ const carteraSinFecha: ReglaInsight = {
     return crear(
       this,
       "Cartera sin antiguedad determinable",
-      `${pesos(monto)} de saldo corresponden a ventas sin fecha: no se les puede calcular antiguedad ` +
+      `${pesos(monto)} de saldo corresponden a entregas sin fecha: no se les puede calcular antiguedad ` +
         `y no entran en ningun bucket. Folios: ${lista(folios, 5)}.`,
       folios,
     );

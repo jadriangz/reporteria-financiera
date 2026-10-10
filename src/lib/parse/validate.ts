@@ -14,7 +14,7 @@ import {
 import { type FilaResuelta, folioDe, resolverCabeceras } from "./cabecera";
 import { CLAVES_PARAMETROS, LECTURAS, type ParametroSustituido, sinCapturar } from "./parametros";
 import { REGLAS, type ContextoValidacion, type FilaEvaluada, type FolioExcluido } from "./reglas";
-import type { RawParametros, RawSheets } from "./tipos";
+import type { NombreHoja, RawParametros, RawSheets } from "./tipos";
 
 export interface ResultadoValidacion {
   readonly dataset: Dataset;
@@ -26,6 +26,12 @@ export interface ResultadoValidacion {
    * panel de validacion no viaja con el documento. El motor no los ve (AD-06).
    */
   readonly sustituciones: readonly ParametroSustituido[];
+  /**
+   * Numeros de fila que entraron al Dataset, por hoja. Es lo que le permite a un
+   * listado decir de cada fila lo mismo que el motor hace con ella: una partida
+   * puede cumplir el esquema y aun asi quedar fuera con todo su folio.
+   */
+  readonly filasAceptadas: Readonly<Record<NombreHoja, ReadonlySet<number>>>;
 }
 
 /**
@@ -179,7 +185,19 @@ export function validate(raw: RawSheets): ResultadoValidacion {
 
   const hallazgos = REGLAS.flatMap((regla) => regla.evaluar(ctx));
 
-  return { dataset, hallazgos, sustituciones };
+  const aceptadas = (filas: readonly FilaEvaluada[]): ReadonlySet<number> =>
+    new Set(filas.filter((f) => f.aceptada).map((f) => f.fila));
+
+  return {
+    dataset,
+    hallazgos,
+    sustituciones,
+    filasAceptadas: {
+      ventas: aceptadas(ventas.evaluadas),
+      cobranza: aceptadas(cobranza.evaluadas),
+      gastos: aceptadas(gastos.evaluadas),
+    },
+  };
 }
 
 /** Atajo para la UI: cuenta hallazgos por severidad. */

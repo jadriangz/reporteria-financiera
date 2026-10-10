@@ -93,6 +93,48 @@ se sabe:
 
 ---
 
+### Alternativa cuando la extensión no carga: Chrome sin ventana
+
+Si el usuario ya volvió a invocar el comando con `@browser` y las herramientas siguen sin aparecer,
+hay un camino que **sí observa**, y es válido siempre que el reporte diga con qué se observó. Se usó
+por primera vez el 2026-10-10, desde WSL2 contra el Chrome de Windows.
+
+**Cómo.** Se lanza `chrome.exe --headless=new --remote-debugging-port=<puerto>
+--user-data-dir=<carpeta temporal>`: un perfil desechable, nunca el del usuario. Se maneja por el
+protocolo de depuración: `Page.navigate`, `Runtime.evaluate` (con `awaitPromise` para esperar dentro
+de la página), `Emulation.setDeviceMetricsOverride` para el ancho, `Page.captureScreenshot` y
+`Page.printToPDF`. El tema se cambia con el selector de la barra superior, y los datos con
+`?fixture=demo` o con B.4, igual que con la extensión. Al terminar se cierran ese Chrome y vite, y
+se borra la carpeta temporal.
+
+**Lo que NO demuestra.** Tres límites, que van en el reporte y en la línea base cada vez:
+
+1. **El PDF no sale del diálogo «Guardar como PDF».** `Page.printToPDF` con `preferCSSPageSize`
+   usa el mismo motor (Skia/PDF) y respeta el `@page` de la hoja de estilos, y `displayHeaderFooter`
+   equivale a la casilla «Encabezados y pies de página». Pero no es el diálogo operado a mano: lo
+   que una persona haga ahí con sus opciones no queda observado.
+2. **Ninguna hoja se mira como imagen** si el equipo no tiene con qué rasterizar un PDF. Se lee su
+   texto, sus posiciones y sus colores con un lector de PDF instalado **fuera del repositorio**.
+   «Sale en claro» se apoya entonces en que ninguna hoja traiga el relleno oscuro de hoja completa,
+   no en haberla visto. Un invariante del papel se verifica en el papel: esto es lo más cerca que
+   se llega sin él, y hay que decirlo.
+3. **El ancho se emula en la ventana**, no con el banco de iframes de B.3. Es una emulación de
+   viewport real, y el layout responde a ella, pero no es el mismo método que el de las corridas
+   anteriores.
+
+**Lecciones de esa corrida**, cada una cuesta un rato:
+
+- **Desde WSL2 no se alcanza el puerto de depuración de un Chrome de Windows**: está en el
+  `127.0.0.1` de Windows. Windows sí alcanza a vite en WSL por `localhost`. El puente fue un guion
+  de PowerShell con `ClientWebSocket` que manda un lote de comandos y guarda las respuestas.
+- **`chrome.exe --version` en Windows no imprime la versión: abre el navegador.** La versión se lee
+  con `Browser.getVersion`.
+- **`pkill -f vite` mata también al propio shell** si su línea de comando contiene «vite». Se apaga
+  por el puerto que se leyó de la salida de vite, y se confirma que quedó libre.
+- **La captura con el medio de impresión emulado salió en negro.** No sirve para mirar el papel.
+- La pestaña sin ventana está siempre `visible`, así que la trampa de las gráficas con ancho 0 no
+  aplica; aun así, comprueba que las gráficas tengan ancho antes de dar por bueno un estado.
+
 ## Fase A — automático
 
 En este orden, uno por uno, reportando el veredicto y la salida relevante de cada uno:
@@ -223,6 +265,27 @@ Tres métodos, en este orden:
 
 Confirma siempre la carga antes de juzgar: el nombre del archivo en la barra superior y el panel
 de validación con lo que ese archivo debe producir.
+
+### B.5 El folio con el saldo en dos tramos (v1.2.0)
+
+**El demo no lo trae, a propósito, y sin este paso nadie lo ve.** Sus dos folios con varias
+partidas, V-008 y V-015, entregaron todo el mismo día: su saldo cae en un solo tramo. La celda de
+antigüedad que lista dos tramos con sus importes —la razón de ser del rediseño de Cobranza— solo
+aparece con entregas en fechas distintas. Está probada en código (`partidas.test.ts` y el selector
+de Cobranza), pero **cómo se ve** solo se comprueba aquí.
+
+Con B.4, construye en la página la variante del demo: en la hoja `ventas`, la celda `B11` —la fecha
+del accesorio de V-008— pasa a `46254`, el 20/08/2026. Cárgala, fija el corte en 2026-09-09 y abre
+Cobranza. Lo esperado:
+
+- El renglón de V-008: saldo $165,000, y en Antigüedad **«61 a 90 días $141,000»** y **«0 a 30 días
+  $24,000»**, en dos líneas de la misma celda, sin desplegar nada.
+- Al desplegarlo: el equipo con $141,000 pendientes a 65 días y el accesorio con $24,000 pendientes,
+  todavía sin vencer.
+- **La etiqueta de cada tramo en una sola línea, en los cuatro anchos.** A 360 px se partía una
+  palabra por renglón («61 / a / 90 / días»), precisa e ilegible (corregido el 2026-10-10).
+- En el PDF de esa variante, las mismas dos líneas en la hoja de Cobranza, y la paginación sin
+  moverse respecto del demo.
 
 ### Qué buscar, con su definición
 

@@ -4,7 +4,7 @@ import { TablaCifras } from "../../components/ui/TablaCifras";
 import { RejillaKPI, TarjetaKPI } from "../../components/ui/TarjetaKPI";
 import { Cifra, Seccion } from "../../components/ui/primitivas";
 import type { ColumnaTabla } from "../../components/ui/tabla";
-import type { Insight } from "../../lib/calc";
+import type { Insight, SaldoPartida } from "../../lib/calc";
 import {
   dias as fmtDias,
   entero,
@@ -65,7 +65,7 @@ export function ModuloCobranza({ calculos }: { calculos: Calculos }) {
 
       <Seccion
         titulo="Saldos pendientes"
-        descripcion="Ordenados por antigüedad. Despliegue una fila para ver sus abonos."
+        descripcion="Un renglón por venta, ordenados por antigüedad. Despliegue una fila para ver sus partidas y sus abonos."
       >
         <TablaSaldos calculos={calculos} dataset={dataset} />
       </Seccion>
@@ -179,7 +179,8 @@ const COLUMNAS_SALDOS: readonly ColumnaTabla<FilaSaldo>[] = [
   },
   {
     clave: "fecha",
-    encabezado: "Fecha",
+    encabezado: "Entrega",
+    titulo: "Fecha de entrega. En una venta con varias entregas, la de su pendiente más antiguo.",
     celda: (s) => <span className="cifras">{fmtFecha(s.fecha)}</span>,
     ordenar: (s) => s.fecha?.getTime() ?? null,
     ancho: "6rem",
@@ -209,7 +210,8 @@ const COLUMNAS_SALDOS: readonly ColumnaTabla<FilaSaldo>[] = [
     clave: "dias",
     encabezado: "Días",
     alineacion: "derecha",
-    titulo: "Días vencidos si hay crédito pactado; si no, días desde la venta.",
+    titulo:
+      "Días vencidos si hay crédito pactado; si no, días desde la entrega. En una venta con varias entregas, los de su pendiente más antiguo.",
     celda: (s) => (s.dias === null ? "—" : entero(s.dias)),
     ordenar: (s) => s.dias,
     ancho: "4rem",
@@ -217,11 +219,42 @@ const COLUMNAS_SALDOS: readonly ColumnaTabla<FilaSaldo>[] = [
   {
     clave: "bucket",
     encabezado: "Antigüedad",
-    celda: (s) => ETIQUETA_BUCKET[s.bucket],
+    titulo: "Tramo del saldo. Si el saldo de la venta abarca varios tramos, cuánto hay en cada uno.",
+    celda: (s) => <CeldaAntiguedad saldo={s} />,
     ordenar: (s) => s.dias,
-    ancho: "8rem",
+    ancho: "12rem",
   },
 ];
+
+/**
+ * El tramo del saldo de un folio, dicho de modo que no se pueda leer de mas.
+ *
+ * Con todo el saldo en un tramo, su nombre. Con el saldo repartido —entregas de
+ * fechas distintas—, cada tramo CON SU IMPORTE, visible sin desplegar nada: asi
+ * los importes de esta columna suman lo mismo que la barra de antiguedad. Un
+ * folio que dijera «Más de 180 días» junto a su saldo entero afirmaria que todo
+ * ese dinero es viejo, y la barra de arriba diria otra cosa del mismo dinero.
+ *
+ * El reparto lo hizo el motor (`tramos`); aqui solo se pinta.
+ */
+function CeldaAntiguedad({ saldo }: { saldo: FilaSaldo }) {
+  // Sin partir renglon: en poco ancho la columna se encogia y la etiqueta salia
+  // una palabra por linea («61 / a / 90 / días»), precisa e ilegible. La tabla es
+  // de detalle y se desplaza a lo ancho; la celda conserva su forma.
+  if (saldo.tramos.length <= 1) {
+    return <span className="whitespace-nowrap">{ETIQUETA_BUCKET[saldo.tramos[0]?.bucket ?? saldo.bucket]}</span>;
+  }
+  return (
+    <ul className="space-y-0.5 whitespace-nowrap">
+      {saldo.tramos.map((t) => (
+        <li key={t.bucket} className="flex items-baseline justify-between gap-3">
+          <span>{ETIQUETA_BUCKET[t.bucket]}</span>
+          <span className="cifras">{moneda(t.saldo)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /** Un saldo negativo se muestra y se explica; no se esconde ni se pone en cero. */
 function CeldaSaldo({ saldo }: { saldo: number }) {
@@ -237,7 +270,7 @@ function CeldaSaldo({ saldo }: { saldo: number }) {
 }
 
 function TablaSaldos({ calculos, dataset }: { calculos: Calculos; dataset: Dataset | null }) {
-  const pendientes = saldosPendientes(calculos.cartera, dataset);
+  const pendientes = saldosPendientes(calculos.cartera);
 
   if (pendientes.length === 0) {
     return (
@@ -258,9 +291,71 @@ function TablaSaldos({ calculos, dataset }: { calculos: Calculos; dataset: Datas
       }))}
       ordenInicial={{ clave: "dias", direccion: "desc" }}
       expandir={(s) =>
-        dataset === null ? null : <DetalleAbonos dataset={dataset} folio={s.folio} />
+        dataset === null && s.partidas.length < 2 ? null : <DetalleFolio saldo={s} dataset={dataset} />
       }
     />
+  );
+}
+
+/**
+ * Lo que se despliega bajo un folio: sus partidas, si trae mas de una, y sus
+ * abonos. Con una sola partida la tabla de partidas repetiria el renglon.
+ */
+function DetalleFolio({ saldo, dataset }: { saldo: FilaSaldo; dataset: Dataset | null }) {
+  return (
+    <div className="space-y-2">
+      {saldo.partidas.length > 1 && <DetallePartidas folio={saldo.folio} partidas={saldo.partidas} />}
+      {dataset !== null && <DetalleAbonos dataset={dataset} folio={saldo.folio} />}
+    </div>
+  );
+}
+
+const COLUMNAS_PARTIDAS: readonly ColumnaTabla<SaldoPartida>[] = [
+  { clave: "linea", encabezado: "Línea", celda: (p) => p.linea, ancho: "7rem" },
+  { clave: "modelo", encabezado: "Modelo", celda: (p) => p.modelo },
+  { clave: "fecha", encabezado: "Entrega", celda: (p) => <span className="cifras">{fmtFecha(p.fecha)}</span>, ancho: "6rem" },
+  { clave: "precio", encabezado: "Precio", alineacion: "derecha", celda: (p) => moneda(p.precioVenta) },
+  {
+    clave: "aplicado",
+    encabezado: "Aplicado",
+    alineacion: "derecha",
+    titulo: "Lo que le tocó de los abonos de la venta, que se aplican en orden de entrega.",
+    celda: (p) => moneda(p.aplicado),
+  },
+  { clave: "pendiente", encabezado: "Pendiente", alineacion: "derecha", celda: (p) => <CeldaSaldo saldo={p.saldo} /> },
+  {
+    clave: "dias",
+    encabezado: "Días",
+    alineacion: "derecha",
+    celda: (p) => (p.saldo === 0 || p.dias === null ? "—" : entero(p.dias)),
+    ancho: "4rem",
+  },
+  {
+    clave: "bucket",
+    encabezado: "Antigüedad",
+    celda: (p) => (p.saldo === 0 ? "Pagada" : ETIQUETA_BUCKET[p.bucket]),
+    ancho: "8rem",
+  },
+];
+
+/** Las partidas de un folio: que se entrego, cuando, y cuanto de cada una sigue pendiente. */
+function DetallePartidas({ folio, partidas }: { folio: string; partidas: readonly SaldoPartida[] }) {
+  return (
+    <div>
+      <p className="mb-1.5 text-[11px] text-slate-500">
+        Los abonos de la venta se aplican a sus partidas en orden de entrega: lo que queda pendiente
+        es lo último entregado.
+      </p>
+      <TablaCifras
+        etiquetaTabla={`Partidas de ${folio}`}
+        columnas={COLUMNAS_PARTIDAS}
+        filas={partidas.map((p, i) => ({
+          id: `${folio}-partida-${i}`,
+          datos: p,
+          tono: p.saldo === 0 ? "neutro" : p.saldo < 0 ? "advertencia" : tonoDeBucket(p.bucket),
+        }))}
+      />
+    </div>
   );
 }
 
@@ -287,7 +382,7 @@ function DetalleAbonos({ dataset, folio }: { dataset: Dataset; folio: string }) 
     return (
       <p className="text-[11px] text-slate-500">
         No hay abonos capturados contra <span className="cifras">{folio}</span>. El saldo es el
-        precio de venta completo.
+        precio completo de la venta.
       </p>
     );
   }

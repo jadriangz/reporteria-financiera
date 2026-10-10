@@ -1,3 +1,4 @@
+import { resolverCabeceras } from "../parse/cabecera";
 import { validate } from "../parse/validate";
 import { HOJAS_TABULARES, type NombreHoja, type RawCelda, type RawHoja, type RawSheets } from "../parse/tipos";
 import { CobranzaSchema, GastoSchema, type Hallazgo, VentaSchema } from "../schema";
@@ -198,13 +199,28 @@ export function filasDeHoja(
   const cuenta = (fila: number, severidad: Hallazgo["severidad"]) =>
     hallazgos.filter((h) => h.hoja === hoja && h.fila === fila && h.severidad === severidad).length;
 
+  // Cada fila se juzga DENTRO DE SU FOLIO, con el mismo recorrido que el
+  // validador: una partida que deja vacio el cliente lo hereda, y una que cumple
+  // el esquema puede quedar fuera con todo su folio. Juzgarla sola hacia que el
+  // listado dijera "Rechazada" de una fila que si entraba al reporte, y "valida"
+  // de una que no.
+  const combinado = combinar(raw, capturas);
+  const dentro = validate(combinado).filasAceptadas[hoja];
+  const conCabecera = new Map(
+    hoja === "ventas" ? resolverCabeceras(combinado.ventas).filas.map((f) => [f.fila, f.valores]) : [],
+  );
+  const resumir = (fila: number, valores: Readonly<Record<string, RawCelda>>) => {
+    const resumen = resumirFila(hoja, conCabecera.get(fila) ?? valores);
+    return Object.assign(resumen, { valida: resumen.valida && dentro.has(fila) });
+  };
+
   const delArchivo = raw[hoja].filas.map(
     (f): FilaListado => ({
       clave: `archivo-${f.fila}`,
       origen: "archivo",
       idCaptura: null,
       fila: f.fila,
-      ...resumirFila(hoja, f.valores),
+      ...resumir(f.fila, f.valores),
       errores: cuenta(f.fila, "error"),
       advertencias: cuenta(f.fila, "advertencia"),
     }),
@@ -215,7 +231,7 @@ export function filasDeHoja(
       origen: "captura",
       idCaptura: c.id,
       fila: c.fila,
-      ...resumirFila(hoja, c.valores),
+      ...resumir(c.fila, c.valores),
       errores: cuenta(c.fila, "error"),
       advertencias: cuenta(c.fila, "advertencia"),
     }),

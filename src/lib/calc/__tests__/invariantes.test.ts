@@ -177,6 +177,27 @@ describe("invariantes de la cartera", () => {
     ).toEqual([]);
   });
 
+  it("los tramos de cada folio suman su saldo, y sumados entre folios son el aging", () => {
+    expect(
+      enTodos((d) => {
+        const c = calcularCartera(d, { fechaCorte: CORTE });
+        const porBucket = new Map<string, number>();
+        for (const s of c.detalle) {
+          const fallo = distinto(`${s.folio} tramos`, suma(s.tramos, (t) => t.saldo), s.saldo);
+          if (fallo !== null) return fallo;
+          if (s.tramos.some((t) => t.saldo === 0)) return `${s.folio}: tramo en cero`;
+          if (new Set(s.tramos.map((t) => t.bucket)).size !== s.tramos.length) return `${s.folio}: tramo repetido`;
+          for (const t of s.tramos) porBucket.set(t.bucket, (porBucket.get(t.bucket) ?? 0) + t.saldo);
+        }
+        for (const [bucket, saldo] of Object.entries(c.aging.porBucket)) {
+          const fallo = distinto(`aging ${bucket}`, porBucket.get(bucket) ?? 0, saldo);
+          if (fallo !== null) return fallo;
+        }
+        return null;
+      }),
+    ).toEqual([]);
+  });
+
   it("solo la partida que carga un sobrecobro queda en negativo, y ninguna se cubre de mas", () => {
     expect(
       enTodos((d) => {

@@ -150,6 +150,40 @@ con encabezados y pies del navegador** en las 15 hojas —fecha de impresión, t
 `localhost:5173/?fixture=demo` y «n/15»—. Comparar los dos compara casilla activada contra casilla
 activada. Cerrarla exige un PDF que de verdad salga sin ellos, comprobado en el PDF.
 
+**Tercera corrida, 2026-10-10, con la interfaz de partidas (v1.2.0 en curso, pie «v1.1.5»).** Tres
+PDF: el demo sin y con encabezados del navegador, y una copia del demo con el accesorio de V-008
+entregado el 20/08/2026, para ver un folio con el saldo en dos tramos.
+
+- **La paginación no se movió**: 15 hojas con el mismo reparto por módulo en los tres. En Cobranza
+  (hoja 9) las filas de V-008 y V-015 ahora despliegan su tabla de partidas, y aun así el módulo
+  sigue en las hojas 8–10 con las mismas primeras y últimas líneas de cada hoja.
+- **La pregunta de la casilla queda cerrada: desactivar «Encabezados y pies de página» no mueve los
+  saltos.** El PDF sin ellos no trae ninguno —comprobado en el PDF, no en una vista previa— y el
+  PDF con ellos trae en las 15 hojas la dirección `localhost:5173/?fixture=demo` y «n/15». Las dos
+  versiones tienen, hoja por hoja, la misma primera y la misma última línea de contenido.
+- **Cómo se imprimió.** No hubo extensión de navegador en la sesión. Se usó el Chrome 154 de
+  Windows sin ventana, manejado por su protocolo de depuración: la aplicación montó su vista
+  imprimible con el botón «Reporte completo», desde el tema oscuro, y el PDF se pidió con
+  `Page.printToPDF` respetando el `@page` de la hoja de estilos («Skia/PDF m154»). El método está
+  descrito en `.claude/commands/verificar.md`.
+- **Lo que esta corrida NO demuestra.** Tres límites, para que una corrida futura sepa qué quedó
+  realmente observado:
+  1. **El PDF no salió del diálogo «Guardar como PDF» operado a mano.** Es el mismo motor, pero lo
+     que haga ese diálogo con sus propias opciones sigue apoyado en las corridas del 2026-09-14.
+  2. **No se miró ninguna hoja como imagen.** El equipo no tiene con qué rasterizar un PDF: se
+     leyeron su texto, sus posiciones y sus colores.
+  3. **En el recorrido de pantalla el ancho se emuló en la ventana**, no con el banco de iframes.
+- **Sale en claro**, con el alcance del límite 2: ninguna de las 15 hojas trae el relleno
+  `#121212`, en los tres PDF, y el único color muy oscuro del documento es el del texto. Es una
+  comprobación sobre los colores del PDF, no sobre la hoja vista.
+- **El folio en dos tramos, en papel**. El demo no lo trae; la copia se arma con el paso B.5 de
+  `verificar.md`, y hay que repetirlo en cada corrida de cierre. En la hoja 9 de la copia, el renglón de V-008 lista «61 a 90
+  días $141,000» y «0 a 30 días $24,000» en dos líneas de la misma celda, y su tabla de partidas
+  debajo.
+- **«AX-100 + 1 más» ocupa dos renglones en la columna Modelo de Cobranza** (hoja 9, V-015): se
+  parte antes del signo, «AX-100» arriba y «+ 1 más» abajo. «AX-55 + 1 más» cabe en uno. El aviso
+  no se parte por dentro, que es lo que se cuidó.
+
 - [x] **Total de páginas** del reporte completo: **15**. Vertical, 612 × 792 pt, salvo las
   cuatro del Estado de resultados, apaisadas a 792 × 612 pt.
 - [x] Dónde cae cada salto de página, y si algún módulo parte una tabla a media fila:
@@ -198,7 +232,8 @@ nombre del archivo—, la dirección de la aplicación y el número de hoja. En 
 2026-09-14 salieron «9/14/26, 2:05 AM», `localhost:5174/?fixture=demo` y «4/15».
 
 **Recomendación al usuario: desactivarla** al guardar un reporte. La ayuda junto al botón
-«Descargar PDF» lo dice.
+«Descargar PDF» lo dice. Desactivarla no mueve los saltos de página: comparado hoja por hoja el
+2026-10-10 (ver la tercera corrida).
 
 - **La dirección de la aplicación no tiene nada que hacer en el reporte de un cliente.** Es peor
   que perder el número de hoja.

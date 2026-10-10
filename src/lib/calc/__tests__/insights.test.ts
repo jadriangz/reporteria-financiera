@@ -406,7 +406,7 @@ describe("reglas de apoyo", () => {
     });
     const i = buscar(d, "ventas-sin-fecha");
     expect(i?.detalle).toContain("$500,000");
-    expect(i?.detalle).toContain("1 venta");
+    expect(i?.detalle).toContain("1 partida");
   });
 
   it("reporta cartera sin antiguedad determinable con sus folios", () => {
@@ -539,7 +539,7 @@ describe("insights sobre el archivo de demostracion", () => {
 
   it("reporta la unica venta sin fecha con su importe", () => {
     const i = encontrados().find((x) => x.id === "ventas-sin-fecha");
-    expect(i?.detalle).toContain("1 venta");
+    expect(i?.detalle).toContain("1 partida");
     expect(i?.detalle).toContain("$3,600");
   });
 });

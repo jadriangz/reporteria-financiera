@@ -59,6 +59,15 @@ export interface SaldoPartida {
   readonly bucket: ClaveBucket;
 }
 
+/** Lo que un folio tiene pendiente en un tramo de antiguedad. */
+export interface TramoFolio {
+  readonly bucket: ClaveBucket;
+  /** Suma de los pendientes de sus partidas en este tramo. Nunca cero. */
+  readonly saldo: Centavos;
+  /** Los dias de la partida mas antigua del tramo. null en "sin fecha". */
+  readonly dias: number | null;
+}
+
 /**
  * Un folio en la cartera. Una fila por operacion, no por partida.
  *
@@ -66,8 +75,9 @@ export interface SaldoPartida {
  * `bucket` son los de su PENDIENTE MAS ANTIGUO: la partida con saldo que lleva
  * mas dias. Es un resumen para listar el folio en un renglon, y es exacto cuando
  * el folio tiene una sola partida. Cuando lo pendiente abarca entregas de fechas
- * distintas, el reparto real por tramo esta en `partidas`, y es de ahi —no de
- * este campo— de donde sale el aging.
+ * distintas, el reparto real por tramo esta en `tramos`, que suma lo mismo que
+ * `saldo` y es lo que hay que mostrar para que la tabla y el aging digan lo
+ * mismo del mismo dinero.
  */
 export interface SaldoVenta {
   readonly folio: string;
@@ -86,6 +96,12 @@ export interface SaldoVenta {
   readonly bucket: ClaveBucket;
   /** Las partidas computables del folio, en el orden del archivo. Nunca vacio. */
   readonly partidas: readonly SaldoPartida[];
+  /**
+   * El saldo del folio repartido por tramo, del mas antiguo al mas fresco y
+   * "sin fecha" al final. Solo tramos con pendiente: vacio si el folio no debe
+   * nada. Su suma es `saldo`, y sumado entre folios es `aging.porBucket`.
+   */
+  readonly tramos: readonly TramoFolio[];
 }
 
 export interface Aging {
@@ -221,6 +237,25 @@ function partidaDeReferencia(partidas: readonly SaldoPartida[], orden: readonly 
   return referencia ?? (primera === undefined ? undefined : partidas[primera]);
 }
 
+/** Del tramo mas antiguo al mas fresco; "sin fecha" al final, porque no compite en la escala. */
+const ORDEN_TRAMOS: readonly ClaveBucket[] = ["+180", "91-180", "61-90", "31-60", "0-30", BUCKET_SIN_FECHA];
+
+/** Suma los pendientes de las partidas de un folio por tramo. Es la unica cuenta de este reparto. */
+export function tramosDeFolio(partidas: readonly SaldoPartida[]): readonly TramoFolio[] {
+  const tramos: TramoFolio[] = [];
+  for (const bucket of ORDEN_TRAMOS) {
+    let saldo = 0;
+    let dias: number | null = null;
+    for (const p of partidas) {
+      if (p.bucket !== bucket || p.saldo === 0) continue;
+      saldo += p.saldo;
+      if (p.dias !== null && (dias === null || p.dias > dias)) dias = p.dias;
+    }
+    if (saldo !== 0) tramos.push({ bucket, saldo, dias });
+  }
+  return tramos;
+}
+
 /**
  * Cartera completa al corte indicado.
  *
@@ -283,6 +318,7 @@ export function calcularCartera(dataset: Dataset, opciones: OpcionesCartera): Ca
       base: referencia.base,
       bucket: referencia.bucket,
       partidas: saldos,
+      tramos: tramosDeFolio(saldos),
     });
 
     ventaTotal += precioFolio;

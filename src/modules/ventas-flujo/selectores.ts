@@ -48,6 +48,11 @@ export function tonoConversion(conversion: number | null): Tono {
 export interface FilaMesFlujo {
   /** Clave del motor, o "total" para la fila de pie. */
   readonly clave: ClaveMes | "total";
+  /**
+   * ENTREGAS del renglon: partidas con fecha en ese mes. Conserva el nombre del
+   * campo del motor. No son las operaciones del periodo: una venta entregada en
+   * dos meses cuenta en los dos, y la tabla lo dice bajo el pie.
+   */
   readonly operaciones: number;
   readonly facturado: Centavos;
   readonly cobrado: Centavos;
@@ -107,7 +112,7 @@ export function totalFlujo(flujo: Flujo): FilaMesFlujo {
 // --------------------------- Graficas ---------------------------
 
 export const SERIES_MENSUALES: readonly SerieGrafica[] = [
-  { clave: "facturado", etiqueta: "Facturado (por fecha de venta)", color: "marino" },
+  { clave: "facturado", etiqueta: "Facturado (por fecha de entrega)", color: "marino" },
   { clave: "cobrado", etiqueta: "Cobrado (por fecha de pago)", color: "positivo" },
 ];
 

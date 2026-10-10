@@ -195,11 +195,11 @@ punto_equilibrio_mxn  = gastos_fijos / margen_contribucion_pct
 explícita. El "hoy" por defecto lo pone la UI al arrancar (`fechaCorte: hoyUTC()` en el store) y
 el usuario lo cambia en la barra superior. Ver «Restricciones aprendidas».
 
-## Partidas por folio (v1.2.0) — motor implementado; interfaz, plantilla y exportación pendientes
+## Partidas por folio (v1.2.0) — motor e interfaz implementados; plantilla y exportación pendientes
 
-**Estado: fase en curso en la rama `feat/partidas`. Producción sigue en 1.1.5.** El parseo, la
-validación y el motor ya cumplen esta sección, con sus pruebas; la tabla de cifras de «Pruebas» ya
-es la del fixture nuevo. **Donde esta sección y las generales de arriba digan cosas distintas
+**Estado: fase en curso. Producción sigue en 1.1.5.** El parseo, la validación, el motor y la
+interfaz ya cumplen esta sección, con sus pruebas; la tabla de cifras de «Pruebas» ya es la del
+fixture nuevo. **Donde esta sección y las generales de arriba digan cosas distintas
 —«Validación», «Definiciones de cálculo»—, manda esta.** La sesión que cierre la fase las integra en
 un solo texto y quita la marca. Las decisiones y sus razones: `docs/decisiones.md`, entradas del
 2026-09-14 «serie de partidas» y del 2026-10-10.
@@ -259,8 +259,9 @@ anticipos_pct         = proporción de la cobranza que son anticipos
 - **Sobrecobro con varias entregas:** el exceso queda como saldo negativo en la última partida
   **con fecha**, en su tramo; en «sin fecha» solo si ninguna partida del folio la tiene. Lo
   pendiente en una partida sin fecha sí va al tramo «sin fecha».
-- **`cartera.detalle` es un renglón por folio**, con sus `partidas`. El tramo del renglón es el de
-  su pendiente más antiguo; el aging sale de las partidas, no de ese campo.
+- **`cartera.detalle` es un renglón por folio**, con sus `partidas` y sus `tramos`: el saldo del
+  folio ya sumado por tramo, que es lo que se pinta. El `bucket` del renglón es el de su pendiente
+  más antiguo y sirve para ordenar y dar tono, nunca para decir dónde está el dinero.
 - **Por mes se cuentan entregas; en el total, folios.** La suma de los meses no da el total cuando
   hay folios con varias partidas.
 - **Las «unidades» de Producto son partidas**, también en su renglón de total: una tabla de
@@ -273,9 +274,16 @@ anticipos_pct         = proporción de la cobranza que son anticipos
 
 ### Interfaz y plantilla
 
-- Cobranza y Ventas listan folios, expandibles a sus partidas (`FilaExpandible`). Producto lista
-  partidas. Clientes y Estado de resultados no cambian de forma; en Clientes «operaciones» son
-  folios.
+- **Cobranza lista folios.** Si el saldo de uno abarca varios tramos, la celda de antigüedad lista
+  cada tramo con su importe, sin desplegar: lo que la tabla dice por tramo suma lo que dice la
+  barra. Al desplegar, sus partidas (si trae más de una) y sus abonos.
+- **Un folio se nombra con su partida de mayor precio y dice cuántas más trae** («AX-55 + 1 más»),
+  igual en Cobranza y en Clientes: `rotuloDeFolio`, en `src/modules/compartido/`.
+- Producto lista partidas, y sus «unidades» son partidas. Clientes y Estado de resultados no
+  cambian de forma; en Clientes «operaciones» son folios.
+- **Ventas y flujo cuenta entregas por mes** y lo dice en el encabezado. Cuando las entregas no
+  coinciden con las operaciones del periodo, una nota bajo la tabla explica por qué no suman.
+- Ventas y flujo no lista ventas, solo meses: no tiene tabla de folios que desplegar.
 - **Plantilla v2** (`Plantilla_Captura_Reporteria_v2.xlsx`): mismas columnas, instrucciones nuevas
   y, por primera vez, fórmulas en las filas 3–301, a nivel de folio y con rango `$B$3:$B$1000`.
   **La v1 se sigue aceptando.** La aplicación ofrece solo la v2 y no las distingue por el nombre
@@ -303,11 +311,6 @@ código (`partidas.test.ts`), y los invariantes como propiedades sobre datasets 
 
 Imprecisiones conocidas y temporales de la rama. No son defectos que alguien deba investigar:
 
-- **Cobranza muestra cada folio en un solo tramo**, el de su pendiente más antiguo, mientras el
-  aging de arriba ya está repartido por partida.
-- **Clientes rotula un folio de varias partidas** con la línea y el modelo de una sola.
-- **Captura manual:** una partida capturada sin cliente entra bien al dataset y hereda, pero el
-  listado de capturas la marca como inválida, porque la juzga sola.
 - **El demo abierto en Excel** muestra `cobrado` y `saldo` raros en las filas de V-008 y V-015: sus
   fórmulas suman por folio en cada fila. El lector ignora esas columnas; no afecta ninguna cifra.
 - Plantilla v2, exportación, notas de versión y la integración de esta sección en las generales.
