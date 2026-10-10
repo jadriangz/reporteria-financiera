@@ -11,9 +11,10 @@ import {
   VentaSchema,
 } from "../schema";
 
+import { type FilaResuelta, folioDe, resolverCabeceras } from "./cabecera";
 import { CLAVES_PARAMETROS, LECTURAS, type ParametroSustituido, sinCapturar } from "./parametros";
-import { REGLAS, type ContextoValidacion, type FilaEvaluada } from "./reglas";
-import type { RawHoja, RawParametros, RawSheets } from "./tipos";
+import { REGLAS, type ContextoValidacion, type FilaEvaluada, type FolioExcluido } from "./reglas";
+import type { RawParametros, RawSheets } from "./tipos";
 
 export interface ResultadoValidacion {
   readonly dataset: Dataset;
@@ -33,20 +34,84 @@ export interface ResultadoValidacion {
  * reportar las rechazadas. Nunca lanza: una fila mala se excluye y se reporta.
  */
 function aplicarEsquema<T>(
-  hoja: RawHoja,
+  crudas: readonly (Pick<FilaResuelta, "fila" | "valores"> & Partial<Pick<FilaResuelta, "capturados">>)[],
   esquema: { safeParse(v: unknown): { success: boolean; data?: T } },
-): { filas: T[]; evaluadas: FilaEvaluada[] } {
+): { filas: T[]; evaluadas: FilaEvaluada[]; leidas: (T | null)[] } {
   const filas: T[] = [];
   const evaluadas: FilaEvaluada[] = [];
+  const leidas: (T | null)[] = [];
 
-  for (const cruda of hoja.filas) {
+  for (const cruda of crudas) {
     const r = esquema.safeParse(cruda.valores);
-    const aceptada = r.success && r.data !== undefined;
-    if (aceptada && r.data !== undefined) filas.push(r.data);
-    evaluadas.push({ fila: cruda.fila, valores: cruda.valores, aceptada });
+    const dato = r.success && r.data !== undefined ? r.data : null;
+    if (dato !== null) filas.push(dato);
+    leidas.push(dato);
+    evaluadas.push({
+      fila: cruda.fila,
+      valores: cruda.valores,
+      capturados: cruda.capturados ?? cruda.valores,
+      cumpleEsquema: dato !== null,
+      aceptada: dato !== null,
+    });
   }
 
-  return { filas, evaluadas };
+  return { filas, evaluadas, leidas };
+}
+
+/**
+ * Las ventas se leen por folio y no fila por fila: primero se resuelve la
+ * cabecera de cada folio, despues se aplica el esquema, y al final se decide que
+ * folios no se pueden valuar.
+ *
+ * Un folio sale COMPLETO del dataset en dos casos, y en los dos por la misma
+ * razon: no se sabe de que operacion se trata o cuanto vale.
+ *
+ * - `cliente` distinto entre sus partidas.
+ * - Una de sus partidas no cumple el esquema. Dejar las demas repartiria entre
+ *   ellas los pagos del folio y fabricaria un sobrecobro que nadie hizo: una
+ *   partida que no se pudo leer no es una partida que no existe.
+ */
+function leerVentas(raw: RawSheets): {
+  filas: Venta[];
+  evaluadas: FilaEvaluada[];
+  conflictos: ContextoValidacion["conflictos"];
+  foliosExcluidos: FolioExcluido[];
+} {
+  const cabeceras = resolverCabeceras(raw.ventas);
+  const { evaluadas, leidas } = aplicarEsquema<Venta>(cabeceras.filas, VentaSchema);
+
+  const porFila = new Map(evaluadas.map((f) => [f.fila, f]));
+  const foliosExcluidos: FolioExcluido[] = [];
+  for (const [folio, filas] of cabeceras.filasPorFolio) {
+    if (filas.length < 2) continue;
+    const enConflicto = cabeceras.conflictos.find((c) => c.folio === folio && c.campo === "cliente");
+    if (enConflicto !== undefined) {
+      foliosExcluidos.push({ folio, motivo: "cliente-en-conflicto", filas, capturas: enConflicto.capturas });
+      continue;
+    }
+    const ilegibles = filas.filter((n) => porFila.get(n)?.cumpleEsquema === false);
+    if (ilegibles.length > 0) foliosExcluidos.push({ folio, motivo: "partida-ilegible", filas, ilegibles });
+  }
+
+  const fuera = new Set(foliosExcluidos.map((f) => f.folio));
+  const filas: Venta[] = [];
+  const finales: FilaEvaluada[] = [];
+  evaluadas.forEach((f, i) => {
+    const dato = leidas[i];
+    if (dato == null || fuera.has(folioDe(f.valores))) {
+      finales.push(Object.assign({}, f, { aceptada: false }));
+      return;
+    }
+    filas.push(dato);
+    finales.push(f);
+  });
+
+  return {
+    filas,
+    evaluadas: finales,
+    conflictos: cabeceras.conflictos.filter((c) => c.campo !== "cliente"),
+    foliosExcluidos,
+  };
 }
 
 /**
@@ -84,14 +149,15 @@ function leerParametros(raw: RawParametros): { parametros: Parametros; sustituci
  * Convierte las filas crudas en un Dataset y una lista de hallazgos.
  *
  * Nunca lanza por datos malos: las filas que no cumplen el contrato quedan
- * fuera del Dataset y se reportan como error. Una hoja ausente produce un
+ * fuera del Dataset y se reportan como error. En `ventas` la unidad es el folio:
+ * ver `leerVentas`. Una hoja ausente produce un
  * Dataset con esa coleccion vacia, que es lo que `capacidades()` interpreta
  * para deshabilitar los modulos correspondientes.
  */
 export function validate(raw: RawSheets): ResultadoValidacion {
-  const ventas = aplicarEsquema<Venta>(raw.ventas, VentaSchema);
-  const cobranza = aplicarEsquema<Cobranza>(raw.cobranza, CobranzaSchema);
-  const gastos = aplicarEsquema<Gasto>(raw.gastos, GastoSchema);
+  const ventas = leerVentas(raw);
+  const cobranza = aplicarEsquema<Cobranza>(raw.cobranza.filas, CobranzaSchema);
+  const gastos = aplicarEsquema<Gasto>(raw.gastos.filas, GastoSchema);
   const { parametros, sustituciones } = leerParametros(raw.parametros);
 
   const dataset: Dataset = {
@@ -106,6 +172,8 @@ export function validate(raw: RawSheets): ResultadoValidacion {
     ventas: ventas.evaluadas,
     cobranza: cobranza.evaluadas,
     gastos: gastos.evaluadas,
+    conflictos: ventas.conflictos,
+    foliosExcluidos: ventas.foliosExcluidos,
     sustituciones,
   };
 

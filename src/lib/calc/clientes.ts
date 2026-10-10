@@ -1,6 +1,6 @@
 import { type Dataset, norm } from "../schema";
 
-import { type Centavos, type VentaExcluida, divSegura, particionarVentas } from "./base";
+import { type Centavos, type VentaExcluida, agruparFolios, divSegura, particionarVentas } from "./base";
 import { cobradoPorFolio } from "./cobranza";
 import { calcularVenta } from "./venta";
 
@@ -11,6 +11,10 @@ import { calcularVenta } from "./venta";
  * El cliente se agrupa por `norm()`: un mismo nombre llega capturado con
  * espacios y capitalizacion distintos y, sin normalizar, se parte en dos
  * clientes que suman mal la concentracion y la exposicion.
+ *
+ * DOS NIVELES (v1.2.0). El ingreso, la utilidad y las lineas se suman por
+ * partida. Las operaciones, lo cobrado y el saldo son del folio: una venta de
+ * equipo con dos accesorios es UNA operacion, y su cobro se cuenta una vez.
  */
 
 /** Lineas que definen el attach rate, segun el giro del cliente inicial. */
@@ -20,6 +24,7 @@ export const LINEA_ACCESORIO = "ACCESORIOS";
 export interface Cliente {
   readonly clave: string;
   readonly nombre: string;
+  /** Folios, no filas: cuantas veces compro. */
   readonly operaciones: number;
   readonly ingreso: Centavos;
   readonly utilidadBruta: Centavos;
@@ -30,7 +35,7 @@ export interface Cliente {
   readonly participacion: number | null;
   /** Lineas normalizadas que le compro. */
   readonly lineas: readonly string[];
-  /** Mas de una operacion. */
+  /** Mas de un folio: volvio a comprar. Varias partidas en una sola venta no lo hacen recurrente. */
   readonly recurrente: boolean;
 }
 
@@ -42,13 +47,33 @@ export interface AttachRate {
   /** Nombres de quienes compraron equipo pero no accesorios: la oportunidad. */
   readonly sinAccesorio: readonly string[];
   /**
-   * Operaciones de la linea Accesorios en todo el periodo.
+   * Partidas de la linea Accesorios en todo el periodo.
    *
    * AUSENCIA DE LINEA NO ES ATTACH BAJO. Un negocio que no vende accesorios da
    * tasa 0 y parece el peor attach rate posible, cuando en realidad la metrica
    * no le aplica. Quien concluya algo de `tasa` debe mirar esto primero.
    */
   readonly operacionesAccesorio: number;
+}
+
+/**
+ * Venta cruzada medida DENTRO de la operacion: de los folios con equipo, cuantos
+ * llevaron accesorio en el mismo folio. Es una metrica aparte del attach rate
+ * por cliente, que no cambia.
+ *
+ * AUSENCIA DE PARTIDAS NO ES VENTA CRUZADA EN CERO. Un archivo capturado con una
+ * fila por folio —como enseñaba la plantilla hasta la v1.1— da 0 de N aunque el
+ * cliente haya comprado su accesorio el mismo dia con otro folio. Quien concluya
+ * algo de `tasa` debe mirar primero `foliosConVariasPartidas`: si es cero, la
+ * metrica no se puede juzgar.
+ */
+export interface VentaCruzadaFolio {
+  readonly foliosConEquipo: number;
+  readonly foliosConAmbos: number;
+  /** foliosConAmbos / foliosConEquipo. null si ningun folio trae equipo. */
+  readonly tasa: number | null;
+  /** Folios con mas de una partida computable. Cero: el archivo no usa partidas. */
+  readonly foliosConVariasPartidas: number;
 }
 
 export interface Concentracion {
@@ -65,6 +90,7 @@ export interface Clientes {
   readonly detalle: readonly Cliente[];
   readonly concentracion: Concentracion;
   readonly attachRate: AttachRate;
+  readonly ventaCruzadaFolio: VentaCruzadaFolio;
   readonly totalClientes: number;
   readonly recurrentes: number;
   /** Suma de saldos: exposicion crediticia total. */
@@ -101,16 +127,19 @@ export function calcularClientes(dataset: Dataset): Clientes {
   const mapa = new Map<string, Acumulado>();
   let ingresoTotal = 0;
 
-  for (const venta of incluidas) {
-    const clave = norm(venta.cliente);
-    const c = calcularVenta(venta, dataset.parametros);
-    const precio = venta.precio_venta ?? 0;
-    const cobradoVenta = cobrado.get(venta.folio) ?? 0;
+  let foliosConEquipo = 0;
+  let foliosConAmbos = 0;
+  let foliosConVariasPartidas = 0;
+
+  for (const { folio, partidas } of agruparFolios(incluidas)) {
+    const cabecera = partidas[0];
+    if (cabecera === undefined) continue;
+    const clave = norm(cabecera.cliente);
 
     let a = mapa.get(clave);
     if (a === undefined) {
       a = {
-        nombre: venta.cliente.trim(),
+        nombre: cabecera.cliente.trim(),
         operaciones: 0,
         ingreso: 0,
         utilidadBruta: 0,
@@ -121,13 +150,30 @@ export function calcularClientes(dataset: Dataset): Clientes {
       mapa.set(clave, a);
     }
 
+    // Por partida: lo que se vendio y lo que dejo.
+    let precioFolio = 0;
+    const lineasFolio = new Set<string>();
+    for (const partida of partidas) {
+      const precio = partida.precio_venta ?? 0;
+      precioFolio += precio;
+      a.ingreso += precio;
+      a.utilidadBruta += calcularVenta(partida, dataset.parametros).utilidadBruta;
+      a.lineas.add(norm(partida.linea));
+      lineasFolio.add(norm(partida.linea));
+    }
+
+    // Por folio: la operacion y su cobro, una sola vez.
+    const cobradoFolio = cobrado.get(folio) ?? 0;
     a.operaciones += 1;
-    a.ingreso += precio;
-    a.utilidadBruta += c.utilidadBruta;
-    a.cobrado += cobradoVenta;
-    a.saldo += precio - cobradoVenta;
-    a.lineas.add(norm(venta.linea));
-    ingresoTotal += precio;
+    a.cobrado += cobradoFolio;
+    a.saldo += precioFolio - cobradoFolio;
+    ingresoTotal += precioFolio;
+
+    if (partidas.length > 1) foliosConVariasPartidas += 1;
+    if (lineasFolio.has(LINEA_EQUIPO)) {
+      foliosConEquipo += 1;
+      if (lineasFolio.has(LINEA_ACCESORIO)) foliosConAmbos += 1;
+    }
   }
 
   const detalle: Cliente[] = [...mapa.entries()]
@@ -170,6 +216,12 @@ export function calcularClientes(dataset: Dataset): Clientes {
         .filter((c) => !c.lineas.includes(LINEA_ACCESORIO))
         .map((c) => c.nombre),
       operacionesAccesorio,
+    },
+    ventaCruzadaFolio: {
+      foliosConEquipo,
+      foliosConAmbos,
+      tasa: divSegura(foliosConAmbos, foliosConEquipo),
+      foliosConVariasPartidas,
     },
     totalClientes: detalle.length,
     recurrentes: detalle.filter((c) => c.recurrente).length,

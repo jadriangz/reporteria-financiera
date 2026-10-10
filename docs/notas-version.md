@@ -43,6 +43,12 @@ estaban mal calculadas.** Cuando cambien con esta versión, las nuevas son las c
   cuenta folios. Con un folio por fila es el mismo número.
 - **El ticket promedio es por venta.** Antes era la venta total entre el número de filas; ahora,
   entre el número de folios. Con un folio por fila es el mismo número.
+- **Las «unidades» de Rendimiento por producto cuentan productos vendidos, también en el total.**
+  Cada fila de `ventas` es una unidad. Antes, el renglón de total tomaba el número de operaciones,
+  que coincidía con las filas solo porque cada venta ocupaba una. Ahora suma lo mismo que sus
+  líneas y sus modelos. Con un folio por fila es el mismo número; con ventas de varias partidas, el
+  total de unidades es mayor que las «Operaciones» del Resumen, y es lo correcto: una venta con un
+  equipo y dos accesorios es una operación y tres unidades.
 - **Venta cruzada por folio**, métrica nueva: de las ventas con equipo, cuántas llevaron
   accesorio en la misma operación. Solo aparece si su archivo tiene algún folio con varias
   partidas. El attach rate por cliente no cambia.

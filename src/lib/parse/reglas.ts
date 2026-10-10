@@ -12,6 +12,7 @@ import {
   parsePct,
 } from "../schema";
 
+import { type ConflictoCabecera, folioDe } from "./cabecera";
 import { CLAVES_PARAMETROS, LECTURAS, type ParametroSustituido, REGLA_PORCENTAJE, sinCapturar } from "./parametros";
 import { COLUMNAS_MONTO, HOJAS_TABULARES, type NombreHoja, type RawCelda, type RawSheets } from "./tipos";
 
@@ -31,16 +32,46 @@ export interface Regla {
 /** Una fila cruda emparejada con el resultado de aplicarle el esquema Zod. */
 export interface FilaEvaluada {
   readonly fila: number;
+  /**
+   * Lo que entro al esquema. En `ventas` trae la cabecera del folio ya puesta
+   * (`cabecera.ts`); en las demas hojas es la fila tal cual.
+   */
   readonly valores: Readonly<Record<string, RawCelda>>;
-  /** null si Zod la rechazo: entonces no entra al Dataset. */
+  /** Lo que el usuario escribio en ESTA fila. Para los avisos que citan lo capturado. */
+  readonly capturados: Readonly<Record<string, RawCelda>>;
+  /** false si Zod rechazo la fila. */
+  readonly cumpleEsquema: boolean;
+  /**
+   * Si la fila entra al Dataset. En `ventas` puede ser false aunque la fila
+   * cumpla el esquema: sale con todo su folio (`foliosExcluidos`).
+   */
   readonly aceptada: boolean;
 }
+
+/** Un folio de varias partidas que sale completo del Dataset. */
+export type FolioExcluido =
+  | {
+      readonly folio: string;
+      readonly motivo: "cliente-en-conflicto";
+      readonly filas: readonly number[];
+      readonly capturas: ConflictoCabecera["capturas"];
+    }
+  | {
+      readonly folio: string;
+      readonly motivo: "partida-ilegible";
+      readonly filas: readonly number[];
+      /** Las filas que no cumplen el esquema y rompen el folio. */
+      readonly ilegibles: readonly number[];
+    };
 
 export interface ContextoValidacion {
   readonly raw: RawSheets;
   readonly ventas: readonly FilaEvaluada[];
   readonly cobranza: readonly FilaEvaluada[];
   readonly gastos: readonly FilaEvaluada[];
+  /** `dias_credito`, `condicion` o `vendedor` distintos dentro de un folio: se aplico el primero. */
+  readonly conflictos: readonly ConflictoCabecera[];
+  readonly foliosExcluidos: readonly FolioExcluido[];
   /** Parametros que no se pudieron leer. `validate()` los calcula una vez; de ahi salen el aviso y la interfaz. */
   readonly sustituciones: readonly ParametroSustituido[];
 }
@@ -152,27 +183,110 @@ const fechaInvalida: Regla = {
   },
 };
 
-const folioDuplicado: Regla = {
-  id: "folio-duplicado",
+// Desde la v1.2.0 repetir el folio no es un error: es como se captura una venta
+// con varias partidas. De la regla `folio-duplicado` queda lo que si impide
+// valuar un folio: no saber de quien es, o no poder leer una de sus partidas.
+
+/** "$24,000", para los mensajes. Sin centavos: aqui importa el orden de magnitud. */
+function pesos(centavos: number): string {
+  return `${centavos < 0 ? "-" : ""}$${Math.round(Math.abs(centavos) / 100).toLocaleString("es-MX")}`;
+}
+
+/** "2", "2 y 3", "2, 3 y 4". */
+function enumerar(filas: readonly number[]): string {
+  if (filas.length <= 1) return filas.join("");
+  return `${filas.slice(0, -1).join(", ")} y ${filas[filas.length - 1]}`;
+}
+
+/** Venta legible de un folio, sumando sus partidas. */
+function ventaLegible(ctx: ContextoValidacion, folio: string): number {
+  let total = 0;
+  for (const f of ctx.ventas) {
+    if (folioDe(f.valores) === folio) total += parseMonto(f.valores["precio_venta"] ?? null) ?? 0;
+  }
+  return total;
+}
+
+/**
+ * Lo que pasa con los abonos de un folio que sale del analisis. Se conservan en
+ * el Dataset —la exportacion no se los quita al cliente— y el motor no los
+ * aplica a nada. Antes eso pasaba en silencio; aqui se dice cuantos son y cuanto
+ * suman.
+ */
+function abonosSinAplicar(ctx: ContextoValidacion, folio: string): string {
+  const filas: number[] = [];
+  let monto = 0;
+  for (const f of ctx.cobranza) {
+    if (texto(f.valores["folio_venta"]) !== folio) continue;
+    filas.push(f.fila);
+    monto += parseMonto(f.valores["monto"] ?? null) ?? 0;
+  }
+  if (filas.length === 0) return "";
+  return filas.length === 1
+    ? ` Su abono por ${pesos(monto)} (hoja cobranza, fila ${filas[0]}) queda sin aplicar.`
+    : ` Sus ${filas.length} abonos por ${pesos(monto)} (hoja cobranza, filas ${enumerar(filas)}) quedan sin aplicar.`;
+}
+
+function capturasTexto(capturas: ConflictoCabecera["capturas"]): string {
+  return capturas.map((c) => `fila ${c.fila}: "${c.capturado}"`).join("; ");
+}
+
+const clienteEnConflicto: Regla = {
+  id: "cliente-en-conflicto",
   severidad: "error",
-  descripcion: "Dos ventas comparten el mismo folio: la cobranza no sabria a cual aplicar.",
+  descripcion: "Las partidas de un folio traen clientes distintos: el folio completo queda fuera.",
   evaluar(ctx) {
-    const vistos = new Map<string, number>();
     const out: Hallazgo[] = [];
-    for (const f of ctx.ventas) {
-      const folio = texto(f.valores["folio"]);
-      if (folio === "") continue;
-      const previa = vistos.get(folio);
-      if (previa === undefined) {
-        vistos.set(folio, f.fila);
-        continue;
-      }
+    for (const f of ctx.foliosExcluidos) {
+      if (f.motivo !== "cliente-en-conflicto") continue;
+      const primera = f.capturas[0];
+      const distinta = f.capturas.find((c) => c.capturado !== primera?.capturado) ?? primera;
       out.push(
-        hallazgo("error", "ventas", `El folio ${folio} ya se uso en la fila ${previa}.`, {
-          fila: f.fila,
-          campo: "folio",
-          accion: `Asigne un folio unico a esta venta o elimine la fila repetida.`,
-        }),
+        hallazgo(
+          "error",
+          "ventas",
+          `El folio ${f.folio} trae clientes distintos en sus partidas (${capturasTexto(f.capturas)}): no se sabe ` +
+            `de quien es la venta, y el folio completo queda fuera del analisis (filas ${enumerar(f.filas)}, ` +
+            `${pesos(ventaLegible(ctx, f.folio))} de venta).${abonosSinAplicar(ctx, f.folio)}`,
+          {
+            ...(distinta === undefined ? {} : { fila: distinta.fila }),
+            campo: "cliente",
+            accion:
+              `Escriba el mismo cliente en todas las partidas del folio ${f.folio}, o deles folios distintos ` +
+              `si son ventas distintas.`,
+          },
+        ),
+      );
+    }
+    return out;
+  },
+};
+
+const folioIncompleto: Regla = {
+  id: "folio-incompleto",
+  severidad: "error",
+  descripcion: "Una partida de un folio no se pudo leer: el folio completo queda fuera.",
+  evaluar(ctx) {
+    const out: Hallazgo[] = [];
+    for (const f of ctx.foliosExcluidos) {
+      if (f.motivo !== "partida-ilegible") continue;
+      const rota = f.ilegibles.length === 1 ? `La fila ${f.ilegibles[0]}` : `Las filas ${enumerar(f.ilegibles)}`;
+      out.push(
+        hallazgo(
+          "error",
+          "ventas",
+          `${rota} del folio ${f.folio} no ${f.ilegibles.length === 1 ? "se pudo" : "se pudieron"} leer, y sin ` +
+            `${f.ilegibles.length === 1 ? "ella" : "ellas"} el folio no se puede valuar: sus ${f.filas.length} ` +
+            `partidas quedan fuera del analisis (filas ${enumerar(f.filas)}, ${pesos(ventaLegible(ctx, f.folio))} ` +
+            `de venta legible).${abonosSinAplicar(ctx, f.folio)}`,
+          {
+            ...(f.ilegibles[0] === undefined ? {} : { fila: f.ilegibles[0] }),
+            campo: "folio",
+            accion:
+              `Corrija ${f.ilegibles.length === 1 ? "esa fila" : "esas filas"} (revise que tenga modelo) y el ` +
+              `folio ${f.folio} completo vuelve a entrar.`,
+          },
+        ),
       );
     }
     return out;
@@ -210,7 +324,7 @@ const filaRechazada: Regla = {
     const out: Hallazgo[] = [];
     for (const hoja of HOJAS_TABULARES) {
       for (const f of filasDe(ctx, hoja)) {
-        if (f.aceptada) continue;
+        if (f.cumpleEsquema) continue;
         out.push(
           hallazgo("error", hoja, `La fila no cumple el formato esperado y fue excluida.`, {
             fila: f.fila,
@@ -287,14 +401,18 @@ const diasCreditoIlegible: Regla = {
   evaluar(ctx) {
     const out: Hallazgo[] = [];
     for (const f of ctx.ventas) {
-      const crudo = f.valores["dias_credito"] ?? null;
+      // Lo capturado en ESTA fila: la cabecera del folio pudo haberla sustituido.
+      const crudo = f.capturados["dias_credito"] ?? null;
       if (!f.aceptada || vacia(crudo) || parseEnteroNoNegativo(crudo) !== null) continue;
+      const delFolio = parseEnteroNoNegativo(f.valores["dias_credito"] ?? null);
       out.push(
         hallazgo(
           "advertencia",
           "ventas",
-          `dias_credito dice "${texto(crudo)}", que no es un numero entero de dias: el aging de esta ` +
-            `venta se calcula por antiguedad, igual que sin dias_credito.`,
+          `dias_credito dice "${texto(crudo)}", que no es un numero entero de dias: ` +
+            (delFolio === null
+              ? `el aging de esta venta se calcula por antiguedad, igual que sin dias_credito.`
+              : `se aplican los ${delFolio} dias de las demas partidas de su folio.`),
           { fila: f.fila, campo: "dias_credito", accion: "Escriba los dias de credito pactados como numero entero, por ejemplo 90." },
         ),
       );
@@ -340,11 +458,14 @@ const abonoExcedePrecio: Regla = {
   severidad: "advertencia",
   descripcion: "Lo cobrado de una venta supera su precio: sobra dinero o falta capturar el precio.",
   evaluar(ctx) {
+    // El precio de una venta es el de su folio: la suma de sus partidas.
     const precio = new Map<string, number>();
     for (const f of ctx.ventas) {
       const folio = texto(f.valores["folio"]);
       const monto = parseMonto(f.valores["precio_venta"] ?? null);
-      if (folio !== "" && monto !== null) precio.set(folio, monto);
+      // Solo lo que el motor va a cobrar: ni un folio excluido ni una partida Demo.
+      if (!f.aceptada || canonizar(LINEA, f.valores["linea"]) === "Demo") continue;
+      if (folio !== "" && monto !== null) precio.set(folio, (precio.get(folio) ?? 0) + monto);
     }
 
     const cobrado = new Map<string, number>();
@@ -371,6 +492,74 @@ const abonoExcedePrecio: Regla = {
             ...(fila === undefined ? {} : { fila }),
             campo: "monto",
             accion: `Revise los abonos de ${folio} o corrija precio_venta en la hoja ventas.`,
+          },
+        ),
+      );
+    }
+    return out;
+  },
+};
+
+/**
+ * `dias_credito`, `condicion` o `vendedor` distintos dentro de un folio. Vale el
+ * primero capturado y se dice cual. Advertencia: la venta se calcula.
+ */
+const cabeceraEnConflicto: Regla = {
+  id: "cabecera-en-conflicto",
+  severidad: "advertencia",
+  descripcion: "Un dato de cabecera distinto entre partidas de un folio: se aplica el primero capturado.",
+  evaluar(ctx) {
+    const fuera = new Set(ctx.foliosExcluidos.map((f) => f.folio));
+    const out: Hallazgo[] = [];
+    for (const c of ctx.conflictos) {
+      const primera = c.capturas[0];
+      if (primera === undefined || fuera.has(c.folio)) continue;
+      const distinta = c.capturas.find((x) => x.capturado !== primera.capturado) ?? primera;
+      out.push(
+        hallazgo(
+          "advertencia",
+          "ventas",
+          `El folio ${c.folio} trae ${c.campo} distinto en sus partidas (${capturasTexto(c.capturas)}): ` +
+            `se aplica "${primera.capturado}", el de la fila ${primera.fila}, a todo el folio.`,
+          {
+            fila: distinta.fila,
+            campo: c.campo,
+            accion: `Deje ${c.campo} igual en todas las partidas del folio ${c.folio}, o vacio en las que heredan.`,
+          },
+        ),
+      );
+    }
+    return out;
+  },
+};
+
+/**
+ * Una partida Demo dentro de un folio que tambien trae ventas. La Demo se
+ * excluye como siempre; lo que hay que decir es que los pagos del folio se
+ * aplican completos a las partidas que si cuentan.
+ */
+const demoEnFolio: Regla = {
+  id: "demo-en-folio",
+  severidad: "advertencia",
+  descripcion: "Partida Demo en un folio con ventas: los pagos se aplican solo a las partidas que cuentan.",
+  evaluar(ctx) {
+    const esDemo = (f: FilaEvaluada): boolean => canonizar(LINEA, f.valores["linea"]) === "Demo";
+    const conVenta = new Set<string>();
+    for (const f of ctx.ventas) if (f.aceptada && !esDemo(f)) conVenta.add(folioDe(f.valores));
+    const out: Hallazgo[] = [];
+    for (const f of ctx.ventas) {
+      const folio = folioDe(f.valores);
+      if (!f.aceptada || !esDemo(f) || !conVenta.has(folio)) continue;
+      out.push(
+        hallazgo(
+          "advertencia",
+          "ventas",
+          `Partida Demo dentro del folio ${folio}, que tambien trae ventas: la Demo se excluye, y los pagos ` +
+            `del folio se aplican solo a las partidas que cuentan.`,
+          {
+            fila: f.fila,
+            campo: "linea",
+            accion: `Si la unidad demostrativa no es parte de esa venta, dele su propio folio.`,
           },
         ),
       );
@@ -564,7 +753,8 @@ const enumeracionNoReconocida: Regla = {
       for (const [campo, e] of Object.entries(ENUMERACIONES[hoja])) {
         const opciones: readonly string[] = e.opciones;
         for (const f of filasDe(ctx, hoja)) {
-          const crudo = f.valores[campo];
+          // Lo capturado en ESTA fila: en `condicion` la cabecera del folio pudo sustituirlo.
+          const crudo = f.capturados[campo];
           if (!f.aceptada || vacia(crudo) || canonizar(opciones, crudo) !== null) continue;
           out.push(
             hallazgo(
@@ -683,7 +873,8 @@ const valorSinParametro: Regla = {
 export const REGLAS: readonly Regla[] = [
   valorNoNumerico,
   fechaInvalida,
-  folioDuplicado,
+  clienteEnConflicto,
+  folioIncompleto,
   cobranzaHuerfana,
   filaRechazada,
   filaSinFecha,
@@ -691,6 +882,8 @@ export const REGLAS: readonly Regla[] = [
   diasCreditoIlegible,
   porcentajeIlegible,
   abonoExcedePrecio,
+  cabeceraEnConflicto,
+  demoEnFolio,
   margenUniforme,
   enumeracionNoReconocida,
   parametroNoReconocido,

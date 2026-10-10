@@ -113,20 +113,35 @@ describe("una sola representacion: la captura entra al mismo dataset que el arch
 });
 
 describe("validacion en vivo", () => {
-  it("un folio repetido se dice al escribirlo, con el mismo mensaje del panel de carga", () => {
+  // Hasta la 1.1.5 estas pruebas exigian el error "El folio ya se uso": repetir
+  // un folio era el defecto que se cazaba. Desde la 1.2.0 es como se captura una
+  // venta con varias partidas, y lo que se caza es que el folio cambie de dueño.
+  it("repetir un folio no es un error: la fila entra como partida de esa venta y hereda su cabecera", () => {
+    const candidata = venta("tmp", 28, { ...VENTA_OK, folio: "V-001", cliente: "" });
+    const h = validarCandidata(archivo, SIN_CAPTURAS, "ventas", candidata, null);
+    expect(h.filter((x) => x.severidad === "error")).toEqual([]);
+
+    const { dataset } = validate(combinar(archivo, { ...SIN_CAPTURAS, ventas: [candidata] }));
+    const partidas = dataset.ventas.filter((v) => v.folio === "V-001");
+    expect(partidas).toHaveLength(2);
+    // V-001 esta en la fila 3 del archivo, a nombre de Agricola San Lorenzo.
+    expect(partidas[1]?.cliente).toBe("Agricola San Lorenzo");
+  });
+
+  it("un folio con otro cliente que el suyo se dice al escribirlo, como error", () => {
     const candidata = venta("tmp", 28, { ...VENTA_OK, folio: "V-001" });
     const h = validarCandidata(archivo, SIN_CAPTURAS, "ventas", candidata, null);
-    const duplicado = h.find((x) => x.campo === "folio");
-    expect(duplicado?.severidad).toBe("error");
-    // V-001 esta en la fila 3 del archivo.
-    expect(duplicado?.mensaje).toBe("El folio V-001 ya se uso en la fila 3.");
+    const conflicto = h.find((x) => x.campo === "cliente");
+    expect(conflicto?.severidad).toBe("error");
+    expect(conflicto?.mensaje).toContain('fila 3: "Agricola San Lorenzo"; fila 28: "Cliente Nuevo"');
+    expect(conflicto?.accion).toBeTruthy();
   });
 
   it("tambien contra otra fila capturada a mano", () => {
     const capturas: Capturas = { ...SIN_CAPTURAS, ventas: [venta("c1", 28, VENTA_OK)] };
-    const candidata = venta("tmp", 29, VENTA_OK);
+    const candidata = venta("tmp", 29, { ...VENTA_OK, cliente: "Otro Cliente" });
     const h = validarCandidata(archivo, capturas, "ventas", candidata, null);
-    expect(h.find((x) => x.campo === "folio")?.mensaje).toBe("El folio V-100 ya se uso en la fila 28.");
+    expect(h.find((x) => x.campo === "cliente")?.mensaje).toContain('fila 28: "Cliente Nuevo"; fila 29: "Otro Cliente"');
   });
 
   it("al editar una captura no choca consigo misma", () => {

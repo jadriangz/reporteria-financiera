@@ -200,6 +200,42 @@ export const ENUMERACIONES = {
   },
 } as const;
 
+/** Lo que una columna de cabecera sabe de sí misma. Ver `CABECERA_VENTA`. */
+export interface LecturaCabecera {
+  /** La coerción del contrato para esa celda. null: vacía o ilegible, que aquí es lo mismo. */
+  leer(raw: unknown): string | number | null;
+  /** Con qué se comparan dos valores ya leídos: «Rio Verde» y «rio verde » son el mismo cliente. */
+  clave(valor: string | number): string;
+  /** Qué pasa si dos partidas del folio traen valores distintos. */
+  readonly siDifiere: "excluye-folio" | "primera";
+}
+
+/**
+ * Columnas de CABECERA de una venta: describen la operación —el folio— y no la
+ * partida, así que valen lo mismo en todas sus filas (CLAUDE.md, «Partidas por
+ * folio»). El resto de las columnas son de la partida.
+ *
+ * Vale el PRIMER VALOR NO VACÍO del folio, en orden de filas. Una celda vacía
+ * hereda sin aviso: vacío es ausencia, no dato, y quien escribe los días de
+ * crédito en el segundo renglón no los pierde. Solo chocan dos valores
+ * capturados distintos. `cliente` distinto saca el folio entero; los demás
+ * toman el primero y se avisa.
+ *
+ * Esta declaración es todo lo que el contrato dice de la cabecera. Quien la
+ * resuelve (`src/lib/parse/cabecera.ts`) solo elige DE QUÉ FILA sale la celda;
+ * la celda elegida la sigue coercionando `VentaSchema`. El motor recibe cada
+ * partida con su cabecera puesta y no vuelve a mirar si venía vacía.
+ */
+export const CABECERA_VENTA = {
+  cliente:      { leer: parseTexto,                                clave: (v) => norm(v),   siDifiere: "excluye-folio" },
+  dias_credito: { leer: parseEnteroNoNegativo,                     clave: (v) => String(v), siDifiere: "primera" },
+  condicion:    { leer: (raw) => canonizar(CONDICION, raw),        clave: (v) => String(v), siDifiere: "primera" },
+  vendedor:     { leer: parseTexto,                                clave: (v) => norm(v),   siDifiere: "primera" },
+} as const satisfies Readonly<Record<string, LecturaCabecera>>;
+
+export type CampoCabecera = keyof typeof CABECERA_VENTA;
+export const CAMPOS_CABECERA = Object.keys(CABECERA_VENTA) as readonly CampoCabecera[];
+
 const zMonto  = z.unknown().transform(parseMonto);
 const zFecha  = z.unknown().transform(parseFecha);
 const zPct    = z.unknown().transform(parsePct);

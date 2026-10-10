@@ -1110,3 +1110,95 @@ escribirlo distinto: no está comprobado.
 **Las seis entradas no eran ajenas: faltaban.** Durante semanas se trataron como ruido. Quien las
 vea en un diff no las borra, y quien vea un diff que las **quita** desconfía de él: `npm install`
 completo no las escribe, `--package-lock-only` sí, y el lockfile correcto es el que las trae.
+
+---
+
+## 2026-10-10 — La cabecera de un folio es su primer valor no vacío
+
+**Contexto.** La serie de partidas dejó sin decidir qué se aplica si la primera fila de un folio trae
+vacío un dato de cabecera que otra fila sí trae. Decía «se toma el de la primera partida».
+
+**Decisión.** Vale el **primer valor no vacío** del folio, en orden de filas, y sin advertencia. Una
+celda vacía nunca entra en conflicto: solo chocan dos valores capturados distintos, y ahí gana el
+primero capturado. `cliente` y `vendedor` se comparan con `norm()`, como agrupa el motor;
+`dias_credito` y `condicion`, ya coercionados. Un `dias_credito` ilegible cuenta como vacío y conserva
+su advertencia, que ahora dice qué se le aplicó.
+
+**Alternativa descartada.** Que mande la primera fila aunque esté vacía. Quien escribe los días de
+crédito en el segundo renglón los perdería, y su cartera se mediría por antigüedad sin que nada se lo
+diga. Vacío es ausencia, no dato.
+
+**Consecuencia.** La declaración vive en `CABECERA_VENTA` (`src/lib/schema.ts`) y la resuelve
+`src/lib/parse/cabecera.ts` antes de aplicar el esquema: el paso solo elige de qué fila sale la celda,
+y `VentaSchema` la coerciona como a cualquier otra. El motor no ve celdas vacías de cabecera.
+
+---
+
+## 2026-10-10 — Un folio que no se puede valuar sale completo, y sus abonos se nombran
+
+**Contexto.** Dos casos sin decidir. Uno, qué pasa con los abonos de un folio excluido por `cliente`
+en conflicto: se creía que hoy daban error de cobranza huérfana, y no es así. La regla arma su lista
+de folios con todas las filas de `ventas`, incluidas las rechazadas, así que esos abonos quedaban
+inertes y en silencio. Otro, que no estaba en el contrato: una partida que el esquema rechaza —sin
+`modelo`— dentro de un folio con más partidas.
+
+**Decisión.**
+- Un folio de varias partidas sale **completo** del dataset si sus partidas dicen clientes distintos
+  o si una de ellas no cumple el esquema. El error dice qué fila lo rompió, cuántas partidas y cuánta
+  venta salen.
+- Sus abonos **se conservan** en el dataset y no generan error propio. El error del folio dice
+  cuántos son, cuánto suman y en qué filas de `cobranza` están. El motor no los aplica a nada, igual
+  que los abonos contra una Demo.
+
+**Alternativa descartada.** Excluir solo la partida ilegible y avisar que el folio quedó incompleto.
+Los pagos del folio se repartirían entre las partidas restantes y fabricarían un sobrecobro que nadie
+hizo: una partida que no se pudo leer no es una partida que no existe (GOBERNANZA.md §1). Evitarlo
+obligaría al motor a reservar pago para una fila que el contrato declaró fuera, usando su precio
+crudo. Es severo —un accesorio sin modelo tira la venta del equipo—, pero no más que hoy, cuando una
+venta de equipo sin modelo ya se cae entera. Descartado también un error de «venta que no existe» por
+cada abono: sería falso, y pediría corregir un `folio_venta` que está bien.
+
+**Consecuencia.** Queda una sola regla para un folio roto, con dos causas (`cliente-en-conflicto`,
+`folio-incompleto`). Con la cabecera resuelta por folio, la única causa que queda para rechazar una
+partida dentro de un folio válido es `modelo` vacío. Un silencio que ya existía se volvió
+información.
+
+---
+
+## 2026-10-10 — El exceso de un sobrecobro va a la última partida con fecha
+
+**Contexto.** El contrato decía dos cosas que chocan cuando la última partida de un folio no tiene
+fecha: el exceso queda «en la última partida entregada», y una partida sin fecha «se ordena al final».
+
+**Decisión.** El exceso se carga a la última partida **con fecha**, en su tramo. Solo si ninguna
+partida del folio tiene fecha va a «sin fecha». Lo mismo vale para un cobrado negativo, una nota de
+crédito sin abonos que la compensen.
+
+**Alternativa descartada.** Cargarlo a la última en orden, aunque no tenga fecha. Pondría un saldo a
+favor en el tramo «sin fecha», que no dice nada de cuándo se pagó de más.
+
+**Consecuencia.** El sobrecobro sigue el orden de entrega. Lo pendiente en una partida sin fecha sí
+va a «sin fecha», porque ahí no hay otra cosa que decir.
+
+---
+
+## 2026-10-10 — La cartera lista un renglón por folio, con el tramo de su pendiente más antiguo
+
+**Contexto.** `cartera.detalle` era una fila por venta con un solo tramo, y los selectores de Cobranza
+y Clientes la consumen así. Con partidas, el saldo de un folio puede estar en dos tramos. La sesión
+del motor no toca la interfaz.
+
+**Decisión.** `detalle` pasa a ser un renglón por **folio**, con los campos que ya tenía más
+`partidas`. `precioVenta`, `cobrado` y `saldo` son del folio. `fecha`, `dias`, `base` y `bucket` son
+los de su pendiente más antiguo. El aging no sale de ese campo sino de las partidas, que traen cada
+una su pendiente y su tramo.
+
+**Alternativa descartada.** Un renglón por partida. Rompería cada selector que suma `detalle` como
+operaciones, y obligaría a tocar la interfaz en la sesión del motor.
+
+**Consecuencia.** La interfaz compila sin editarse. **Imprecisión conocida y temporal, no un
+defecto:** hasta la sesión de interfaz, Cobranza muestra cada folio en un solo tramo mientras el
+aging de arriba ya está repartido, y Clientes rotula un folio de varias partidas con la línea y el
+modelo de una sola. En el mismo sentido, por mes se cuentan **entregas** y en el total **folios**: la
+suma de los meses no da el total cuando hay folios con varias partidas, y hay que decirlo donde se
+muestre. La cascada trae además `partidas`, que es lo que suman las unidades por línea y modelo.

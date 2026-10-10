@@ -73,7 +73,9 @@ export function filasProducto(producto: Producto): readonly FilaProducto[] {
 
 /**
  * Fila de total: la cascada del periodo del motor, no una suma de subtotales.
- * Unidades = operaciones: la plantilla no captura cantidad por fila.
+ * Unidades = partidas: productos vendidos, no operaciones. La plantilla no
+ * captura cantidad por fila, asi que cada partida es una unidad. Hasta la 1.1.5
+ * se leian las operaciones, y coincidian solo porque cada folio tenia una fila.
  */
 export function totalProducto(total: Cascada): FilaProducto {
   return {
@@ -81,7 +83,7 @@ export function totalProducto(total: Cascada): FilaProducto {
     nivel: "subtotal",
     linea: "Total",
     modelo: null,
-    unidades: total.operaciones,
+    unidades: total.partidas,
     ingreso: total.ventaTotal,
     costo: total.costoTotal,
     utilidadBruta: total.utilidadBruta,

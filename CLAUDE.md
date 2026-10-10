@@ -195,13 +195,14 @@ punto_equilibrio_mxn  = gastos_fijos / margen_contribucion_pct
 explícita. El "hoy" por defecto lo pone la UI al arrancar (`fechaCorte: hoyUTC()` en el store) y
 el usuario lo cambia en la barra superior. Ver «Restricciones aprendidas».
 
-## Partidas por folio (v1.2.0) — decidida, pendiente de implementar
+## Partidas por folio (v1.2.0) — motor implementado; interfaz, plantilla y exportación pendientes
 
-**Estado: especificación de la fase que sigue. El código y producción están en 1.1.5.** Mientras
-esta sección lleve ese título, todo lo demás de este archivo —la validación, las definiciones de
-cálculo y la tabla de cifras de «Pruebas»— describe lo vigente y **no se toca**. La sesión que
-implemente la 1.2.0 integra esta sección en las suyas y le quita la marca. Las decisiones y sus
-razones: `docs/decisiones.md`, entradas del 2026-09-14 «serie de partidas».
+**Estado: fase en curso en la rama `feat/partidas`. Producción sigue en 1.1.5.** El parseo, la
+validación y el motor ya cumplen esta sección, con sus pruebas; la tabla de cifras de «Pruebas» ya
+es la del fixture nuevo. **Donde esta sección y las generales de arriba digan cosas distintas
+—«Validación», «Definiciones de cálculo»—, manda esta.** La sesión que cierre la fase las integra en
+un solo texto y quita la marca. Las decisiones y sus razones: `docs/decisiones.md`, entradas del
+2026-09-14 «serie de partidas» y del 2026-10-10.
 
 **El folio agrupa partidas.** Cada fila de `ventas` es una partida; las filas con el mismo folio
 son una sola operación. **No hay hoja nueva ni campos nuevos**: las columnas son las mismas y
@@ -214,21 +215,25 @@ cambia su significado. Un folio por fila sigue siendo válido.
 
 - **`fecha` es la fecha de entrega de la partida.** Dos partidas del mismo folio pueden tener
   fechas distintas, y es legítimo.
-- **La cabecera se resuelve al leer, no en el motor.** Puede venir solo en la primera fila del
-  folio: las demás heredan, sin advertencia. La herencia vive en `src/lib/parse/` y el motor
-  recibe cada partida con su cabecera ya resuelta. Es la restricción «toda coerción vive en el
-  esquema»: un motor que leyera una celda vacía como «heredar» sería el quinto caso.
+- **La cabecera se resuelve al leer, no en el motor.** Vale el **primer valor no vacío** del folio,
+  en orden de filas: las partidas que lo dejan vacío lo heredan, sin advertencia. `CABECERA_VENTA`
+  (`schema.ts`) declara las columnas y cómo se comparan; `src/lib/parse/cabecera.ts` solo elige de
+  qué fila sale la celda, y `VentaSchema` la coerciona como a cualquier otra. El motor recibe cada
+  partida con su cabecera puesta. Es la restricción «toda coerción vive en el esquema»: un motor
+  que leyera una celda vacía como «heredar» sería el quinto caso.
 
 ### Validación que cambia
 
 - **`folio-duplicado` deja de ser error.** Repetir el folio es la forma correcta de capturar.
-- **Error:** `cliente` distinto entre partidas del mismo folio. Saca **el folio completo** del
-  dataset, con un mensaje que lista sus filas.
-- **Advertencia:** `dias_credito`, `condicion` o `vendedor` distintos dentro del folio (se toma el
-  de la primera partida y se dice cuál se aplicó); partida Demo en un folio con ventas (los pagos
-  se aplican solo a las partidas que cuentan); anticipo con un hueco implausible hasta la entrega.
-- **Info:** anticipo, que es un pago anterior a la primera entrega de su folio. En este negocio es
-  lo normal.
+- **Error:** `cliente` distinto entre partidas del mismo folio, o una partida que no cumple el
+  esquema dentro de un folio con más partidas. En los dos casos sale **el folio completo** del
+  dataset: no se reparten sus pagos entre las partidas que quedan, porque fabricaría un sobrecobro.
+  El mensaje lista sus filas, y dice cuántos abonos y por cuánto quedan sin aplicar; esos abonos se
+  conservan en el dataset y no generan error propio.
+- **Advertencia:** `dias_credito`, `condicion` o `vendedor` distintos dentro del folio (se aplica
+  el primero capturado y se dice cuál); partida Demo en un folio con ventas (los pagos se aplican
+  solo a las partidas que cuentan).
+- **Sin implementar todavía:** el anticipo —info— y su advertencia por hueco implausible.
 
 ### Cálculo
 
@@ -252,7 +257,14 @@ anticipos_pct         = proporción de la cobranza que son anticipos
 - **Por partida:** utilidad bruta, margen, comisión, rendimiento por modelo y línea, ingreso por
   mes. Los ingresos por mes se agrupan por la fecha de cada partida.
 - **Sobrecobro con varias entregas:** el exceso queda como saldo negativo en la última partida
-  entregada, en su tramo. Lo pendiente en una partida sin fecha va al tramo «sin fecha».
+  **con fecha**, en su tramo; en «sin fecha» solo si ninguna partida del folio la tiene. Lo
+  pendiente en una partida sin fecha sí va al tramo «sin fecha».
+- **`cartera.detalle` es un renglón por folio**, con sus `partidas`. El tramo del renglón es el de
+  su pendiente más antiguo; el aging sale de las partidas, no de ese campo.
+- **Por mes se cuentan entregas; en el total, folios.** La suma de los meses no da el total cuando
+  hay folios con varias partidas.
+- **Las «unidades» de Producto son partidas**, también en su renglón de total: una tabla de
+  rendimiento por producto cuenta productos vendidos, no operaciones.
 - **Invariantes que se mantienen:** `Σ buckets === saldoTotal` y `cobrado + saldo === venta`.
 - **`attach_rate` por cliente no cambia.** `venta_cruzada_folio` es una métrica aparte, y **solo
   se juzga si hay al menos un folio con varias partidas**: en un archivo de una fila por producto
@@ -269,28 +281,41 @@ anticipos_pct         = proporción de la cobranza que son anticipos
   **La v1 se sigue aceptando.** La aplicación ofrece solo la v2 y no las distingue por el nombre
   del archivo.
 
-### Cifras de referencia que cambian con el fixture de la 1.2.0
+### Cifras de referencia que cambiaron con el fixture de la 1.2.0
 
-El demo une V-008 con V-009 y V-015 con V-016. **No** une V-017 con V-018: dentro del folio el
-sobrecobro se netea y el caso límite desaparece. V-009 deja vacía `condicion` (cabecera heredada)
-y V-016 conserva «Contado» contra «Credito» (cabecera en conflicto).
+El demo une V-008 con V-009 y V-015 con V-016: los folios que quedan son V-008 y V-015, y los
+abonos P-012 y P-021 apuntan a ellos. **No** une V-017 con V-018: dentro del folio el sobrecobro
+se netea y el caso límite desaparece. En V-008 el accesorio deja vacía `condicion` (cabecera
+heredada); en V-015 conserva «Contado» contra «Credito» (cabecera en conflicto).
 
 ```
-operaciones             =    24  →  22          // cambia de unidad: filas → folios
+operaciones             =    24  →  22          // cambió de unidad: filas → folios
 ticket_promedio         =   187_370.83  →  204_404.55
 venta_cruzada_folio     =   2/13                // métrica nueva
 ```
 
-`venta_total`, `costo_total`, `utilidad_bruta`, `cobrado`, `saldo` y `attach_rate` **no se
-mueven**. Los pagos en orden de entrega y los anticipos se prueban con datos armados en código,
-no añadiendo ventas al demo.
+`venta_total`, `costo_total`, `utilidad_bruta`, `cobrado`, `saldo`, los cinco tramos y
+`attach_rate` **no se movieron**. Los pagos en orden de entrega se prueban con datos armados en
+código (`partidas.test.ts`), y los invariantes como propiedades sobre datasets generados
+(`invariantes.test.ts`), no añadiendo ventas al demo.
+
+### Pendiente de las sesiones que siguen
+
+Imprecisiones conocidas y temporales de la rama. No son defectos que alguien deba investigar:
+
+- **Cobranza muestra cada folio en un solo tramo**, el de su pendiente más antiguo, mientras el
+  aging de arriba ya está repartido por partida.
+- **Clientes rotula un folio de varias partidas** con la línea y el modelo de una sola.
+- **Captura manual:** una partida capturada sin cliente entra bien al dataset y hereda, pero el
+  listado de capturas la marca como inválida, porque la juzga sola.
+- **El demo abierto en Excel** muestra `cobrado` y `saldo` raros en las filas de V-008 y V-015: sus
+  fórmulas suman por folio en cada fila. El lector ignora esas columnas; no afecta ninguna cifra.
+- Plantilla v2, exportación, notas de versión y la integración de esta sección en las generales.
 
 ### Sin decidir (no inventar: preguntar)
 
 - El umbral que vuelve advertencia un anticipo, y la base exacta de `anticipos_pct`.
 - El umbral y el texto del hallazgo de `venta_cruzada_folio`.
-- Qué se aplica si la primera fila trae vacío un dato de cabecera que otra fila sí trae.
-- Qué pasa con los abonos de un folio excluido por `cliente` en conflicto.
 - Qué muestran `cobrado` y `saldo` de la plantilla v2 en la segunda partida de un folio.
 
 ## Módulos de reporte
@@ -402,12 +427,14 @@ lo que manda es el espacio que tiene, no el que tiene la ventana.
 entra al repositorio, ni siquiera como fixture (GOBERNANZA.md, sección 10).
 
 **Todos los valores de esta tabla son EXCLUYENDO la fila Demo (V-006), al corte
-`2026-09-09`.** El parser entrega 25 ventas; el motor excluye la Demo y calcula sobre 24. Están
+`2026-09-09`.** El parser entrega 25 partidas; el motor excluye la Demo y calcula sobre 24, que
+son 22 folios. Están
 en pesos: el motor trabaja en centavos, así que multiplique por 100 al compararlos. La fuente
 es `src/lib/calc/__tests__/fixture.ts`; esta tabla es su copia legible.
 
 ```
-operaciones             =    24
+operaciones             =    22          // folios; hasta la 1.1.5, 24 filas
+partidas                =    24
 venta_total             = 4_496_900
 costo_total             = 3_278_000
 utilidad_bruta          = 1_218_900
@@ -419,7 +446,7 @@ saldo                   = 1_955_800
 gastos_fijos            =   640_800
 gastos_variables        =   360_100
 resultado_operativo     =    71_850
-ticket_promedio         =   187_370.83
+ticket_promedio         =   204_404.55  // por folio; hasta la 1.1.5, 187_370.83 por fila
 punto_equilibrio / mes  =   298_465.89   // el del periodo entre los 9 meses del eje
 aging["0-30"]           =   683_000
 aging["31-60"]          =    94_800
@@ -428,6 +455,7 @@ aging["91-180"]         =   118_000
 aging["+180"]           =   670_000
 aging["sin-fecha"]      =         0
 attach_rate             = 3/10 = 0.30
+venta_cruzada_folio     = 2/13
 ```
 
 **El corte es obligatorio y fijo.** El aging depende de él: con "hoy" la suite empezaría a
@@ -441,7 +469,8 @@ costo y lo abonado contra ese folio.
 Este archivo ejercita a propósito los casos límite que el archivo del cliente nunca tocó:
 los **cinco tramos de antigüedad con saldo**, base de medición **mixta** (ventas con
 `dias_credito` y sin él), las **seis líneas** de producto incluida la Demo, un **sobrecobro**
-(V-018, saldo negativo) y una **venta sin fecha** (V-025).
+(V-018, saldo negativo), una **venta sin fecha** (V-025) y **dos folios con varias partidas**
+(V-008, con cabecera heredada, y V-015, con cabecera en conflicto).
 
 Si un cambio rompe estos números, el cambio está mal.
 
