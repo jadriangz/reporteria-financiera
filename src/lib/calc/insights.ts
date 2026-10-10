@@ -196,7 +196,7 @@ const margenDerivado: ReglaInsight = {
     return crear(
       this,
       "El costo parece derivado del precio",
-      `El margen es exactamente ${pct(Number(dominante), 1)} en ${veces} de ${margenes.length} ventas ` +
+      `El margen es exactamente ${pct(Number(dominante), 1)} en ${veces} de ${margenes.length} partidas ` +
         `(${pct(proporcion)}). Un costo real casi nunca produce el mismo margen exacto: es probable que ` +
         `se haya capturado aplicando un porcentaje al precio. La utilidad reportada solo sera confiable ` +
         `cuando se capture el costo real de cada equipo.`,
@@ -381,17 +381,19 @@ const importesConIva: ReglaInsight = {
 const ventasSinFecha: ReglaInsight = {
   id: "ventas-sin-fecha",
   nivel: "advertencia",
-  descripcion: "Ventas que no pueden ubicarse en ningun mes.",
+  descripcion: "Partidas que no pueden ubicarse en ningun mes.",
   evaluar(ctx) {
     const grupo = ctx.resultados.meses.find((m) => m.mes === SIN_FECHA);
     if (grupo === undefined || grupo.operaciones === 0) return null;
 
     return crear(
       this,
-      "Ventas sin fecha",
-      `${grupo.operaciones} ${grupo.operaciones === 1 ? "venta" : "ventas"} por ${pesos(grupo.ventaTotal)} ` +
-        `no tienen fecha capturada: quedan fuera del analisis mensual y de la antiguedad de cartera. ` +
-        `Se reportan aparte, no se descartan.`,
+      "Partidas sin fecha de entrega",
+      grupo.operaciones === 1
+        ? `1 partida por ${pesos(grupo.ventaTotal)} no tiene fecha capturada: queda fuera del analisis mensual ` +
+            `y de la antiguedad de cartera. Se reporta aparte, no se descarta.`
+        : `${grupo.operaciones} partidas por ${pesos(grupo.ventaTotal)} no tienen fecha capturada: quedan fuera ` +
+            `del analisis mensual y de la antiguedad de cartera. Se reportan aparte, no se descartan.`,
     );
   },
 };
@@ -412,7 +414,7 @@ const carteraSinFecha: ReglaInsight = {
     return crear(
       this,
       "Cartera sin antiguedad determinable",
-      `${pesos(monto)} de saldo corresponden a ventas sin fecha: no se les puede calcular antiguedad ` +
+      `${pesos(monto)} de saldo corresponden a entregas sin fecha: no se les puede calcular antiguedad ` +
         `y no entran en ningun bucket. Folios: ${lista(folios, 5)}.`,
       folios,
     );

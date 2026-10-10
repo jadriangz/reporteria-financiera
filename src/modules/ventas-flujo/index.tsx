@@ -59,7 +59,7 @@ export function ModuloVentasFlujo({ calculos }: { calculos: Calculos }) {
 
       <Seccion
         titulo="Facturado contra cobrado por mes"
-        descripcion="Lo facturado por fecha de venta; lo cobrado por fecha de pago real."
+        descripcion="Lo facturado por fecha de entrega; lo cobrado por fecha de pago real."
       >
         <Grafica
           tipo="barras"
@@ -129,7 +129,7 @@ function Indicadores({ flujo, fuera }: { flujo: Flujo; fuera: FueraDelEje | null
       <TarjetaKPI
         etiqueta="Facturado"
         valor={moneda(i.facturado)}
-        nota={`${entero(total.operaciones)} ${total.operaciones === 1 ? "operación" : "operaciones"}, por fecha de venta.`}
+        nota={`${entero(total.operaciones)} ${total.operaciones === 1 ? "entrega" : "entregas"}, por fecha de entrega.`}
       />
       <TarjetaKPI
         etiqueta="Cobrado"
@@ -189,8 +189,9 @@ const COLUMNAS_MESES: readonly ColumnaTabla<FilaMesFlujo>[] = [
   },
   {
     clave: "operaciones",
-    encabezado: "Operaciones",
+    encabezado: "Entregas",
     alineacion: "derecha",
+    titulo: "Partidas entregadas en el mes. Una venta entregada en dos meses cuenta en los dos.",
     celda: (f) => entero(f.operaciones),
     ancho: "6rem",
   },
@@ -227,6 +228,7 @@ const COLUMNAS_MESES: readonly ColumnaTabla<FilaMesFlujo>[] = [
 
 function TablaMensual({ calculos }: { calculos: Calculos }) {
   const { flujo } = calculos;
+  const { operaciones, partidas } = calculos.resultados.total;
   return (
     <div className="max-w-4xl">
       <TablaCifras
@@ -235,6 +237,19 @@ function TablaMensual({ calculos }: { calculos: Calculos }) {
         filas={filasMensualesFlujo(flujo).map((f) => ({ id: f.clave, datos: f, tono: f.tono }))}
         totales={{ id: "total", datos: totalFlujo(flujo) }}
       />
+      {/*
+        Quien sume la columna y la compare con las operaciones del Resumen no va a
+        cuadrar, y va a creer que hay un error. No lo hay: aqui se cuentan
+        entregas, porque una venta puede entregarse en dos meses y no es de
+        ninguno de los dos. Solo se dice cuando las dos cuentas difieren.
+      */}
+      {partidas !== operaciones && (
+        <Nota>
+          La columna cuenta entregas, no ventas: las {entero(partidas)} entregas del periodo
+          corresponden a {entero(operaciones)} {operaciones === 1 ? "venta" : "ventas"}, porque
+          una venta con varias partidas puede entregarse en fechas distintas.
+        </Nota>
+      )}
     </div>
   );
 }

@@ -272,7 +272,14 @@ export function alcanceDelReporte(
   const incluye: string[] = [];
   const noIncluye: string[] = [];
 
-  incluye.push(`${entero(resultados.total.operaciones)} operaciones de venta computables.`);
+  // Operaciones son folios. Si alguna trae varias partidas, se dicen las dos
+  // cuentas: Producto cuenta partidas, y sin esto las cifras parecerian no cuadrar.
+  const { operaciones, partidas } = resultados.total;
+  incluye.push(
+    partidas === operaciones
+      ? `${entero(operaciones)} operaciones de venta computables.`
+      : `${entero(operaciones)} operaciones de venta computables, en ${entero(partidas)} partidas.`,
+  );
   if (resultados.excluidas.length > 0) {
     const lista = resultados.excluidas
       .map((e) => `${e.venta.folio} (${MOTIVO_CORTO[e.motivo]})`)
@@ -303,7 +310,7 @@ export function alcanceDelReporte(
   }
 
   if (!dataset.ventas.some((v) => v.dias_credito !== null)) {
-    noIncluye.push("Días de crédito pactados: la antigüedad se mide desde la fecha de venta.");
+    noIncluye.push("Días de crédito pactados: la antigüedad se mide desde la fecha de entrega.");
   }
 
   noIncluye.push("Utilidad neta auditada: no hay impuestos, depreciación ni gastos sin capturar.");

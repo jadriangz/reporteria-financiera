@@ -248,7 +248,10 @@ describe("periodo y alcance", () => {
 
   it("el alcance nombra la Demo excluida y lo que si entra en el reporte", () => {
     const a = alcanceDelReporte(fixture, calculos);
-    expect(a.incluye[0]).toBe(`${ESPERADO.operaciones} operaciones de venta computables.`);
+    // Folios y partidas, las dos cuentas: el demo tiene dos ventas con varias partidas.
+    expect(a.incluye[0]).toBe(
+      `${ESPERADO.operaciones} operaciones de venta computables, en ${ESPERADO.partidas} partidas.`,
+    );
     expect(a.incluye.join(" ")).toContain("V-006 (Demo)");
     expect(a.incluye.join(" ")).toContain("30 abonos de cobranza");
     expect(a.incluye.join(" ")).toContain("82 registros de gastos operativos, tal como se capturaron.");

@@ -168,7 +168,7 @@ function GraficaDelResumen({ calculos }: { calculos: Calculos }) {
     return (
       <Seccion
         titulo="Facturado contra cobrado por mes"
-        descripcion="Lo facturado por fecha de venta; lo cobrado por fecha de pago real."
+        descripcion="Lo facturado por fecha de entrega; lo cobrado por fecha de pago real."
         acciones={<EnlaceModulo id="flujo">Ver detalle</EnlaceModulo>}
       >
         <Grafica

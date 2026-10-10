@@ -602,7 +602,7 @@ const margenUniforme: Regla = {
       hallazgo(
         "advertencia",
         "ventas",
-        `El margen es exactamente ${margenPct}% en el ${pct}% de las ventas (${veces} de ${margenes.length}): el costo parece derivado del precio.`,
+        `El margen es exactamente ${margenPct}% en el ${pct}% de las partidas (${veces} de ${margenes.length}): el costo parece derivado del precio.`,
         {
           campo: "costo_unitario",
           accion: `Verifique que costo_unitario sea el costo real de cada equipo y no un porcentaje aplicado al precio.`,
