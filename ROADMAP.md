@@ -94,7 +94,14 @@ Decidido el 2026-09-14.
 - Cobro, saldo, antigüedad y ticket por folio; utilidad, margen y producto por partida.
 - Venta cruzada por folio como métrica nueva. El attach rate por cliente se conserva.
 
-**Entrada:** producción en 1.1.4.
+- Plantilla v2: mismas columnas, instrucciones nuevas y fórmulas por folio en las columnas
+  calculadas. La v1 se sigue aceptando.
+
+Las viñetas son el resumen. El alcance completo —cabecera y partida, casos límite, niveles de
+cálculo, fixture y por qué la versión es MENOR— está en `docs/decisiones.md` (entradas del
+2026-09-14, serie de partidas) y la especificación en `CLAUDE.md`, «Partidas por folio (v1.2.0)».
+
+**Entrada:** producción en 1.1.4. Cumplida: producción está en 1.1.5 desde el 2026-09-14.
 **Salida:** un archivo con varias partidas por folio carga sin rechazar el folio repetido, y la
 suma de tramos, cobrado más saldo y la utilidad por partida cuadran contra sus totales.
 
@@ -109,7 +116,7 @@ construir la plantilla de Sheets antes obligaría a rehacerla.
 
 - **Desaparece el XML editado a mano como categoría de defecto.** Sheets genera sus propios
   archivos. Con eso se cierran la fragilidad de GOBERNANZA.md §7, la razón por la que no hay
-  generador de plantilla y la deuda de la plantilla v2 sin filas de relleno (§11).
+  generador de plantilla y la deuda del rediseño de la plantilla sin filas de relleno (§11).
 - **La plantilla trae sus propias defensas:** validación de datos por columna, formato
   condicional que señale lo que falta o no cuadra, rangos protegidos en las columnas calculadas y
   hojas de catálogo con búsqueda automática. Es más robusta de lo que Excel permite mantener a

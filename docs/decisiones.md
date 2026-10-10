@@ -771,3 +771,278 @@ el desajuste.
 **Consecuencia.** Verificado el 2026-09-14 en los dos PDF de la corrida de la 1.1.5: el área
 impresa termina en 578.25 pt (758.25 apaisada) y ningún borde gris la pasa. La paginación no se
 movió: 15 hojas con el mismo reparto por módulo.
+
+---
+
+## 2026-09-14 — Serie de partidas (v1.2.0): cómo leer las entradas que siguen
+
+Las once entradas siguientes se **tomaron** el 2026-09-14 y se **escribieron** el 2026-10-10. Entre
+una fecha y otra vivieron en un archivo de memoria fuera del repositorio, que se perdió con un
+formateo; se reconstruyeron de lo que la persona recordaba. La lección está en la última entrada de
+este archivo y en GOBERNANZA.md §9.
+
+Contexto común a todas: el cliente capturó varias filas con el mismo folio sin que nadie se lo
+pidiera, porque una venta real incluye un equipo y sus accesorios. **El modelo estaba mal, no su
+captura.** Describen la versión 1.2.0, que al escribirlas no está implementada: producción sigue en
+1.1.5. La especificación está en CLAUDE.md, «Partidas por folio (v1.2.0)».
+
+Donde una entrada dice «Alternativa descartada: no quedó registrada», es literal: la reconstrucción
+no la trajo, y no se inventa una para llenar el formato.
+
+---
+
+## 2026-09-14 — El folio agrupa partidas dentro de `ventas`, sin hoja nueva
+
+**Contexto.** `folio` era el identificador único de una fila de `ventas`, y eso confundía la
+operación comercial con las partidas que la componen. La regla `folio-duplicado` lo trataba como
+error: «la cobranza no sabría a cuál aplicar».
+
+**Decisión.** El folio pasa a **agrupar** filas dentro de `ventas`: cada fila es una partida, y
+las filas con el mismo folio son una sola operación. **No se agregan campos al contrato**: las
+columnas son las mismas y solo cambia su significado. `folio-duplicado` deja de ser error, porque
+repetir el folio es ahora la forma correcta de capturar una venta con varios productos. Lo que
+queda de esa regla es la validación de cabecera inconsistente (entrada siguiente).
+
+**Alternativa descartada.** Una hoja `partidas` separada. Duplicaría el trabajo de captura y
+obligaría al cliente a cambiar cómo ya trabaja.
+
+**Consecuencia.** La llave `ventas.folio` ←→ `cobranza.folio_venta` no cambia: un abono sigue
+apuntando a un folio, y ya no hay ambigüedad porque se aplica al folio entero (ver «Los pagos se
+aplican en orden de entrega»). `dataset.ventas` sigue siendo una lista de filas; lo que cambia es
+que varias pueden compartir folio.
+
+---
+
+## 2026-09-14 — Cabecera por folio y datos por partida; la cabecera se resuelve al leer
+
+**Contexto.** Si varias filas son una operación, algunas columnas describen la operación y otras
+el producto. Hay que decir cuáles, y qué pasa cuando las filas de un folio no coinciden.
+
+**Decisión.**
+- **Cabecera**, igual en todas las partidas del folio: `cliente`, `dias_credito`, `condicion`,
+  `vendedor`.
+- **Partida**, varía por fila: `linea`, `modelo`, `serie`, `costo_unitario`, `precio_venta`,
+  `comision_pct`, `comision_base`, `fecha`.
+- `cliente` distinto entre partidas del mismo folio es **error** y saca **el folio completo** del
+  dataset, con un mensaje que lista sus filas.
+- `dias_credito`, `condicion` o `vendedor` distintos es **advertencia**: se toma el de la primera
+  partida y se dice cuál se aplicó.
+- La cabecera puede venir **solo en la primera fila** del grupo: las demás heredan, **sin
+  advertencia**. Es una forma válida de capturar.
+- **La herencia y la resolución de cabecera viven en la capa de parseo** —esquema y validación—,
+  no en el motor. El motor recibe cada partida con su cabecera ya resuelta. Confirmado el
+  2026-10-10: la reconstrucción decía «el motor acepta», y eso habría sido el quinto caso de la
+  restricción «toda coerción vive en el esquema» de CLAUDE.md.
+
+**Alternativa descartada.** Resolver la cabecera en el motor. Lo pondría a interpretar una celda
+vacía como «heredar», que es leer valores crudos. Además no alcanza: hoy `VentaSchema` exige
+`cliente`, así que una fila que lo deja vacío se excluye antes de llegar al motor. Ejecutado el
+2026-10-10 con datos inventados: «La fila no cumple el formato esperado y fue excluida».
+
+**Consecuencia.** La resolución necesita ver el grupo, y el esquema de hoy juzga fila por fila:
+la sesión de implementación decide cómo se ordenan las dos cosas dentro de `src/lib/parse/`.
+Quedan sin decidir, y se registran como huecos: qué se aplica si la primera fila trae vacío un
+dato de cabecera que una fila posterior sí trae, y qué pasa con los abonos de un folio excluido
+por `cliente` en conflicto (hoy un abono sin venta es error de cobranza huérfana).
+
+---
+
+## 2026-09-14 — La fecha de una partida es su fecha de entrega
+
+**Contexto.** `ventas.fecha` no decía de qué era la fecha. Con un folio de varias filas la
+pregunta deja de ser retórica: ¿una fecha por operación o una por partida?
+
+**Decisión.** Es la **fecha de entrega**, confirmado con el cliente. Cada partida tiene la suya y
+son legítimamente distintas: puede entregar el equipo un día y los accesorios otro. Por eso
+`fecha` es dato de partida y no de cabecera.
+
+**Alternativa descartada.** No quedó registrada.
+
+**Consecuencia.** Los ingresos por mes se agrupan por la fecha de cada partida, y un folio puede
+abarcar dos meses. `dias_credito` cuenta desde la entrega de cada partida. Las definiciones de
+CLAUDE.md que hoy dicen `fecha_venta` pasan a leerse como la fecha de entrega de la partida.
+
+---
+
+## 2026-09-14 — Los pagos se aplican a las partidas en orden de entrega
+
+**Contexto.** Un abono apunta a un folio, no a una partida. Para envejecer la cartera hay que
+decidir qué partidas quedan pagadas y cuáles pendientes.
+
+**Decisión.** Los pagos del folio se aplican a sus partidas **en orden de entrega, la más antigua
+primero**. Lo que queda sin pagar es lo último entregado, y la cartera envejece desde ahí. Es lo
+que hace cualquier ERP. Casos límite, todos decididos:
+
+- **Sobrecobro con varias entregas:** el exceso queda como saldo negativo en la última partida
+  entregada, en su tramo.
+- **Partida sin fecha dentro de un folio:** se ordena al final; lo pendiente en ella va al tramo
+  «sin fecha».
+- **Partida Demo en un folio con ventas:** se excluye como hoy, y los pagos del folio se aplican
+  solo a las partidas que cuentan, con advertencia.
+- **Dos partidas con la misma fecha:** decide el orden de las filas.
+
+**Alternativa descartada.** No quedó registrada.
+
+**Consecuencia.** El saldo de un folio puede caer en **dos tramos** de antigüedad si lo pendiente
+abarca partidas de fechas distintas. Es correcto y más preciso. Los invariantes se mantienen:
+`Σ buckets === saldoTotal` y `cobrado + saldo === venta`. La decisión del 2026-09-11 sobre
+sobrecobros sigue en pie; ahora dice además en qué partida cae el negativo.
+
+---
+
+## 2026-09-14 — Un pago anterior a la primera entrega es un anticipo, y es información
+
+**Contexto.** Con fecha de entrega por partida aparece un caso que antes no se distinguía: el
+abono que llega antes de que se entregue nada.
+
+**Decisión.** Un pago con fecha anterior a la primera entrega de su folio es un **anticipo** y se
+clasifica como **info**, no advertencia: en este negocio es lo normal. Advertencia solo cuando el
+hueco entre el pago y la entrega sea implausible. Métrica nueva: **proporción de la cobranza que
+son anticipos**, que mide la necesidad de capital de trabajo de un negocio que importa.
+
+**Alternativa descartada.** Advertencia para todo anticipo. Llenaría el panel con lo habitual y
+enseñaría a ignorarlo.
+
+**Consecuencia.** **El umbral de «implausible» queda por definir** en la sesión de implementación,
+justificado con el negocio y con datos inventados, nunca con cifras del cliente (GOBERNANZA.md
+§10). Tampoco está escrito sobre qué base se mide la proporción ni qué se hace con un abono sin
+`fecha_pago` o con un folio sin ninguna fecha de entrega: son huecos de esa sesión.
+
+---
+
+## 2026-09-14 — Qué se calcula por folio y qué por partida
+
+**Contexto.** Con dos niveles, cada cifra del reporte tiene que decir a cuál pertenece.
+
+**Decisión.**
+- **Por folio:** cobrado, saldo, antigüedad, buckets, provisión, DSO y ticket promedio.
+- **Por partida:** utilidad bruta, margen, comisión, rendimiento por modelo y por línea, e
+  ingreso por mes.
+- **«Operaciones» pasa a significar folios, no filas**, también en la columna de Clientes.
+- En Ventas y flujo la cuenta por mes cuenta **entregas**, porque un folio puede abarcar dos
+  meses.
+- **Interfaz:** Cobranza y Ventas listan folios, expandibles a sus partidas con `FilaExpandible`.
+  Producto lista partidas, sin cambio de forma. Clientes y Estado de resultados no cambian de
+  forma.
+
+**Alternativa descartada.** No quedó registrada.
+
+**Consecuencia.** `operaciones` y `ticket_promedio` cambian de unidad. En un archivo con una fila
+por folio dan lo mismo que antes (ver la entrada de la versión). «Antigüedad por folio» se lee
+junto con la entrada anterior: el cobro y el saldo son del folio, y lo pendiente envejece según la
+partida donde quedó.
+
+---
+
+## 2026-09-14 — El attach rate por cliente se conserva; la venta cruzada por folio es métrica nueva
+
+**Contexto.** Con partidas se puede medir la venta cruzada dentro de una misma operación: folios
+con equipo y accesorio sobre folios con equipo. Lo natural parecía sustituir el attach rate por
+cliente.
+
+**Decisión.** El attach rate **por cliente** se conserva sin cambio. La venta cruzada **por
+folio** entra como métrica nueva, y **solo se juzga si hay al menos un folio con varias
+partidas**.
+
+**Alternativa descartada.** Sustituir el attach rate por la medición por folio. Un archivo
+capturado como enseñaba la plantilla hasta hoy —una fila por producto— daría 0% y dispararía
+«oportunidad de venta cruzada» contra todos. Es el mismo error de «ausencia de dato no es dato en
+cero» que ya se corrigió dos veces (cartera sin abonos, y 2026-09-11, accesorios).
+
+**Consecuencia.** Es lo que sostiene la versión MENOR: ninguna métrica existente cambia de
+criterio. Con el demo de la 1.2.0 la métrica nueva vale 2 de 13. Quedan sin decidir el umbral y el
+texto del hallazgo que la juzga.
+
+---
+
+## 2026-09-14 — Plantilla v2: mismas columnas, fórmulas por folio, y la v1 se sigue aceptando
+
+**Contexto.** GOBERNANZA.md §7 paso 6 obliga a versionar la plantilla cuando cambia el contrato.
+Las columnas no cambian, pero sí las instrucciones y las fórmulas de las columnas calculadas.
+
+**Decisión.** La plantilla se renombra a `Plantilla_Captura_Reporteria_v2.xlsx`. La v1 **se sigue
+aceptando**: tiene las mismas columnas, y un folio por fila sigue siendo válido. La aplicación
+ofrece solo la v2 para descargar y **no las distingue por el nombre del archivo** —el cliente lo
+va a renombrar—; si hace falta saber cuál es, se deduce del contenido. En la v2 se escriben **por
+primera vez** las fórmulas de las filas 3–301, ya a nivel de folio y con el rango `$B$3:$B$1000`.
+La plantilla descargable nunca las tuvo fuera de la fila de ejemplo.
+
+**Alternativa descartada.** No quedó registrada.
+
+**Consecuencia.** **El nombre «plantilla v2» cambia de dueño.** En la entrada del 2026-09-13
+(«La plantilla se edita a mano»), en GOBERNANZA.md §11 y en ROADMAP.md (v1.3) designaba el
+rediseño con hojas como tablas de Excel. Desde aquí ese es «el rediseño de la plantilla», y v2 es
+esta. Aquella entrada dio razones para no hacer a mano una plantilla nueva; esta sí se edita a
+mano sobre su XML, con cerca de 1,200 fórmulas, la misma clase de cirugía que dejó 1,297 filas sin
+cerrar. La cerca es la prueba de XML bien formado de `plantilla.test.ts`. Queda sin decidir qué
+muestran `cobrado` y `saldo` en la segunda partida de un folio.
+
+---
+
+## 2026-09-14 — Los seis pasos de §7 van en orden estricto solo cuando cambian columnas
+
+**Contexto.** GOBERNANZA.md §7 fija seis pasos «en este orden», con `schema.ts` y la plantilla
+primero. En la v1.2.0 no cambia ninguna columna: cambia lo que significan.
+
+**Decisión.** El orden es **obligatorio cuando cambian columnas** y **flexible cuando solo cambia
+el significado**. En esta fase se hace CLAUDE.md, después el motor, y después plantilla y
+exportación.
+
+**Alternativa descartada.** Mantener el orden estricto siempre. Obligaría a editar la plantilla
+antes de tener el motor que define sus fórmulas.
+
+**Consecuencia.** El orden estricto existe para que esquema y plantilla no se desincronicen
+mientras tanto. Aquí no pueden: los encabezados son los mismos y la prueba de encabezados sigue
+pasando en cada paso intermedio. Anotado en GOBERNANZA.md §7.
+
+---
+
+## 2026-09-14 — La v1.2.0 es MENOR: quitar la unicidad del folio es relajar, no romper
+
+**Contexto.** `operaciones` y `ticket_promedio` cambian de unidad, de filas a folios, y
+GOBERNANZA.md §3 pide MAYOR cuando cambia una definición de cálculo que altera cifras ya
+reportadas. Hasta el 2026-10-10 nadie había argumentado por qué la fase es MENOR.
+
+**Decisión.** MENOR, 1.2.0. Quitar la unicidad del folio es una relajación. **Ningún archivo que
+hoy se procesa correctamente cambia una sola cifra**: si cada folio tiene una partida, la cuenta
+de folios es igual a la de filas y `operaciones` y `ticket_promedio` dan lo mismo. Los únicos
+archivos cuyas cifras cambian son los que hoy traen folios repetidos, y esos hoy están mal
+calculados.
+
+**Alternativa descartada.** MAYOR, por el cambio de unidad de `operaciones` y `ticket_promedio`.
+La unidad solo cambia en archivos que hoy no se calculan bien.
+
+**Consecuencia.** Un folio repetido hoy **no bloquea nada**: el error se anuncia, pero las filas
+entran al motor y cada una resta todo lo cobrado del folio, así que ese cobrado se cuenta una vez
+por fila. Ejecutado el 2026-10-10 sobre la 1.1.5 con datos inventados: un folio de dos filas,
+$100,000 y $10,000, con un abono de $60,000, da cobrado $120,000 y saldo −$10,000; lo correcto es
+$60,000 y $50,000. Quien tenga folios repetidos vio cifras mal calculadas, no solo marcadas con
+error, y cuando cambien con la 1.2.0 tiene que entender que las nuevas son las correctas: va a
+`docs/notas-version.md`. §3 no tiene todavía este caso escrito, como sí tiene el de la 1.1.1.
+
+---
+
+## 2026-09-14 — El demo gana dos folios con varias partidas, y tres cifras cambian de unidad
+
+**Contexto.** El fixture tiene que ejercitar el modelo nuevo sin perder los casos límite que ya
+cubre, y sus cifras de referencia no se ajustan para que pase una prueba (GOBERNANZA.md §1).
+
+**Decisión.** Dos uniones en el demo: **V-008 con V-009** y **V-015 con V-016**. En V-009 se deja
+vacía `condicion`; V-016 conserva «Contado» contra una cabecera que dice «Credito», a propósito:
+así el demo ejercita la cabecera heredada y la cabecera en conflicto. Los casos de pagos en orden
+de entrega y de anticipos se prueban con datos armados en código, como `lineaDemo.test.ts`, **no
+añadiendo ventas al demo**. El anticipo se crea adelantando la fecha de un pago existente, lo que
+mueve solo el cobro por mes de Ventas y flujo.
+
+**Alternativa descartada.** Unir también V-017 con V-018. Dentro del folio el sobrecobro de V-018
+se netea contra el saldo de V-017 y el caso límite del fixture desaparece.
+
+**Consecuencia.** No se mueven `venta_total`, `costo_total`, `utilidad_bruta`, `cobrado` ni
+`saldo`. Cambian por definición `operaciones` (24 → 22), `ticket_promedio` ($204,404.55) y aparece
+la venta cruzada por folio (2 de 13). No es ajustar una cifra: la métrica cambió de unidad, y cada
+una se explica en `docs/notas-version.md` con qué medía antes y qué mide ahora. Comprobado el
+2026-10-10 contra el archivo de demostración, por aritmética y sin ejecutar el motor nuevo, que no
+existe: 4,496,900 / 22 = 204,404.55; hay 13 folios con equipo y 2 traen accesorio; cada pareja
+comparte cliente, fecha y vendedor, así que su saldo cae en el mismo tramo que hoy y el aging no
+se mueve; el attach rate por cliente sigue en 3 de 10. Los abonos P-012 y P-021 apuntan hoy a
+V-009 y V-016 y hay que reapuntarlos al folio que sobreviva.

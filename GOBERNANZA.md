@@ -115,6 +115,18 @@ la escribió así ve bajar su costo y su utilidad al actualizar. Es PARCHE: la d
 misma, y la cifra anterior estaba mal respecto de ella. El arreglo sí se anuncia, con la
 versión que lo explica.
 
+**Relajar una restricción del contrato es MENOR cuando ningún archivo hoy válido cambia una
+cifra.** Es el caso complementario: allá el código no cumplía la definición; aquí la definición se
+amplía para aceptar más, sin mover nada de lo que ya se calculaba bien.
+
+*Caso (1.2.0).* El folio deja de ser único por fila y pasa a agrupar partidas, y con eso
+`operaciones` y `ticket_promedio` se cuentan por folio y no por fila. Leído solo, es un cambio de
+definición. Pero en un archivo con un folio por fila —todo archivo que hoy carga sin error— la
+cuenta de folios es la de filas, y no cambia ninguna cifra. Los únicos archivos que cambian son
+los que traen folios repetidos, y esos hoy se calculan mal: el error se anuncia, las filas entran
+igual al motor y lo cobrado se cuenta una vez por fila. Es MENOR, y se anuncia igual, para que
+quien vio esas cifras sepa que las nuevas son las correctas (`docs/decisiones.md`, 2026-09-14).
+
 La versión vive en `package.json` y se muestra en el pie de la aplicación y en el PDF
 exportado. Un reporte sin versión no es auditable.
 
@@ -314,6 +326,12 @@ raro.
 5. Actualizar `CLAUDE.md`
 6. **Versionar la plantilla** (`_v2.xlsx`) y decidir si la app soporta ambas
 
+**El orden es obligatorio cuando cambian columnas, y flexible cuando solo cambia el significado.**
+Existe para que esquema y plantilla no se desincronicen mientras se trabaja. Si los encabezados no
+cambian, no pueden desincronizarse y la prueba de encabezados sigue pasando en cada paso
+intermedio. Caso: la v1.2.0 cambia lo que significa `folio` sin tocar ninguna columna, y va
+`CLAUDE.md`, motor, y después plantilla y exportación (`docs/decisiones.md`, 2026-09-14).
+
 **No hay generador de la plantilla, y es a propósito.** La versión gratuita de SheetJS escribe
 valores, fórmulas, formatos numéricos y anchos, pero no estilos de celda, listas desplegables ni
 paneles fijos. La hoja INSTRUCCIONES depende de esa presentación: le dice al cliente «solo escriba
@@ -415,8 +433,10 @@ Priorizado. Lo de arriba entra primero.
   aceptan sin aviso: «-500» se lee como −$500. Los importes negativos de `cobranza.monto` se
   quedan sin aviso a propósito, porque pueden ser notas de crédito. La severidad se decide al
   implementarlo, con el criterio de consecuencia (`docs/decisiones.md`, 2026-09-14).
-- Plantilla v2 con hojas como tablas de Excel, para eliminar las filas de relleno y el
-  renglón de nota que el lector tiene que descartar. Las fórmulas de las columnas calculadas
+- **Rediseño de la plantilla** con hojas como tablas de Excel, para eliminar las filas de relleno
+  y el renglón de nota que el lector tiene que descartar. Hasta el 2026-10-10 este punto se
+  llamaba «plantilla v2»; ese nombre es ahora de la plantilla de partidas de la v1.2.0
+  (`docs/decisiones.md`, 2026-09-14), que conserva las hojas como están. Las fórmulas de las columnas calculadas
   (`utilidad_bruta`, `margen_pct`, `cobrado`, `saldo`) hoy solo están en la fila de ejemplo,
   desde v1.0.0: se escriben en v1.2, ya a nivel de folio, con el rango `cobranza!$B$3:$B$1000`
   de la fila de ejemplo y del demo, y desaparecen con Google Sheets en v1.3 (ROADMAP.md §3).
