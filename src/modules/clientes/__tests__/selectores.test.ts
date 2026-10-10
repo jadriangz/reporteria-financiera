@@ -10,6 +10,7 @@ import {
 import { CORTE, ESPERADO, cargarFixture } from "../../../lib/calc/__tests__/fixture";
 import { type Cobranza, type Dataset, ParametrosSchema, type Venta } from "../../../lib/schema";
 import { filasClientes, operacionesDe, tonoDeSaldo, ventaCruzada } from "../selectores";
+import { sufijoOtras } from "../../compartido/rotuloFolio";
 
 function venta(p: Partial<Venta> & Pick<Venta, "folio">): Venta {
   return {
@@ -118,7 +119,7 @@ describe("tono del saldo", () => {
 describe("operaciones de un cliente", () => {
   it("suman el ingreso y el saldo del cliente, para cada cliente del archivo", () => {
     for (const c of clientes.detalle) {
-      const ops = operacionesDe(c.clave, cartera, fixture, true);
+      const ops = operacionesDe(c.clave, cartera, true);
       expect(ops.length, c.nombre).toBe(c.operaciones);
       expect(ops.reduce((t, o) => t + o.precioVenta, 0), c.nombre).toBe(c.ingreso);
       expect(ops.reduce((t, o) => t + o.saldo, 0), c.nombre).toBe(c.saldo);
@@ -127,20 +128,23 @@ describe("operaciones de un cliente", () => {
 
   it("une linea y modelo, y va en orden cronologico", () => {
     const coop = clientes.detalle.find((c) => c.nombre === "Cooperativa Rio Verde");
-    const ops = operacionesDe(coop?.clave ?? "", cartera, fixture, true);
+    const ops = operacionesDe(coop?.clave ?? "", cartera, true);
     // Dos operaciones: V-015 es un folio con equipo y accesorio (hasta la 1.1.5
     // eran V-015 y V-016), y V-024 es otra compra.
     expect(ops.map((o) => o.folio)).toEqual(["V-015", "V-024"]);
     expect(ops.map((o) => o.precioVenta)).toEqual([53_150_000, 1_150_000]);
-    // Linea y modelo se afirman solo del folio de una partida. Que rotulo lleva
-    // un folio con varias es de la sesion de interfaz de la v1.2.0: hoy el
-    // selector le pone los de una sola de sus partidas.
-    expect([ops[1]?.linea, ops[1]?.modelo]).toEqual(["Accesorios", "Bateria BX-30"]);
+    // V-015 trae un AX-100 de $520,000 y una bateria de $11,500: se rotula con
+    // su partida de mayor precio, y dice que trae una mas. Mientras el rotulo
+    // tomaba una partida cualquiera y callaba la otra, esta prueba estuvo aflojada.
+    expect(ops.map((o) => [o.folio, o.linea, o.modelo])).toEqual([
+      ["V-015", `Equipo${sufijoOtras(1)}`, `AX-100${sufijoOtras(1)}`],
+      ["V-024", "Accesorios", "Bateria BX-30"],
+    ]);
   });
 
   it("el sobrecobro de una operacion se marca en advertencia, no en riesgo", () => {
     const lorenzo = clientes.detalle.find((c) => c.nombre === "Agricola San Lorenzo");
-    const ops = operacionesDe(lorenzo?.clave ?? "", cartera, fixture, true);
+    const ops = operacionesDe(lorenzo?.clave ?? "", cartera, true);
     const sobre = ops.find((o) => o.folio === "V-018");
     expect(sobre?.saldo).toBe(-20_000);
     expect(sobre?.tonoSaldo).toBe("advertencia");
@@ -154,13 +158,13 @@ describe("operaciones de un cliente", () => {
       ],
     });
     const c = calcularClientes(d);
-    const ops = operacionesDe(c.detalle[0]?.clave ?? "", calcularCartera(d, { fechaCorte: CORTE }), d, true);
+    const ops = operacionesDe(c.detalle[0]?.clave ?? "", calcularCartera(d, { fechaCorte: CORTE }), true);
     expect(c.detalle).toHaveLength(1);
     expect(ops).toHaveLength(2);
   });
 
   it("la Demo no aparece como operacion de nadie", () => {
-    const todas = clientes.detalle.flatMap((c) => operacionesDe(c.clave, cartera, fixture, true));
+    const todas = clientes.detalle.flatMap((c) => operacionesDe(c.clave, cartera, true));
     expect(todas.map((o) => o.folio)).not.toContain("V-006");
     expect(todas).toHaveLength(ESPERADO.operaciones);
   });
@@ -175,7 +179,7 @@ describe("operaciones de un cliente", () => {
       cobranza: [abono({ folio_venta: "V-pagado", monto: 50_000_000 })],
     });
     const c = calcularClientes(d);
-    const ops = operacionesDe(c.detalle[0]?.clave ?? "", calcularCartera(d, { fechaCorte: CORTE }), d, true);
+    const ops = operacionesDe(c.detalle[0]?.clave ?? "", calcularCartera(d, { fechaCorte: CORTE }), true);
     expect(Object.fromEntries(ops.map((o) => [o.folio, o.tonoSaldo]))).toEqual({
       "V-viejo": "riesgo",
       "V-pagado": "neutro",

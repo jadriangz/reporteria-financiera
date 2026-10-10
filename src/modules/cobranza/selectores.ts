@@ -10,6 +10,7 @@ import {
   divSegura,
 } from "../../lib/calc";
 import { type Cobranza, type Dataset, norm } from "../../lib/schema";
+import { rotuloDeFolio } from "../compartido/rotuloFolio";
 
 /**
  * Logica de PRESENTACION del modulo de cobranza.
@@ -81,7 +82,8 @@ export type BaseMedicion = "vencimiento" | "antiguedad" | "mixta" | "ninguna";
  * saber cual esta viendo, y en un archivo pueden convivir las dos.
  */
 export function baseDeMedicion(cartera: Cartera): BaseMedicion {
-  const conSaldo = cartera.detalle.filter((s) => s.saldo > 0 && s.fecha !== null);
+  // Por partida: es la que tiene fecha de entrega y la que envejece.
+  const conSaldo = cartera.detalle.flatMap((s) => s.partidas).filter((p) => p.saldo > 0 && p.fecha !== null);
   if (conSaldo.length === 0) return "ninguna";
   const vencido = conSaldo.some((s) => s.base === "vencido");
   const antiguedad = conSaldo.some((s) => s.base === "antiguedad");
@@ -93,28 +95,28 @@ export const TEXTO_BASE: Readonly<Record<BaseMedicion, string>> = {
   vencimiento:
     "La antigüedad se mide desde el vencimiento pactado: los días mostrados son días VENCIDOS.",
   antiguedad:
-    "Ninguna venta con saldo tiene días de crédito capturados, así que la antigüedad se mide desde la fecha de la venta, no desde un vencimiento.",
+    "Ninguna venta con saldo tiene días de crédito capturados, así que la antigüedad se mide desde la fecha de entrega, no desde un vencimiento.",
   mixta:
-    "Medición mixta: las ventas con días de crédito se miden desde su vencimiento y el resto desde la fecha de venta. La columna «base» lo indica fila por fila.",
+    "Medición mixta: las ventas con días de crédito se miden desde su vencimiento y el resto desde la fecha de entrega. La columna «base» lo indica fila por fila.",
   ninguna: "No hay saldos con fecha que permitan medir antigüedad.",
 };
 
 // --------------------------- Saldos pendientes ---------------------------
 
 /**
- * Fila de la tabla de saldos.
+ * Fila de la tabla de saldos: un FOLIO, con el rotulo de lo que se vendio.
  *
- * `SaldoVenta` no trae el modelo porque al motor no le hace falta para calcular
- * cartera. Se une aqui desde el dataset, que es trabajo de presentacion: no se
- * recalcula ningun importe.
+ * `modelo` es el de su partida principal y dice cuantas mas trae («AX-55 + 1
+ * más»): ver `rotuloDeFolio`. El saldo repartido por tramo viene del motor, en
+ * `tramos`; aqui no se recalcula ningun importe.
  */
 export interface FilaSaldo extends SaldoVenta {
   readonly modelo: string | null;
 }
 
 /**
- * Filas de la tabla de saldos: solo las que tienen saldo distinto de cero,
- * ordenadas por dias descendente.
+ * Filas de la tabla de saldos: un renglon por folio, solo los que tienen saldo
+ * distinto de cero, ordenados por los dias de su pendiente mas antiguo.
  *
  * Un saldo NEGATIVO (mas cobrado que el precio) se conserva y se muestra: es un
  * error de captura o un anticipo, y esconderlo o ponerlo en cero le quita al
@@ -122,16 +124,10 @@ export interface FilaSaldo extends SaldoVenta {
  *
  * Una venta sin fecha entra con `dias: null`, que la tabla pinta como raya.
  */
-export function saldosPendientes(
-  cartera: Cartera,
-  dataset: Dataset | null,
-): readonly FilaSaldo[] {
-  const modeloDe = new Map<string, string>();
-  for (const v of dataset?.ventas ?? []) modeloDe.set(v.folio, v.modelo);
-
+export function saldosPendientes(cartera: Cartera): readonly FilaSaldo[] {
   return cartera.detalle
     .filter((s) => s.saldo !== 0)
-    .map((s): FilaSaldo => Object.assign({ modelo: modeloDe.get(s.folio) ?? null }, s))
+    .map((s): FilaSaldo => Object.assign({ modelo: rotuloDeFolio(s.partidas).modelo }, s))
     .sort((a, b) => {
       // Sin fecha al final: no tienen antiguedad con la que competir.
       if (a.dias === null && b.dias === null) return a.folio.localeCompare(b.folio);

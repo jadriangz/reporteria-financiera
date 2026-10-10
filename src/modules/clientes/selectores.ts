@@ -10,8 +10,9 @@ import {
   type SaldoVenta,
   divSegura,
 } from "../../lib/calc";
-import { type Dataset, norm } from "../../lib/schema";
+import { norm } from "../../lib/schema";
 import { exposicionPorCliente, tonoDeBucket } from "../cobranza/selectores";
+import { rotuloDeFolio } from "../compartido/rotuloFolio";
 
 /**
  * Logica de PRESENTACION del modulo de clientes.
@@ -78,8 +79,11 @@ export interface OperacionCliente extends SaldoVenta {
 }
 
 /**
- * Las ventas computables de un cliente, en orden cronologico (sin fecha al
- * final), con linea y modelo unidos desde el dataset.
+ * Las operaciones de un cliente —un renglon por FOLIO—, en orden cronologico
+ * (sin fecha al final).
+ *
+ * Linea y modelo son el rotulo del folio: los de su partida principal, diciendo
+ * cuantas mas trae («Equipo + 1 más», «AX-100 + 1 más»). Ver `rotuloDeFolio`.
  *
  * Salen de `cartera.detalle`, que ya trae la Demo excluida y el saldo del
  * motor: la suma de estas operaciones reproduce el ingreso y el saldo del
@@ -88,23 +92,21 @@ export interface OperacionCliente extends SaldoVenta {
 export function operacionesDe(
   clave: string,
   cartera: Cartera,
-  dataset: Dataset | null,
   conCobranza: boolean,
 ): readonly OperacionCliente[] {
-  const venta = new Map((dataset?.ventas ?? []).map((v) => [v.folio, v]));
   return cartera.detalle
     .filter((s) => norm(s.cliente) === clave)
-    .map(
-      (s): OperacionCliente =>
-        Object.assign(
-          {
-            linea: venta.get(s.folio)?.linea ?? null,
-            modelo: venta.get(s.folio)?.modelo ?? null,
-            tonoSaldo: tonoDeSaldo(s.saldo, s.saldo > 0 ? s.bucket : null, conCobranza),
-          },
-          s,
-        ),
-    )
+    .map((s): OperacionCliente => {
+      const rotulo = rotuloDeFolio(s.partidas);
+      return Object.assign(
+        {
+          linea: rotulo.linea,
+          modelo: rotulo.modelo,
+          tonoSaldo: tonoDeSaldo(s.saldo, s.saldo > 0 ? s.bucket : null, conCobranza),
+        },
+        s,
+      );
+    })
     .sort((a, b) => {
       if (a.fecha === null && b.fecha === null) return a.folio.localeCompare(b.folio);
       if (a.fecha === null) return 1;

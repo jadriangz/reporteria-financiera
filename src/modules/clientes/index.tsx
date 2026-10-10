@@ -7,7 +7,7 @@ import { Cifra, Seccion } from "../../components/ui/primitivas";
 import type { ColumnaTabla } from "../../components/ui/tabla";
 import { UMBRAL_ATTACH, UMBRAL_CONCENTRACION_TOP5 } from "../../lib/calc";
 import { entero, fecha as fmtFecha, moneda, nulo, porcentaje } from "../../lib/format";
-import { type Calculos, useAppStore } from "../../store/useAppStore";
+import type { Calculos } from "../../store/useAppStore";
 import { ETIQUETA_BUCKET } from "../cobranza/selectores";
 import {
   type FilaCliente,
@@ -157,7 +157,6 @@ const COLUMNAS_CLIENTES: readonly ColumnaTabla<FilaCliente>[] = [
 ];
 
 function TablaClientes({ calculos }: { calculos: Calculos }) {
-  const dataset = useAppStore((s) => s.dataset);
   const conCobranza = calculos.capacidades.cobranza;
   const filas = useMemo(
     () => filasClientes(calculos.clientes, calculos.cartera, conCobranza),
@@ -173,7 +172,7 @@ function TablaClientes({ calculos }: { calculos: Calculos }) {
         filas={filas.map((c) => ({ id: c.clave, datos: c }))}
         ordenInicial={{ clave: "ingreso", direccion: "desc" }}
         expandir={(c) => (
-          <Operaciones operaciones={operacionesDe(c.clave, calculos.cartera, dataset, conCobranza)} />
+          <Operaciones operaciones={operacionesDe(c.clave, calculos.cartera, conCobranza)} />
         )}
         vacio="No hay ventas computables."
       />
