@@ -11,6 +11,53 @@ La más reciente va arriba. El razonamiento de cada decisión está en `docs/dec
 
 ---
 
+## 1.2.0 — MENOR — en preparación, sin publicar
+
+**Borrador.** Producción sigue en 1.1.5 y nada de esto ha cambiado todavía. Se escribe antes para
+que lo decidido no dependa de la memoria de nadie (GOBERNANZA.md, sección 9); la sesión que
+implemente la versión lo completa y le pone fecha.
+
+### Qué estaba mal
+
+**Una venta con varios productos no se podía capturar bien.** La aplicación exigía un folio
+distinto por fila. Si repetía el folio para anotar un equipo y sus accesorios, el panel marcaba
+«El folio ya se usó» como error, **pero las filas se calculaban igual, y mal**: cada fila restaba
+todo lo cobrado del folio, así que ese cobro se contaba una vez por fila.
+
+Ejemplo con datos inventados, tal como lo calcula la 1.1.5: un folio con dos filas, de $100,000 y
+$10,000, y un solo abono de $60,000.
+
+| | La 1.1.5 mostraba | Lo correcto |
+|---|---|---|
+| Cobrado | $120,000 | $60,000 |
+| Saldo | −$10,000 | $50,000 |
+
+Si su archivo tenía folios repetidos, **las cifras que vio no solo estaban marcadas con un error:
+estaban mal calculadas.** Cuando cambien con esta versión, las nuevas son las correctas.
+
+### Qué cambia si ya usaba la aplicación
+
+- **Repetir el folio es la forma correcta de capturar una venta con varios productos.** Cada fila
+  es una partida, con su producto, su precio y su fecha de entrega. Ya no es un error.
+- **«Operaciones» cuenta ventas, no filas.** Antes contaba filas de la hoja `ventas`; ahora
+  cuenta folios. Con un folio por fila es el mismo número.
+- **El ticket promedio es por venta.** Antes era la venta total entre el número de filas; ahora,
+  entre el número de folios. Con un folio por fila es el mismo número.
+- **Venta cruzada por folio**, métrica nueva: de las ventas con equipo, cuántas llevaron
+  accesorio en la misma operación. Solo aparece si su archivo tiene algún folio con varias
+  partidas. El attach rate por cliente no cambia.
+
+### ¿Pueden moverse sus cifras?
+
+**Si cada folio de su archivo ocupa una sola fila, no se mueve ninguna.** Solo cambian los
+archivos con folios repetidos, que es donde el cálculo anterior estaba mal:
+
+| Si su archivo tenía… | Antes | Ahora | Qué puede moverse |
+|---|---|---|---|
+| Un folio repetido en varias filas | error anunciado; lo cobrado se contaba una vez por fila | una venta con varias partidas | cobrado, saldo, antigüedad, provisión, DSO, operaciones, ticket promedio |
+
+---
+
 ## 1.1.5 — PARCHE — 2026-09-14
 
 Defectos de presentación, y una instrucción de la plantilla que prometía algo que no hace.

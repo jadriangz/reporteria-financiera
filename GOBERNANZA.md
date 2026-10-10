@@ -115,6 +115,18 @@ la escribió así ve bajar su costo y su utilidad al actualizar. Es PARCHE: la d
 misma, y la cifra anterior estaba mal respecto de ella. El arreglo sí se anuncia, con la
 versión que lo explica.
 
+**Relajar una restricción del contrato es MENOR cuando ningún archivo hoy válido cambia una
+cifra.** Es el caso complementario: allá el código no cumplía la definición; aquí la definición se
+amplía para aceptar más, sin mover nada de lo que ya se calculaba bien.
+
+*Caso (1.2.0).* El folio deja de ser único por fila y pasa a agrupar partidas, y con eso
+`operaciones` y `ticket_promedio` se cuentan por folio y no por fila. Leído solo, es un cambio de
+definición. Pero en un archivo con un folio por fila —todo archivo que hoy carga sin error— la
+cuenta de folios es la de filas, y no cambia ninguna cifra. Los únicos archivos que cambian son
+los que traen folios repetidos, y esos hoy se calculan mal: el error se anuncia, las filas entran
+igual al motor y lo cobrado se cuenta una vez por fila. Es MENOR, y se anuncia igual, para que
+quien vio esas cifras sepa que las nuevas son las correctas (`docs/decisiones.md`, 2026-09-14).
+
 La versión vive en `package.json` y se muestra en el pie de la aplicación y en el PDF
 exportado. Un reporte sin versión no es auditable.
 
@@ -314,6 +326,12 @@ raro.
 5. Actualizar `CLAUDE.md`
 6. **Versionar la plantilla** (`_v2.xlsx`) y decidir si la app soporta ambas
 
+**El orden es obligatorio cuando cambian columnas, y flexible cuando solo cambia el significado.**
+Existe para que esquema y plantilla no se desincronicen mientras se trabaja. Si los encabezados no
+cambian, no pueden desincronizarse y la prueba de encabezados sigue pasando en cada paso
+intermedio. Caso: la v1.2.0 cambia lo que significa `folio` sin tocar ninguna columna, y va
+`CLAUDE.md`, motor, y después plantilla y exportación (`docs/decisiones.md`, 2026-09-14).
+
 **No hay generador de la plantilla, y es a propósito.** La versión gratuita de SheetJS escribe
 valores, fórmulas, formatos numéricos y anchos, pero no estilos de celda, listas desplegables ni
 paneles fijos. La hoja INSTRUCCIONES depende de esa presentación: le dice al cliente «solo escriba
@@ -366,6 +384,18 @@ noción de rango, que es su razón de existir.
 Sin esto, en seis meses nadie recuerda por qué el motor conserva las filas `Demo` y
 alguien las borra "para simplificar".
 
+**Una decisión que no está en `docs/decisiones.md` no existe.** Se escribe en el repositorio **en
+la misma sesión en que se toma**, no al implementarla. Si todavía no está implementada, la entrada
+lo dice.
+
+*Caso (v1.2.0).* El alcance completo de la fase de partidas —once decisiones, con sus casos límite
+y su fixture— se tomó el 2026-09-14 y se guardó en un archivo de memoria fuera del repositorio,
+para registrarlo al implementar. Un formateo del equipo borró la memoria. El repositorio sobrevivió
+intacto. La sesión siguiente, con solo la documentación, encontró cinco viñetas en `ROADMAP.md` y
+ninguna entrada en el registro, y no pudo arrancar la fase: hubo que reconstruir las decisiones de
+lo que una persona recordaba, y cuatro llegaron sin su alternativa descartada. Lo que estaba en el
+repositorio no perdió una coma.
+
 ---
 
 ## 10. Manejo de datos
@@ -415,8 +445,10 @@ Priorizado. Lo de arriba entra primero.
   aceptan sin aviso: «-500» se lee como −$500. Los importes negativos de `cobranza.monto` se
   quedan sin aviso a propósito, porque pueden ser notas de crédito. La severidad se decide al
   implementarlo, con el criterio de consecuencia (`docs/decisiones.md`, 2026-09-14).
-- Plantilla v2 con hojas como tablas de Excel, para eliminar las filas de relleno y el
-  renglón de nota que el lector tiene que descartar. Las fórmulas de las columnas calculadas
+- **Rediseño de la plantilla** con hojas como tablas de Excel, para eliminar las filas de relleno
+  y el renglón de nota que el lector tiene que descartar. Hasta el 2026-10-10 este punto se
+  llamaba «plantilla v2»; ese nombre es ahora de la plantilla de partidas de la v1.2.0
+  (`docs/decisiones.md`, 2026-09-14), que conserva las hojas como están. Las fórmulas de las columnas calculadas
   (`utilidad_bruta`, `margen_pct`, `cobrado`, `saldo`) hoy solo están en la fila de ejemplo,
   desde v1.0.0: se escriben en v1.2, ya a nivel de folio, con el rango `cobranza!$B$3:$B$1000`
   de la fila de ejemplo y del demo, y desaparecen con Google Sheets en v1.3 (ROADMAP.md §3).
@@ -468,6 +500,41 @@ Priorizado. Lo de arriba entra primero.
   `@napi-rs/wasm-runtime`, `@tybys/wasm-util` y `tslib`—, ajenas a esa sesión. Se restauró el
   lockfile y solo se cambiaron sus dos líneas de versión, que decían `0.0.0`. Falta decidir, en
   su propia sesión, si se regenera, comprobando que `npm ci` y el build no cambien.
+- **`source-map-js` 1.2.1 tiene una vulnerabilidad de severidad alta**, y va en la misma sesión
+  que el lockfile: las dos tocan `package-lock.json`. Observado el 2026-10-10 con `npm audit`:
+  GHSA-68fv-2mgg-jv7q, denegación de servicio al procesar un source map malicioso, CVSS 7.5. Es
+  transitiva y solo de desarrollo, vía `vite → postcss` y `@tailwindcss/vite → @tailwindcss/node`.
+  **No llega a lo que se sirve**, comprobado el mismo día de dos formas: `npm ls source-map-js
+  --omit=dev` sale vacío, y en el `dist/` de la 1.1.5 no aparece `source-map-js`,
+  `SourceMapConsumer` ni `SourceMapGenerator` en ningún archivo. El riesgo es de la máquina que
+  construye, no del cliente. `npm audit fix` la sube a 1.2.2 o posterior; no se corrió. `xlsx`
+  0.20.3, la dependencia del CDN de la sección 12, no aparece en ese reporte.
+- **Ningún error del panel de validación bloquea un módulo, y la especificación dice que sí.**
+  Observado el 2026-10-10. No es solo un texto de la interfaz:
+  - `CLAUDE.md`, «Validación», **define** Error como «bloquea el módulo afectado».
+  - `docs/decisiones.md` razona la severidad sobre esa premisa: la entrada del 2026-09-14 sobre
+    `parametros` dice que «Error» significa que bloquea el módulo afectado, y la del 2026-09-13
+    sobre valores de lista descarta el error con el mismo criterio.
+  - `src/components/PanelValidacion.tsx` lo afirma en su comentario (línea 23) y en pantalla:
+    «N errores bloquean los módulos afectados» (170–171) y «Los errores bloquean únicamente el
+    módulo afectado» (199).
+  - `capacidades()` (`src/lib/schema.ts:317`) habilita cada módulo solo por si hay filas de
+    ventas, cobranza, fechas de pago y gastos. Los hallazgos no entran. Verificado por lectura.
+  - Lo que un error hace de verdad depende de la regla. Una fila que no cumple el esquema sale
+    del dataset. Un folio repetido ni eso: ejecutado con datos inventados, las dos filas entran al
+    motor y cada una resta todo lo cobrado del folio (`docs/decisiones.md`, 2026-09-14, versión
+    de la 1.2.0). Qué hace cada una de las demás reglas de error no está revisado.
+  - Antecedente: `comision_pct` ilegible pasó de error a advertencia en la 1.1.4 por esta misma
+    razón, tratado como un caso y no como el patrón (`docs/notas-version.md`).
+
+  **La pregunta que abre, sin decidir:** ¿se cambia el código para que un error bloquee su
+  módulo, o la especificación para que deje de prometerlo? Cualquiera de las dos mueve cosas: la
+  primera apaga módulos que hoy se muestran, la segunda obliga a revisar las dos decisiones que
+  eligieron severidad con ese criterio. Va en su propia sesión.
+- **AD-01 a AD-06 están en `ROADMAP.md` §4 y no en el registro de decisiones.** Observado el
+  2026-10-10 al escribir la regla de la sección 9. Están en el repositorio, así que no corren el
+  riesgo de la memoria perdida, pero quien busque una decisión en `docs/decisiones.md` no las
+  encuentra. Falta migrarlas con su formato o referenciarlas desde el registro.
 - Gastos por categoría en el motor, hoy solo agregados.
 - Números de página en el PDF impreso.
 
