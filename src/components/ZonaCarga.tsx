@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 import demoUrl from "../../docs/DEMO_Agrodrones_Bajio_FICTICIO.xlsx?url";
-import plantillaUrl from "../../docs/Plantilla_Captura_Reporteria_v1.xlsx?url";
+import plantillaUrl from "../../docs/Plantilla_Captura_Reporteria_v2.xlsx?url";
 import { useAppStore } from "../store/useAppStore";
 import { PieAplicacion } from "./PieAplicacion";
 
@@ -110,7 +110,7 @@ export function ZonaCarga() {
         ¿No tiene el formato?{" "}
         <a
           href={plantillaUrl}
-          download="Plantilla_Captura_Reporteria.xlsx"
+          download="Plantilla_Captura_Reporteria_v2.xlsx"
           className="text-marino underline underline-offset-2 hover:no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marino"
         >
           Descargue la plantilla de captura

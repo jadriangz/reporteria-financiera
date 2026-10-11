@@ -3,7 +3,8 @@ import { z } from "zod";
 /**
  * Contrato de datos canónico.
  * Coincide campo por campo con la plantilla Excel entregada al cliente
- * (Plantilla_Captura_Reporteria_v1.xlsx). Cambiar un nombre aquí obliga a
+ * (Plantilla_Captura_Reporteria_v2.xlsx; la v1 tiene las mismas columnas y se
+ * sigue aceptando). Cambiar un nombre aquí obliga a
  * cambiarlo en la plantilla. No hacerlo unilateralmente.
  */
 

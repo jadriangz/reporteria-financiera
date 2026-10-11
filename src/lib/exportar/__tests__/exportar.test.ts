@@ -133,7 +133,7 @@ describe("ida y vuelta", () => {
 
 describe("misma estructura que la plantilla", () => {
   const plantilla = XLSX.read(
-    readFileSync(fileURLToPath(new URL("../../../../docs/Plantilla_Captura_Reporteria_v1.xlsx", import.meta.url))),
+    readFileSync(fileURLToPath(new URL("../../../../docs/Plantilla_Captura_Reporteria_v2.xlsx", import.meta.url))),
     // Con los formatos de numero, para compararlos contra los de la exportacion.
     { cellNF: true },
   );
