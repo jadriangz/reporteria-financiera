@@ -1271,3 +1271,90 @@ afirma que la venta fue solo eso: es el mismo problema con otra cara.
 **Consecuencia.** El rótulo no depende del orden de las filas ni de qué esté pagado. Es presentación:
 elige qué partida nombrar y no suma nada. El desglose completo está al desplegar el folio en
 Cobranza.
+
+---
+
+## 2026-10-10 — En la plantilla, `cobrado` y `saldo` van en la primera fila del folio, y las demás muestran «↑»
+
+**Contexto.** Con partidas, `saldo` restaba todo lo cobrado del folio al precio de una sola fila: en
+un folio de dos filas, la segunda mostraba un saldo negativo que no existe. Era uno de los puntos
+sin decidir de la serie de partidas.
+
+**Decisión.** `cobrado` y `saldo` son del folio y aparecen en la **primera aparición del folio en la
+hoja**: `cobrado` suma sus abonos, y `saldo` es la suma de los precios de sus partidas —sin las
+Demo, como el motor— menos ese cobrado. En las demás filas del folio la celda muestra **«↑»**.
+`utilidad_bruta` y `margen_pct` siguen por fila, porque son de la partida. El demo usa las mismas
+fórmulas.
+
+**Alternativas descartadas.**
+- **Repetirlos en cada fila.** La columna dejaría de poder sumarse —contaría el saldo del folio una
+  vez por partida—, y un accesorio de $10,000 con «saldo 50,000» al lado afirmaría que ese accesorio
+  debe $50,000. Es el argumento con que se descartó la fila por tramo en Cobranza.
+- **Repartir el pendiente por partida.** Sería una segunda implementación, en fórmulas de Excel, de
+  la regla de orden de entrega que ya hace el motor: sin pruebas, y condenada a divergir.
+- **Dejar en blanco las demás filas.** Se leería como «no se calculó». La flecha siempre es cierta
+  —la primera aparición está arriba—, no necesita formato condicional, y las sumas la ignoran por
+  ser texto.
+
+**Consecuencia.** «Primera fila» es la primera aparición y no «la fila de arriba es distinta»: un
+folio repetido en filas no contiguas no muestra su saldo dos veces. La aplicación no depende de
+nada de esto, porque el lector ignora las columnas calculadas. Las fórmulas se evaluaron con un
+motor de hoja de cálculo (HyperFormula) sobre datos inventados, fuera del repositorio; **en Excel y
+en Google Sheets las valida una persona**. En el demo, la columna `cobrado` suma ahora $2,836,100
+—la cifra de referencia con la Demo incluida— donde antes contaba dos veces los folios unidos.
+**Esa suma no es la de la aplicación, que muestra $2,541,100, y las dos están bien:** la hoja suma
+todos los abonos, y el motor no cuenta los $295,000 abonados contra la unidad Demo. Alguien lo va a
+reportar como defecto: está escrito en CLAUDE.md, junto a la restricción de las columnas
+calculadas, y en INSTRUCCIONES, renglón «Linea Demo».
+
+---
+
+## 2026-10-10 — La plantilla v2 trae completas sus filas de captura, en las tres hojas
+
+**Contexto.** Al abrir el XML para escribir las fórmulas se encontró que las filas de captura casi
+no tenían celdas: en `ventas`, `cobranza` y `gastos` cada fila traía solo la del folio. En `ventas`
+ninguna era azul; en las otras dos, solo esa. «Solo escriba en las celdas de letra azul» no era
+cierto donde se escribe, desde la v1.0. El demo sí trae sus celdas, y por eso se veía bien y la
+plantilla no.
+
+**Decisión.** La v2 escribe **todas** las celdas de las filas de captura de las tres hojas —5,382
+en `ventas`, 3,493 en `cobranza`, 4,491 en `gastos`—, con estilos que ya existían en el archivo y
+no se usaban ahí: letra azul para lo que se captura (con formato de fecha, de moneda y de
+porcentaje donde toca) y negra para lo calculado. No se creó ningún estilo. Las cuatro columnas de
+cabecera llevan además una fórmula que copia la fila de arriba cuando se repite el folio, y el
+libro pide calcular al abrir.
+
+**Alternativa descartada.** Agregar solo las celdas con fórmula. Dejaba cada fila con borde en unas
+columnas y sin nada en otras, y la instrucción de la letra azul igual de falsa: habría sido
+reescribir INSTRUCCIONES sabiendo que seguía sin ser verdad.
+
+**Consecuencia.** Se hizo por hojas, comprobando después de cada una que un parser XML real leyera
+todas las partes sin error y que el lector de la aplicación siguiera dando un dataset vacío. Queda
+cerrada una deuda: la buena formación del XML se prueba ahora con `@xmldom/xmldom`, además del
+verificador propio de cuando no había parser en las dependencias. Como hay fórmulas en columnas de
+entrada, una prueba carga la plantilla como la devuelve una hoja de cálculo, con cadenas vacías
+guardadas, y exige que siga vacía. La edición se hizo con guiones que quedan en `scripts/plantilla/`
+como registro de cómo se hizo y punto de partida de una v3. **No son un generador** y sigue sin
+haberlo (GOBERNANZA.md §7): la plantilla publicada es la de `docs/`, y los guiones se niegan a
+escribir ahí.
+
+---
+
+## 2026-10-10 — La aplicación no distingue la plantilla v1 de la v2
+
+**Contexto.** La v2 cambia de nombre porque cambian sus fórmulas y sus instrucciones, y la v1 se
+sigue aceptando. Quedaba por resolver cómo saber cuál es cuál sin mirar el nombre del archivo, que
+el cliente va a cambiar.
+
+**Decisión.** No se distinguen, porque no hace falta. Tienen las mismas columnas, y lo único que
+cambia —las columnas calculadas y las fórmulas de cabecera— el lector lo ignora o lo lee igual que
+un dato escrito a mano. No hay ninguna rama del código que dependa de la versión de la plantilla.
+
+**Alternativa descartada.** Detectarla por contenido —la presencia de fórmulas en las filas de
+captura, o el título de INSTRUCCIONES, que ahora dice «v2»— y avisar al usuario. Sería un aviso
+sobre algo que no cambia ninguna cifra, y la primera vez que una hoja de cálculo reescribiera el
+archivo la detección fallaría.
+
+**Consecuencia.** Si algún día una versión de la plantilla sí cambia columnas, la detección se hace
+por los encabezados, que es lo que el lector ya mira. Una prueba fija la promesa: la v1 carga con
+los mismos encabezados, los mismos parámetros y ningún error.

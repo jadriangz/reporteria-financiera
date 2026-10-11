@@ -107,8 +107,23 @@ las "simplifica" sin leer el porqué, rompe el reporte en silencio.
   llenos, las columnas calculadas (`utilidad_bruta`, `margen_pct`, `cobrado`, `saldo`) traen
   fórmulas estiradas que devuelven `0` y `""` en las ~280 filas de relleno: si se toman en
   cuenta, el lector cree que hay 300 ventas capturadas donde hay 21. Así vienen el archivo de
-  demostración (1,200 fórmulas) y el del cliente. La plantilla descargable solo trae fórmula en
-  la fila de ejemplo, pero la regla no depende de eso: el lector recibe lo que el cliente mande.
+  demostración (1,200 fórmulas) y el del cliente. La plantilla v1 solo traía fórmula en la fila de
+  ejemplo; la v2 las trae en cada fila de captura. La regla no depende de eso: el lector recibe
+  lo que el cliente mande.
+  **Desde la v2 también hay fórmulas en cuatro columnas de ENTRADA** —`cliente`, `dias_credito`,
+  `condicion` y `vendedor` copian la fila de arriba al repetir el folio—. En una fila sin capturar
+  devuelven cadena vacía, y una cadena vacía es una celda vacía: la fila sigue sin contar. Una
+  prueba carga la plantilla como la devuelve una hoja de cálculo, con esos valores guardados.
+- **La columna `cobrado` del Excel y el «Efectivo cobrado» de la aplicación pueden dar totales
+  distintos, y los dos están bien. NO ES UN DEFECTO.** La fórmula de la hoja suma todos los abonos
+  anotados contra cada folio. El motor no cuenta como cobranza los abonos de un folio que es solo
+  Demo, porque una Demo no es una venta. Con el archivo de demostración, la columna suma
+  **$2,836,100** y la aplicación muestra **$2,541,100**: la diferencia son los $295,000 abonados
+  contra V-006, la unidad Demo. Es la misma pareja de cifras de «Pruebas»: 2_836_100 es el cobrado
+  «con la Demo incluida». Lo mismo pasa con `saldo`: en la hoja suma $1,660,800, porque V-006
+  aparece con −$295,000; en la aplicación, $1,955,800. Las columnas calculadas del Excel son una
+  ayuda para quien captura; las cifras del reporte salen del motor, que no las lee. INSTRUCCIONES
+  lo dice en la sección «Ventas con varios productos», renglón «Linea Demo».
 - **El parser CONSERVA las filas con `linea = "Demo"`.** Excluirlas es trabajo exclusivo
   del motor de cálculo. Si el lector las tira, el motor pierde la capacidad de listarlas
   aparte y el usuario nunca se entera de que existen.
@@ -195,10 +210,10 @@ punto_equilibrio_mxn  = gastos_fijos / margen_contribucion_pct
 explícita. El "hoy" por defecto lo pone la UI al arrancar (`fechaCorte: hoyUTC()` en el store) y
 el usuario lo cambia en la barra superior. Ver «Restricciones aprendidas».
 
-## Partidas por folio (v1.2.0) — motor e interfaz implementados; plantilla y exportación pendientes
+## Partidas por folio (v1.2.0) — motor, interfaz y plantilla implementados; exportación y cierre pendientes
 
-**Estado: fase en curso. Producción sigue en 1.1.5.** El parseo, la validación, el motor y la
-interfaz ya cumplen esta sección, con sus pruebas; la tabla de cifras de «Pruebas» ya es la del
+**Estado: fase en curso. Producción sigue en 1.1.5.** El parseo, la validación, el motor, la
+interfaz y la plantilla v2 ya cumplen esta sección, con sus pruebas; la tabla de cifras de «Pruebas» ya es la del
 fixture nuevo. **Donde esta sección y las generales de arriba digan cosas distintas
 —«Validación», «Definiciones de cálculo»—, manda esta.** La sesión que cierre la fase las integra en
 un solo texto y quita la marca. Las decisiones y sus razones: `docs/decisiones.md`, entradas del
@@ -284,10 +299,19 @@ anticipos_pct         = proporción de la cobranza que son anticipos
 - **Ventas y flujo cuenta entregas por mes** y lo dice en el encabezado. Cuando las entregas no
   coinciden con las operaciones del periodo, una nota bajo la tabla explica por qué no suman.
 - Ventas y flujo no lista ventas, solo meses: no tiene tabla de folios que desplegar.
-- **Plantilla v2** (`Plantilla_Captura_Reporteria_v2.xlsx`): mismas columnas, instrucciones nuevas
-  y, por primera vez, fórmulas en las filas 3–301, a nivel de folio y con rango `$B$3:$B$1000`.
-  **La v1 se sigue aceptando.** La aplicación ofrece solo la v2 y no las distingue por el nombre
-  del archivo.
+- **Plantilla v2** (`Plantilla_Captura_Reporteria_v2.xlsx`): mismas columnas que la v1.
+  - **Las filas de captura están completas** en `ventas`, `cobranza` y `gastos`: una celda por
+    columna, en letra azul lo que se escribe y en negra lo calculado. En la v1 solo existía la
+    celda del folio, y «solo escriba en las celdas de letra azul» no era cierto.
+  - **`cobrado` y `saldo` son del folio y aparecen en su PRIMERA fila.** En las demás partidas del
+    folio la celda muestra «↑». Repetidos, la columna dejaría de poder sumarse. El saldo no
+    cuenta las partidas Demo. `utilidad_bruta` y `margen_pct` siguen por fila.
+  - **La cabecera se copia sola** de la fila de arriba al repetir el folio (fórmula en `cliente`,
+    `dias_credito`, `condicion` y `vendedor`). Se puede escribir encima.
+  - El libro pide calcular al abrir (`fullCalcOnLoad`): las fórmulas no llevan valor guardado.
+  - **La v1 se sigue aceptando, y la aplicación no distingue una de otra**: no lo necesita,
+    porque tienen las mismas columnas y el lector ignora las calculadas. Ofrece solo la v2.
+  - El demo usa las mismas fórmulas de `cobrado` y `saldo`.
 
 ### Cifras de referencia que cambiaron con el fixture de la 1.2.0
 
@@ -309,17 +333,16 @@ código (`partidas.test.ts`), y los invariantes como propiedades sobre datasets 
 
 ### Pendiente de las sesiones que siguen
 
-Imprecisiones conocidas y temporales de la rama. No son defectos que alguien deba investigar:
-
-- **El demo abierto en Excel** muestra `cobrado` y `saldo` raros en las filas de V-008 y V-015: sus
-  fórmulas suman por folio en cada fila. El lector ignora esas columnas; no afecta ninguna cifra.
-- Plantilla v2, exportación, notas de versión y la integración de esta sección en las generales.
+- **Validación humana de la plantilla v2**, que ninguna prueba sustituye: abrirla en Excel y
+  confirmar que no pide reparación y que los paneles quedan fijos; y, en Excel o en Google Sheets,
+  que las listas funcionan, que los colores siguen y que las fórmulas calculan al abrir.
+- Exportación a Excel, notas de versión, incremento de versión y la integración de esta sección
+  en las generales.
 
 ### Sin decidir (no inventar: preguntar)
 
 - El umbral que vuelve advertencia un anticipo, y la base exacta de `anticipos_pct`.
 - El umbral y el texto del hallazgo de `venta_cruzada_folio`.
-- Qué muestran `cobrado` y `saldo` de la plantilla v2 en la segunda partida de un folio.
 
 ## Módulos de reporte
 

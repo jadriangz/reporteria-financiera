@@ -312,7 +312,7 @@ delegan.
 ## 7. El contrato de datos
 
 El acoplamiento más frágil del proyecto: `src/lib/schema.ts` y
-`docs/Plantilla_Captura_Reporteria_v1.xlsx` deben coincidir campo por campo. Si divergen,
+`docs/Plantilla_Captura_Reporteria_v2.xlsx` deben coincidir campo por campo. Si divergen,
 la aplicación lee mal el archivo del cliente y nadie se entera hasta que un número sale
 raro.
 
@@ -449,9 +449,9 @@ Priorizado. Lo de arriba entra primero.
   y el renglón de nota que el lector tiene que descartar. Hasta el 2026-10-10 este punto se
   llamaba «plantilla v2»; ese nombre es ahora de la plantilla de partidas de la v1.2.0
   (`docs/decisiones.md`, 2026-09-14), que conserva las hojas como están. Las fórmulas de las columnas calculadas
-  (`utilidad_bruta`, `margen_pct`, `cobrado`, `saldo`) hoy solo están en la fila de ejemplo,
-  desde v1.0.0: se escriben en v1.2, ya a nivel de folio, con el rango `cobranza!$B$3:$B$1000`
-  de la fila de ejemplo y del demo, y desaparecen con Google Sheets en v1.3 (ROADMAP.md §3).
+  (`utilidad_bruta`, `margen_pct`, `cobrado`, `saldo`) ya están en cada fila de captura desde la
+  plantilla v2, a nivel de folio, con el rango `cobranza!$B$3:$B$1000`,
+  y desaparecen con Google Sheets en v1.3 (ROADMAP.md §3).
   Ese rediseño hay que hacerlo igual, y es el momento de decidir con qué herramienta se genera la plantilla, que hoy se
   edita a mano (sección 7). Opciones evaluadas el 2026-09-13:
   1. **SheetJS más un inyector de XML** que agregue estilos, listas y paneles. No compensa hoy:
