@@ -1358,3 +1358,53 @@ archivo la detección fallaría.
 **Consecuencia.** Si algún día una versión de la plantilla sí cambia columnas, la detección se hace
 por los encabezados, que es lo que el lector ya mira. Una prueba fija la promesa: la v1 carga con
 los mismos encabezados, los mismos parámetros y ningún error.
+
+---
+
+## 2026-10-10 — Un dato que falta solo se pide cuando hace falta: «sin días de crédito», solo con saldo
+
+**Contexto.** Al cargar el demo el panel mostraba 18 advertencias, y 15 eran la misma: «sin
+`dias_credito`: el aging de esta venta se calculará por antigüedad». Diez eran de ventas de contado
+liquidadas el mismo día. De esas la frase es falsa: no hay antigüedad que medir, y no falta nada.
+
+**Decisión.** La regla `venta-sin-dias-credito` solo se dispara cuando el folio tiene **saldo
+pendiente**. Avisa **una vez por folio**, en su primera partida —los días de crédito son de la
+venta, no de cada producto—, y dice cuánto se debe. Un folio pagado o sobrecobrado no la dispara.
+
+**Alternativa descartada.** Bajarla a informativo en todas las ventas. Seguiría diciendo algo falso
+de las liquidadas, en un lugar menos visible. Descartado también quitar las ventas de contado del
+demo: el aviso estaba mal, no el archivo.
+
+**Consecuencia.** En el demo quedan 5 —V-001, V-002, V-003, V-013 y V-023, las que deben y no
+traen plazo— y el total baja de 18 a 8. Ninguna cifra de referencia cambia: es una regla de
+validación, no de cálculo. Catorce avisos que no piden nada enseñan a no leer los que sí; el
+criterio queda para las demás reglas, y las tres que hoy no lo cumplen están en el backlog
+(GOBERNANZA.md §11). Las advertencias que el demo conserva son deliberadas —venta sin fecha,
+sobrecobro, cabecera en conflicto— y su hoja LEEME ahora dice de cada una por qué está ahí; una
+prueba exige que ninguna advertencia del demo quede sin su renglón.
+
+---
+
+## 2026-10-11 — Informativo es lo que la aplicación hizo al leer; advertencia, lo que cambia lo que se va a ver
+
+**Contexto.** «El archivo no trae la hoja `cobranza`: se deshabilitan los módulos de cobranza y
+flujo» era informativo, al nivel de «se ignoraron 274 filas vacías». Salió al revisar por qué el
+panel asusta con un archivo correcto: los informativos son narración de la lectura, y este no lo
+era.
+
+**Decisión.** El criterio queda escrito en CLAUDE.md: **informativo es lo que la aplicación hizo
+al leer; advertencia es lo que cambia lo que el usuario va a ver.** Una hoja de datos ausente
+(`ventas`, `cobranza`, `gastos`) pasa a **advertencia**, y su mensaje dice qué módulos se apagan.
+La hoja `parametros` ausente sigue siendo informativa: no apaga nada, el reporte se calcula con los
+valores por omisión.
+
+**Alternativa descartada.** Error. Un error dice que algo del archivo está mal y hay que
+corregirlo; un archivo sin hoja `gastos` puede ser exactamente lo que el usuario tiene, y el
+reporte de ventas y cartera que produce es válido. Además abriría otra vez la pregunta de qué
+bloquea un error (GOBERNANZA.md §11).
+
+**Consecuencia.** Se revisaron los demás informativos buscando otro que signifique «un módulo quedó
+deshabilitado»: no hay. Lo que sí hay es un caso sin ningún hallazgo —una hoja presente pero
+vacía apaga los mismos módulos y el panel calla—, que queda en el backlog sin decidir, porque la
+plantilla recién descargada es ese caso. La fila Demo sigue informativa por decisión: es
+deliberada, se lista aparte y el reporte lo dice. Ninguna cifra cambia.

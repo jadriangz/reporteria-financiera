@@ -191,9 +191,12 @@ describe("listado de filas", () => {
   it("cuenta los hallazgos de cada fila", () => {
     const { hallazgos } = validate(combinar(archivo, SIN_CAPTURAS));
     const v025 = filasDeHoja(archivo, SIN_CAPTURAS, "ventas", hallazgos).find((f) => f.folio === "V-025");
-    // Sin fecha y sin dias de credito.
-    expect(v025?.advertencias).toBe(2);
+    // Sin fecha. Tampoco trae dias de credito, pero esta pagada: eso ya no se avisa.
+    expect(v025?.advertencias).toBe(1);
     expect(v025?.errores).toBe(0);
+    // V-001 debe $320,000 y no trae dias de credito: esa si.
+    const v001 = filasDeHoja(archivo, SIN_CAPTURAS, "ventas", hallazgos).find((f) => f.folio === "V-001");
+    expect(v001?.advertencias).toBe(1);
   });
 });
 

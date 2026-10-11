@@ -84,7 +84,8 @@ Al cargar, mostrar un **panel de resultados de validación** con tres niveles:
 - **Error** (bloquea el módulo afectado): folio duplicado, `cobranza.folio_venta` sin venta
   correspondiente, monto que no se puede leer (incluido un importe con otra gramática que la
   europea), fecha inválida o fuera de 1990–2100.
-- **Advertencia** (no bloquea): fila sin fecha, venta sin `dias_credito`, abono que excede el
+- **Advertencia** (no bloquea): fila sin fecha, venta **con saldo pendiente** y sin `dias_credito`
+  (una venta liquidada no tiene antigüedad que medir: no se le pide el plazo), abono que excede el
   precio de venta, margen exactamente uniforme en más del 80% de las filas, valor de una
   columna de lista que no es ninguna de sus opciones (se toma como celda vacía y se dice qué
   se aplicó), parámetro capturado que no se puede leer, con un nombre que no es del
@@ -92,8 +93,18 @@ Al cargar, mostrar un **panel de resultados de validación** con tres niveles:
   qué se capturó, qué se aplicó y qué formatos se aceptan; si el parámetro mueve cifras, el aviso
   aparece además junto a la cifra y en el bloque Alcance de la portada del PDF), `dias_credito`
   que no es un entero no negativo (se mide por antigüedad, como sin `dias_credito`), porcentaje
-  que no se puede leer o fuera de 0–100% (la venta va sin comisión, como con la celda vacía).
-- **Info**: filas ignoradas por estar vacías, filas con `linea = "Demo"` excluidas del análisis.
+  que no se puede leer o fuera de 0–100% (la venta va sin comisión, como con la celda vacía),
+  **hoja de datos que no viene en el archivo** (`ventas`, `cobranza` o `gastos`: se deshabilitan
+  sus módulos, y se dice cuáles).
+- **Info**: filas ignoradas por estar vacías, filas de ejemplo y de nota descartadas, filas con
+  `linea = "Demo"` excluidas del análisis, archivo sin hoja `parametros` (se calcula con los
+  valores por omisión).
+
+**Qué separa un informativo de una advertencia: informativo es lo que la aplicación hizo al leer;
+advertencia es lo que cambia lo que el usuario va a ver.** «Se ignoraron 274 filas vacías» es la
+aplicación contando que leyó bien. Que falte la hoja `cobranza` y se apaguen dos módulos es la
+consecuencia más grande que puede tener un archivo: hasta la 1.1.5 era informativo. Y un dato que
+falta solo se avisa cuando hace falta: una venta liquidada no necesita plazo de crédito.
 
 Cada mensaje debe indicar **hoja, número de fila y qué corregir**. Un validador que solo dice
 "archivo inválido" no sirve.

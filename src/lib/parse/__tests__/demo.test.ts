@@ -7,7 +7,7 @@ import { capacidades, type Hallazgo } from "../../schema";
 import { readWorkbookFromBuffer } from "../readWorkbook";
 import type { RawSheets } from "../tipos";
 import { validate, type ResultadoValidacion } from "../validate";
-import { fallaXml, partesXml } from "./xmlXlsx";
+import { erroresXml, fallaXml, hojasXml, partesXml, textosXml } from "./xmlXlsx";
 
 /**
  * Prueba de integracion del lector contra un archivo CAPTURADO, no en blanco.
@@ -98,13 +98,18 @@ describe("lectura del archivo de demostracion", () => {
     expect(res.dataset.cobranza.filter((c) => c.folio_venta === FOLIO_SOBRECOBRO)).toHaveLength(1);
   });
 
-  it("advierte de cada venta sin dias_credito, y solo de esas", () => {
+  it("advierte de las ventas sin dias_credito QUE TIENEN SALDO, y solo de esas", () => {
     const sinCredito = conId(res.hallazgos, "advertencia").filter(
       (h) => h.campo === "dias_credito",
     );
-    // 25 partidas, 8 con plazo capturado y 2 que lo heredan de su folio (los
-    // accesorios de V-008 y V-015): las otras 15 se miden por antiguedad.
-    expect(sinCredito).toHaveLength(15);
+    // 15 partidas no traen plazo, pero 10 son ventas de contado ya liquidadas: no
+    // tienen antiguedad que medir y no les falta nada. Quedan las 5 que deben.
+    const folioDeFila = new Map(raw.ventas.filas.map((f) => [f.fila, String(f.valores["folio"])]));
+    expect(sinCredito.map((h) => folioDeFila.get(h.fila ?? -1))).toEqual(["V-001", "V-002", "V-003", "V-013", "V-023"]);
+    expect(sinCredito[0]?.mensaje).toBe(
+      "Sin dias_credito y con $320,000 por cobrar: la antiguedad de esta venta se medira desde su entrega, no desde un vencimiento.",
+    );
+    expect(res.dataset.ventas.filter((v) => v.dias_credito === null)).toHaveLength(15);
     expect(res.dataset.ventas.filter((v) => v.dias_credito !== null)).toHaveLength(10);
   });
 
@@ -179,10 +184,39 @@ describe("lectura del archivo de demostracion", () => {
   it("cada parte XML del archivo esta bien formada: tambien se ofrece como descarga", () => {
     // Misma cerca que la de la plantilla (plantilla.test.ts): SheetJS tolera XML
     // mal formado que Excel no.
-    const fallas = [...partesXml(Buffer.from(bufferFixture()))].flatMap(([ruta, xml]) => {
+    const partes = partesXml(Buffer.from(bufferFixture()));
+    const fallas = [...partes].flatMap(([ruta, xml]) => {
       const falla = fallaXml(xml);
       return falla === null ? [] : [`${ruta}: ${falla}`];
     });
     expect(fallas).toEqual([]);
+    // Y con un parser XML real: el demo tambien se edita a mano sobre su XML.
+    expect([...partes].flatMap(([ruta, xml]) => erroresXml(xml).map((e) => `${ruta}: ${e}`))).toEqual([]);
+  });
+
+  it("el LEEME explica cada advertencia que el archivo produce a proposito", () => {
+    // Quien carga el demo ve ocho advertencias y una fila Demo. Ninguna es un
+    // defecto del archivo, y el LEEME tiene que decirlo de cada una, o parecen
+    // descuidos. Si el demo gana un aviso que el LEEME no explica, esto falla.
+    const partes = partesXml(Buffer.from(bufferFixture()));
+    const leeme = textosXml(hojasXml(partes).get("LEEME") ?? "", partes.get("xl/sharedStrings.xml") ?? "").join("\n");
+
+    const advertencias = conId(res.hallazgos, "advertencia");
+    const explicadas: readonly (readonly [(h: Hallazgo) => boolean, string])[] = [
+      [(h) => h.campo === "fecha", `(${FOLIO_SIN_FECHA})`],
+      [(h) => h.hoja === "cobranza" && h.mensaje.includes(FOLIO_SOBRECOBRO), `(${FOLIO_SOBRECOBRO})`],
+      [(h) => h.campo === "condicion", "(V-015)"],
+      [(h) => h.campo === "dias_credito", "(cinco ventas)"],
+    ];
+    for (const [es, cita] of explicadas) {
+      expect(advertencias.some(es), cita).toBe(true);
+      expect(leeme, cita).toContain(cita);
+    }
+    // Ninguna advertencia queda sin su renglon en el LEEME.
+    expect(advertencias.filter((h) => !explicadas.some(([es]) => es(h)))).toEqual([]);
+    expect(advertencias.filter((h) => h.campo === "dias_credito")).toHaveLength(5);
+    // La fila Demo es informativa, y tambien esta dicha.
+    expect(leeme).toContain(`Linea Demo (${FOLIO_DEMO})`);
+    expect(leeme).toContain("Ninguno es un error");
   });
 });

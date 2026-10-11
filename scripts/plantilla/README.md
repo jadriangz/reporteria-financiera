@@ -24,6 +24,7 @@ leer y repetir. Si el XML de partida no es exactamente el esperado, se detienen 
 | `comprobar_xml.mjs` | Lee cada parte XML de un .xlsx con un parser real y cuenta filas, celdas por fila, fórmulas y estilos. Es lo que se corrió después de cada etapa. |
 | `evaluar_formulas.mjs` | Evalúa las fórmulas reales de la v2 con un motor de hoja de cálculo sobre datos inventados. Una segunda opinión; no es Excel. |
 | `calcular_demo.mjs` y `aplicar_demo.py` | Calcularon y escribieron en el demo las fórmulas de `cobrado` y `saldo` a nivel de folio, con sus valores guardados (598 celdas). |
+| `leeme_demo.py` | Agregó a la hoja LEEME del demo los avisos que el archivo produce a propósito, con su razón (8 renglones). |
 
 Los dos que evalúan fórmulas necesitan `hyperformula`, que **no es dependencia del proyecto** y no
 debe serlo: se instaló y se corrió en una carpeta temporal, fuera del repositorio.

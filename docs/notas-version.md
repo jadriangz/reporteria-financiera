@@ -59,6 +59,13 @@ estaban mal calculadas.** Cuando cambien con esta versión, las nuevas son las c
     vendedor se copian solos.
   - Las celdas donde se escribe ya van todas en letra azul, como dicen las instrucciones. En la
     plantilla anterior solo lo estaba la fila de ejemplo.
+- **Menos advertencias, y todas piden algo.** El aviso «sin días de crédito» ya solo aparece en las
+  ventas que tienen saldo por cobrar, una vez por venta, y dice cuánto se debe. Antes aparecía
+  también en las ventas de contado ya liquidadas, donde no faltaba nada. Si recarga su archivo
+  verá menos advertencias, y no es porque algo se haya corregido en él. Ninguna cifra cambia.
+- **Si a su archivo le falta una hoja, ahora es una advertencia.** Que no venga `cobranza` o
+  `gastos` deshabilita módulos del reporte, y antes se anunciaba como una nota informativa más,
+  junto a las filas vacías ignoradas. El mensaje dice qué módulos se apagan.
 - **Venta cruzada por folio**, métrica nueva: de las ventas con equipo, cuántas llevaron
   accesorio en la misma operación. Solo aparece si su archivo tiene algún folio con varias
   partidas. El attach rate por cliente no cambia.

@@ -363,19 +363,68 @@ const filaSinFecha: Regla = {
   },
 };
 
+/**
+ * Lo que una venta vale y lo que se le ha cobrado, por folio, leido de las celdas
+ * con las coerciones del esquema. Es lo que el motor va a cobrar: sin los folios
+ * que salieron del analisis y sin las partidas Demo.
+ */
+function precioPorFolio(ctx: ContextoValidacion): Map<string, number> {
+  const precio = new Map<string, number>();
+  for (const f of ctx.ventas) {
+    const folio = folioDe(f.valores);
+    const monto = parseMonto(f.valores["precio_venta"] ?? null);
+    if (!f.aceptada || canonizar(LINEA, f.valores["linea"]) === "Demo") continue;
+    if (folio !== "" && monto !== null) precio.set(folio, (precio.get(folio) ?? 0) + monto);
+  }
+  return precio;
+}
+
+function cobradoPorFolio(ctx: ContextoValidacion): Map<string, number> {
+  const cobrado = new Map<string, number>();
+  for (const f of ctx.cobranza) {
+    const ref = texto(f.valores["folio_venta"]);
+    const monto = parseMonto(f.valores["monto"] ?? null);
+    if (ref !== "" && monto !== null) cobrado.set(ref, (cobrado.get(ref) ?? 0) + monto);
+  }
+  return cobrado;
+}
+
+/**
+ * Una venta CON SALDO PENDIENTE y sin dias de credito: su antiguedad se mide
+ * desde la entrega, no desde un vencimiento.
+ *
+ * Solo si debe. Hasta la 1.1.5 esta regla avisaba de toda venta sin
+ * `dias_credito`, tambien de las de contado liquidadas el mismo dia: «el aging de
+ * esta venta se calculara por antiguedad» de una venta que no tiene aging que
+ * medir. No faltaba nada, y catorce avisos que no piden nada enseñan a no leer
+ * los que si. Un dato que falta solo se pide cuando hace falta.
+ *
+ * Uno por folio, en su primera partida: los dias de credito son de la venta, no
+ * de cada producto.
+ */
 const ventaSinDiasCredito: Regla = {
   id: "venta-sin-dias-credito",
   severidad: "advertencia",
-  descripcion: "Sin dias de credito la antiguedad se mide desde la venta, no desde el vencimiento.",
+  descripcion: "Venta con saldo y sin dias de credito: su antiguedad se mide desde la entrega, no desde el vencimiento.",
   evaluar(ctx) {
+    const precio = precioPorFolio(ctx);
+    const cobrado = cobradoPorFolio(ctx);
+    const vistos = new Set<string>();
     const out: Hallazgo[] = [];
     for (const f of ctx.ventas) {
+      const folio = folioDe(f.valores);
+      if (!f.aceptada || folio === "" || vistos.has(folio)) continue;
+      // La cabecera ya viene resuelta: si esta fila no trae dias, su folio tampoco.
       if (!vacia(f.valores["dias_credito"] ?? null)) continue;
+      const saldo = (precio.get(folio) ?? 0) - (cobrado.get(folio) ?? 0);
+      if (saldo <= 0) continue;
+      vistos.add(folio);
       out.push(
         hallazgo(
           "advertencia",
           "ventas",
-          `Sin dias_credito: el aging de esta venta se calculara por antiguedad, no por vencimiento.`,
+          `Sin dias_credito y con ${pesos(saldo)} por cobrar: la antiguedad de esta venta se medira desde su ` +
+            `entrega, no desde un vencimiento.`,
           {
             fila: f.fila,
             campo: "dias_credito",
@@ -459,23 +508,12 @@ const abonoExcedePrecio: Regla = {
   descripcion: "Lo cobrado de una venta supera su precio: sobra dinero o falta capturar el precio.",
   evaluar(ctx) {
     // El precio de una venta es el de su folio: la suma de sus partidas.
-    const precio = new Map<string, number>();
-    for (const f of ctx.ventas) {
-      const folio = texto(f.valores["folio"]);
-      const monto = parseMonto(f.valores["precio_venta"] ?? null);
-      // Solo lo que el motor va a cobrar: ni un folio excluido ni una partida Demo.
-      if (!f.aceptada || canonizar(LINEA, f.valores["linea"]) === "Demo") continue;
-      if (folio !== "" && monto !== null) precio.set(folio, (precio.get(folio) ?? 0) + monto);
-    }
-
-    const cobrado = new Map<string, number>();
+    const precio = precioPorFolio(ctx);
+    const cobrado = cobradoPorFolio(ctx);
     const filaUltima = new Map<string, number>();
     for (const f of ctx.cobranza) {
       const ref = texto(f.valores["folio_venta"]);
-      const monto = parseMonto(f.valores["monto"] ?? null);
-      if (ref === "" || monto === null) continue;
-      cobrado.set(ref, (cobrado.get(ref) ?? 0) + monto);
-      filaUltima.set(ref, f.fila);
+      if (ref !== "" && parseMonto(f.valores["monto"] ?? null) !== null) filaUltima.set(ref, f.fila);
     }
 
     const out: Hallazgo[] = [];
@@ -692,35 +730,54 @@ const filasDemo: Regla = {
   },
 };
 
-/** Que modulos quedan deshabilitados por falta de una hoja, y que capturar. */
+/** Que deja de verse por falta de una hoja. */
 const HOJA_HABILITA: Readonly<Record<NombreHoja, string>> = {
-  ventas: "todos los modulos",
-  cobranza: "los modulos de cobranza y flujo",
-  gastos: "el estado de resultados",
+  ventas: "se deshabilitan todos los modulos",
+  cobranza: "se deshabilitan los modulos de cobranza y flujo",
+  gastos: "se deshabilita el estado de resultados",
 };
 
+/**
+ * Una hoja de datos que no vino en el archivo. ADVERTENCIA, no informativo.
+ *
+ * Informativo es lo que la aplicacion hizo al leer; advertencia es lo que cambia
+ * lo que el usuario va a ver. Que falte `cobranza` apaga dos modulos: es la
+ * consecuencia mas grande que puede tener un archivo, y hasta la 1.1.5 se
+ * anunciaba al nivel de «se ignoraron 274 filas vacias».
+ */
 const hojaAusente: Regla = {
   id: "hoja-ausente",
-  severidad: "info",
-  descripcion: "Una hoja no venia en el archivo: sus modulos se deshabilitan, no truenan.",
+  severidad: "advertencia",
+  descripcion: "Una hoja de datos no venia en el archivo: sus modulos se deshabilitan, no truenan.",
   evaluar(ctx) {
     const out: Hallazgo[] = [];
     for (const hoja of HOJAS_TABULARES) {
       if (ctx.raw[hoja].presente) continue;
       out.push(
-        hallazgo("info", hoja, `El archivo no trae la hoja ${hoja}: se deshabilita ${HOJA_HABILITA[hoja]}.`, {
+        hallazgo("advertencia", hoja, `El archivo no trae la hoja ${hoja}: ${HOJA_HABILITA[hoja]}.`, {
           accion: `Agregue la hoja ${hoja} a la plantilla y vuelva a cargar el archivo.`,
         }),
       );
     }
-    if (!ctx.raw.parametros.presente) {
-      out.push(
-        hallazgo("info", "parametros", `El archivo no trae la hoja parametros: se usaran los valores por omision.`, {
-          accion: `Agregue la hoja parametros para fijar IVA, provisiones y periodo.`,
-        }),
-      );
-    }
     return out;
+  },
+};
+
+/**
+ * Sin hoja `parametros` no se apaga nada: el reporte se calcula con los valores
+ * por omision. Sigue siendo informativo.
+ */
+const parametrosAusentes: Regla = {
+  id: "parametros-ausentes",
+  severidad: "info",
+  descripcion: "El archivo no trae la hoja parametros: se usan los valores por omision.",
+  evaluar(ctx) {
+    if (ctx.raw.parametros.presente) return [];
+    return [
+      hallazgo("info", "parametros", `El archivo no trae la hoja parametros: se usaran los valores por omision.`, {
+        accion: `Agregue la hoja parametros para fijar IVA, provisiones y periodo.`,
+      }),
+    ];
   },
 };
 
@@ -891,6 +948,7 @@ export const REGLAS: readonly Regla[] = [
   parametroRepetido,
   valorSinParametro,
   hojaAusente,
+  parametrosAusentes,
   filasEjemplo,
   filasVacias,
   filasNota,
