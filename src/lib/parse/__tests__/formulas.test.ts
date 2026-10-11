@@ -120,6 +120,12 @@ describe("fórmulas de las columnas calculadas, leídas con un parser XML", () =
     expect(formulas.get("P")?.fila2).toContain(RANGO_SUMIF);
   });
 
+  it("en el demo, cobrado y saldo son del folio: primera fila, y flecha en las demás", () => {
+    const formulas = formulasDeVentas("DEMO_Agrodrones_Bajio_FICTICIO.xlsx");
+    expect(formulas.get("P")?.fila3).toBe(COBRADO_FILA_3);
+    expect(formulas.get("Q")?.fila3).toBe(SALDO_FILA_3);
+  });
+
   it("la plantilla v1 solo traía fórmula en la fila de ejemplo", () => {
     const formulas = formulasDeVentas("Plantilla_Captura_Reporteria_v1.xlsx");
     expect([...formulas.keys()].sort()).toEqual(COLUMNAS_CALCULADAS);
