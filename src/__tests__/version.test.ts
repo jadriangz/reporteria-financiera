@@ -23,13 +23,13 @@ describe("version de la aplicacion", () => {
     expect(VERSION).toBe(paquete.version);
   });
 
-  it("hoy es la 1.1.5: parche de presentacion, sin cambio de contrato ni de cifras", () => {
-    // PARCHE (GOBERNANZA.md §3): corrige defectos de presentacion sin tocar el
-    // contrato ni ninguna cifra. El PDF desde tema oscuro sale en claro de orilla
-    // a orilla, los rotulos de la grafica de modelos no se enciman ni se cortan,
-    // los marcos del PDF se ven cerrados y la plantilla deja de prometer formulas
-    // que no trae. La serie anterior, 1.1.1 a 1.1.4, corrigio el contrato de datos.
-    expect(VERSION).toBe("1.1.5");
+  it("hoy es la 1.2.0: el folio agrupa partidas, y ningun archivo de un folio por fila cambia una cifra", () => {
+    // MENOR (GOBERNANZA.md §3): quitar la unicidad del folio es relajar una
+    // restriccion del contrato. `operaciones` y `ticket_promedio` pasan a contar
+    // folios, pero con un folio por fila —todo archivo que cargaba sin error— dan
+    // lo mismo. Solo cambian los archivos con folios repetidos, que se calculaban
+    // mal. La anterior, 1.1.5, fue un parche de presentacion.
+    expect(VERSION).toBe("1.2.0");
   });
 
   it("es un semver de tres numeros, sin sufijos", () => {

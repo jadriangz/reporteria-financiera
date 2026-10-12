@@ -1408,3 +1408,105 @@ deshabilitado»: no hay. Lo que sí hay es un caso sin ningún hallazgo —una h
 vacía apaga los mismos módulos y el panel calla—, que queda en el backlog sin decidir, porque la
 plantilla recién descargada es ese caso. La fila Demo sigue informativa por decisión: es
 deliberada, se lista aparte y el reporte lo dice. Ninguna cifra cambia.
+
+---
+
+## 2026-10-12 — La exportación a Excel rellena la plantilla v2; no arma un libro
+
+**Contexto.** La exportación armaba un libro nuevo con SheetJS y producía la forma de la v1: sin
+letra azul, sin listas desplegables, sin paneles fijos, sin INSTRUCCIONES, con `cobrado` y `saldo`
+por fila —un folio de dos partidas mostraba en la segunda un saldo negativo que no existe— y con
+una copia propia de la fila de ejemplo que una prueba mantenía igual a la de la plantilla. La
+versión gratuita de SheetJS no escribe estilos, listas ni paneles (GOBERNANZA.md §7), así que por
+ese camino el archivo exportado nunca podía ser la v2.
+
+**Decisión.** Exportar es **abrir la plantilla v2 y escribir cada dato en la celda de captura que
+le toca** (`src/lib/exportar/`). La plantilla es la misma que la aplicación ofrece para descargar.
+Todo lo que no es un dato llega intacto porque nadie lo escribe: estilos, listas, paneles,
+INSTRUCCIONES, la fila de ejemplo y las fórmulas. De SheetJS se usa lo que sí hace: leer la
+plantilla para saber qué columna es cada encabezado y qué renglón cada parámetro, y abrir y cerrar
+el zip (`CFB`, el módulo con que él mismo escribe sus .xlsx). No entra ninguna dependencia.
+
+- **Columnas calculadas:** no se tocan. Son las fórmulas de la plantilla, por folio y con la flecha.
+- **Cabecera:** la fórmula que copia la fila de arriba se conserva donde muestra justo lo que trae
+  el dataset —la partida que repite el folio de la fila anterior, o la celda vacía de un folio
+  nuevo—, con su valor guardado. Donde no, se escribe el valor encima, como haría quien captura:
+  es el caso de un folio que se repite más abajo y no en la fila siguiente.
+- **Si los datos no caben** en las filas de la plantilla (299 ventas, 499 abonos, 499 gastos), se
+  agregan filas iguales a la última y se extienden hasta ahí el rango de la hoja, las listas y,
+  pasada la fila 1000, los rangos de las fórmulas de `cobrado` y `saldo`.
+- **Parámetros:** el valor va en su renglón; uno sin capturar queda vacío aunque la plantilla traiga
+  uno de muestra, y uno capturado pierde el «PENDIENTE —» de su nota y el fondo de aviso. Las
+  fechas del periodo van como texto dd/mm/aaaa, que es como las trae la plantilla.
+- Si el archivo que recibe no es la plantilla que conoce, **lanza** y no escribe a medias.
+
+**Alternativas descartadas.**
+- **Seguir armando el libro con SheetJS y agregarle solo las fórmulas nuevas.** Daba las fórmulas
+  por folio, pero no la letra azul ni las listas: «filas de captura completas con sus estilos» no
+  se cumple, y el archivo que el cliente se lleva seguiría sin parecerse a la plantilla que conoce.
+- **ExcelJS u otra librería que escriba estilos.** Es un cambio de stack (CLAUDE.md, «no sustituir
+  sin discutirlo») y obliga a describir en código la presentación de la plantilla: una segunda
+  copia de sus estilos.
+- **SheetJS más un inyector de estilos.** Es la alternativa que ya se descartó el 2026-09-13 para
+  el generador, y por la misma razón: una tabla de estilos que sincronizar con el .xlsx. Rellenar la
+  plantilla no tiene esa tabla: el estilo de cada celda es el que la celda ya trae.
+
+**Consecuencia.** **Sigue sin haber generador de la plantilla** (GOBERNANZA.md §7): este código no
+produce la plantilla desde el esquema, la necesita como entrada. **Plantilla y exportación ya no
+pueden divergir, porque son el mismo archivo**: la prueba que mantenía iguales las dos copias de la
+fila de ejemplo dejó de hacer falta, y el archivo que el cliente descarga con sus datos es, por
+construcción, la plantilla que conoce. La plantilla de `docs/` pasa a ser también el molde de la
+exportación, así que editarla cambia lo que se exporta; una prueba exporta
+contra el archivo real y exige que solo cambien las cuatro hojas de datos, que cada parte XML esté
+bien formada para un parser real y que cada celda conserve su lugar y su estilo. Desaparecen la
+copia de la fila de ejemplo, los anchos y los formatos que `exportar/` repetía. El botón trae la
+plantilla con una petición al mismo origen, como el chunk de SheetJS: no lleva ningún dato. Que la
+exportación lance si la plantilla no tiene la forma esperada es lo que vuelve seguro ese
+acoplamiento. **El archivo de demostración exportado pesa unos 250 kB, y no es un defecto**: es el
+precio de traer la plantilla completa, con sus filas de captura libres, y el zip de SheetJS
+comprime menos que el de una hoja de cálculo. Está bien pagado.
+
+**Lo que el archivo exportado no conserva, y ya no conservaba:** se exporta el dataset, no el
+archivo de origen. Una cabecera en conflicto sale ya resuelta —la segunda partida de V-015 del demo
+se exporta con «Credito», no con el «Contado» que traía—, y al recargar no vuelve su advertencia.
+Con partidas eso importa más que antes, y queda en el backlog (GOBERNANZA.md §11).
+
+**Cómo se comprobó.** Ida y vuelta por prueba, con el demo, con folios de varias partidas armados
+en código, con partidas capturadas a mano y con más filas que la plantilla. El botón, en Chrome 154
+sin ventana por el protocolo de depuración, donde SheetJS no tiene `Buffer`: el archivo que generó
+vuelve al mismo dataset. Sus fórmulas, evaluadas con HyperFormula fuera del repositorio: `cobrado`
+suma $2,836,100 y `saldo` $1,660,800 —las cifras de CLAUDE.md para la hoja—, con la flecha en la
+segunda partida de V-008 y de V-015, y cada valor guardado igual al calculado. **Abrirlo en Excel y
+en Google Sheets lo valida una persona**, igual que la plantilla.
+
+---
+
+## 2026-10-12 — Cierre de la fase de partidas: lo decidido que no se implementó sale de las definiciones
+
+**Contexto.** La especificación de la v1.2.0 vivió en una sección marcada de `CLAUDE.md`,
+«Partidas por folio», con la regla de que mandaba sobre las generales mientras la fase estuviera en
+curso. Cerrar la fase era integrarla en «Contrato de datos», «Validación», «Definiciones de
+cálculo» y la tabla de cifras. La sección traía, entre las definiciones de cálculo, `anticipos_pct`,
+y en su validación el anticipo como informativo: decididos el 2026-09-14, marcados «sin implementar
+todavía», y con su umbral y su base sin decidir.
+
+**Decisión.** Al integrar, **los anticipos no pasan a las definiciones**. No hay nada de ellos en
+el código, y «Definiciones de cálculo (exactas, no reinterpretar)» no puede listar una métrica que
+el motor no calcula. Van al backlog (GOBERNANZA.md §11) con lo que falta decidir; la decisión de
+negocio se conserva en la entrada del 2026-09-14. La venta cruzada por folio sí pasa, porque el
+motor la calcula, y la definición dice que todavía no se pinta ni tiene hallazgo. La versión se
+cierra en 1.2.0 sin ellos.
+
+**Alternativa descartada.** Integrar la sección completa y dejar el anticipo con la nota «sin
+implementar». Es lo que la sección marcada ya hacía, y se sostenía porque la marca avisaba que todo
+ahí era provisional. Sin la marca, la nota queda enterrada en una lista de definiciones exactas.
+
+**Consecuencia.** Habría sido **el cuarto caso de la especificación prometiendo lo que el código no
+hace**: INSTRUCCIONES decía que las columnas de letra negra se calculan solas cuando solo la fila de
+ejemplo traía fórmula (corregido en la 1.1.5); `CLAUDE.md` define Error como lo que «bloquea el
+módulo afectado» y ningún error bloquea nada (GOBERNANZA.md §11, abierto); «solo escriba en las
+celdas de letra azul» no era cierto en las filas de captura (corregido con la plantilla v2). Queda
+como práctica en GOBERNANZA.md §5, paso 3: **al integrar una sección «decidida, pendiente de
+implementar» se comprueba qué de lo decidido no se implementó, buscándolo en el código, y se saca
+de las definiciones.** El borrador de las notas de versión tenía el mismo defecto en pequeño —decía
+que la venta cruzada por folio «aparece»— y se corrigió a «todavía no aparece en pantalla».

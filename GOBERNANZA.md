@@ -81,6 +81,20 @@ enciman ni se cortan, los marcos del PDF se ven cerrados y la plantilla deja de 
 que no trae. Desplegada en producción el 2026-09-14, con el PR #3 y la etiqueta `v1.1.5`. Detalle
 en `docs/notas-version.md`.
 
+**v1.2.0 — varias partidas por venta.** MENOR (sección 3). **Cerrada el 2026-10-12 en la rama
+`feat/partidas-cierre`; producción sigue en 1.1.5 hasta que se fusione y se verifique lo servido**
+(sección 5, paso 6). Quien haga esa verificación actualiza el encabezado de esta sección.
+
+- **El folio agrupa partidas**: repetirlo deja de ser error y es como se captura una venta con
+  varios productos. Cobro, saldo y antigüedad son del folio; utilidad, margen y producto, de la
+  partida. Los pagos se aplican en orden de entrega.
+- **`operaciones`, `ticket_promedio` y las unidades del total de Producto cambian de unidad**, de
+  filas a folios o a partidas. Con un folio por fila ninguna cifra se mueve.
+- **Plantilla v2**, con sus filas de captura completas y `cobrado` y `saldo` por folio. La v1 se
+  sigue aceptando.
+- **La exportación a Excel rellena la plantilla v2**: plantilla y exportación son el mismo archivo.
+- Quedó fuera, y está en la sección 11: los anticipos, y mostrar la venta cruzada por folio.
+
 Fuera de alcance en v1, por decisión: autenticación, multiusuario, persistencia,
 histórico entre cortes, conexión a Odoo, multimoneda, consolidación de varias empresas.
 
@@ -195,6 +209,24 @@ reportada? Eso determina la versión y si hace falta avisar al cliente antes.
 **3. Actualizar `CLAUDE.md` primero.** Si el cambio altera una regla de negocio, una
 definición de cálculo o una restricción, se documenta ahí **antes** de escribir código.
 `CLAUDE.md` es la especificación; el código es su consecuencia.
+
+**Cuando la fase no cabe en una sesión, la especificación nueva va en una sección marcada.** Lleva
+su estado en el título —qué está implementado y qué falta— y la regla «donde esta sección y las
+generales digan cosas distintas, manda esta». Así las secciones generales siguen describiendo lo
+que el código hace mientras la fase avanza. Así se escribió la v1.2.0 («Partidas por folio»).
+
+**Al cerrar la fase, la sección marcada se integra en las generales, y antes se comprueba qué de lo
+decidido NO se implementó.** Una sección «decidida, pendiente de implementar» mezcla lo que ya está
+en el código con lo que solo está decidido, y al integrarla todo pasa por igual a definiciones que
+dicen «exactas, no reinterpretar». Lo que no se implementó **sale de las definiciones** y va al
+backlog (sección 11) con su razón; la decisión se conserva en `docs/decisiones.md`. Se comprueba
+buscando cada definición en el código, no releyendo la sección.
+
+*Caso (1.2.0).* La sección de partidas definía `anticipos_pct` y clasificaba los anticipos como
+informativos. Al integrarla, el 2026-10-12, no había nada de eso en el código. Habría sido el cuarto
+caso de la especificación prometiendo lo que el código no hace, después de INSTRUCCIONES con sus
+fórmulas (1.1.5), la definición de Error que «bloquea el módulo» (sección 11) y la letra azul de
+la plantilla (`docs/decisiones.md`, 2026-10-10 y 2026-10-12).
 
 **4. Implementar en rama, con pruebas primero donde haya cálculo.** Motor antes que UI.
 Nunca al revés.
@@ -321,7 +353,9 @@ raro.
 1. Actualizar `schema.ts`
 2. Editar la plantilla a mano sobre su XML, preservando estilos, listas desplegables y paneles
    fijos
-3. Actualizar la exportación a Excel para que siga siendo ida y vuelta
+3. Comprobar que la exportación a Excel siga siendo ida y vuelta. Desde la 1.2.0 la exportación
+   rellena la plantilla, así que una columna nueva en la plantilla ya está en lo exportado: lo que
+   se actualiza es `ENCABEZADOS` y el campo que se escribe en ella (`src/lib/exportar/index.ts`)
 4. Actualizar la prueba que compara encabezados contra la plantilla real
 5. Actualizar `CLAUDE.md`
 6. **Versionar la plantilla** (`_v2.xlsx`) y decidir si la app soporta ambas
@@ -339,6 +373,14 @@ en las celdas de letra azul» y que la fila de fondo verde es el ejemplo. Una pl
 sin estilos le daría instrucciones falsas. La cerca contra la divergencia es
 `src/lib/parse/__tests__/plantilla.test.ts`, que compara `ENCABEZADOS` contra el .xlsx real y
 exige que el XML de cada hoja esté bien formado. Ver `docs/decisiones.md` (2026-09-13).
+
+**La exportación a Excel no es ese generador, y no lo contradice.** Desde la 1.2.0 exportar es
+abrir la plantilla de `docs/` y escribir los datos en sus celdas de captura: el código necesita la
+plantilla como entrada y no tiene tabla de estilos que sincronizar. **Plantilla y exportación ya no
+pueden divergir, porque son el mismo archivo.** El precio es un acoplamiento nuevo: editar la
+plantilla cambia lo que se exporta. Lo vuelve seguro que la exportación lance en vez de escribir a
+medias si no encuentra la forma que espera, y que una prueba exporte contra el archivo real
+(`docs/decisiones.md`, 2026-10-12).
 
 **Nunca se rompe una plantilla que el cliente ya tiene en sus manos.** Si un campo nuevo
 es obligatorio, se acepta su ausencia con advertencia durante al menos una versión.
@@ -533,8 +575,32 @@ Priorizado. Lo de arriba entra primero.
   o se quita la frase.
 - **La venta cruzada por folio no se muestra en ninguna pantalla.** El motor la calcula desde la
   v1.2.0 (`clientes.ventaCruzadaFolio`; con el demo, 2 de 13), pero ningún módulo la pinta ni hay
-  hallazgo que la juzgue: su umbral y su texto siguen sin decidir (CLAUDE.md, «Partidas por
-  folio»). Mientras tanto es una cifra calculada que nadie ve.
+  hallazgo que la juzgue. **Sin decidir, y no se inventa: se pregunta** — el umbral y el texto del
+  hallazgo. La fase de partidas cerró sin ellos porque son decisión de negocio (sección 6).
+  Mientras tanto es una cifra calculada que nadie ve.
+- **Los anticipos no se implementaron en la v1.2.0.** Decidido el 2026-09-14 (`docs/decisiones.md`):
+  un pago anterior a la primera entrega de su folio es un anticipo, se clasifica como informativo,
+  y la proporción de la cobranza que son anticipos es una métrica nueva (`anticipos_pct`). No hay
+  nada de eso en el código. La fase cerró sin ello porque **faltan decisiones que no se inventan**:
+  el umbral que vuelve advertencia un anticipo por hueco implausible entre pago y entrega, la base
+  exacta de la proporción, y qué se hace con un abono sin `fecha_pago` o con un folio sin ninguna
+  fecha de entrega. Hasta entonces `CLAUDE.md` no lo define, para que la especificación no prometa
+  lo que el motor no calcula. Va en su propia sesión, motor primero.
+- **Exportar y recargar borra una advertencia de cabecera en conflicto, sin que nadie lo note.**
+  Observado el 2026-10-12. Se exporta el dataset, no el archivo de origen, y el dataset trae la
+  cabecera ya resuelta: la segunda partida de V-015 del demo se captura con «Contado» contra
+  «Credito», se exporta con «Credito», y al recargar el archivo exportado la advertencia ya no
+  aparece. Era así desde la v1.0 para todo lo que el lector resuelve, pero con partidas importa
+  más: el archivo que el cliente se lleva ya no dice que dos filas de la misma venta se
+  contradecían, y lo que se aplicó fue una regla —la primera fila manda—, no una decisión suya.
+  Falta decidir si la exportación debe conservar lo capturado, si el archivo exportado debe decir
+  qué se resolvió, o si basta con avisarlo al exportar. Lo mismo pasa con un valor de lista no
+  reconocido, que se exporta como celda vacía.
+- **Validación humana de la plantilla v2 y del archivo exportado**, que ninguna prueba sustituye.
+  Pendiente al cerrar la v1.2.0: abrir los dos en Excel y confirmar que no piden reparación y que
+  los paneles quedan fijos; y, en Excel o en Google Sheets, que las listas funcionan, que los
+  colores siguen y que las fórmulas calculan al abrir. Sus fórmulas se evaluaron con un motor de
+  hoja de cálculo fuera del repositorio; eso no es abrirlos.
 - **Tres avisos que piden un dato sin comprobar que haga falta.** Observado el 2026-10-10 al
   corregir el de días de crédito, que tenía ese defecto: avisaba de ventas de contado ya
   liquidadas. Los tres vistos **leyendo el código, no ejecutándolos**:
@@ -587,6 +653,17 @@ Priorizado. Lo de arriba entra primero.
   2026-10-10 al escribir la regla de la sección 9. Están en el repositorio, así que no corren el
   riesgo de la memoria perdida, pero quien busque una decisión en `docs/decisiones.md` no las
   encuentra. Falta migrarlas con su formato o referenciarlas desde el registro.
+- **Las cifras de referencia viven en más de un documento, y eso es lo que las deja divergir.**
+  Observado el 2026-10-12: la tabla de cifras de `docs/linea-base-pdf.md` siguió diciendo
+  `operaciones = 24` desde la sesión del motor, que cambió la unidad a folios (22) y actualizó
+  `fixture.ts` y `CLAUDE.md`. Dos corridas de `/verificar` compararon el PDF contra un manifiesto
+  atrasado. La fuente es `src/lib/calc/__tests__/fixture.ts`, que las pruebas ejercitan; todo lo
+  demás es copia a mano: la tabla de `CLAUDE.md` («Pruebas»), el subconjunto del manifiesto del
+  PDF, las cifras de la variante B.5 en `.claude/commands/verificar.md`, y las que citan
+  `docs/notas-version.md` y este archivo. Revisadas todas ese día: no había otra atrasada. Nada
+  las mantiene iguales. Falta decidir cómo: una prueba que lea las tablas de los documentos y las
+  compare contra el fixture —como la que regenera `docs/contraste.md`—, o que los documentos dejen
+  de repetirlas y apunten a la fuente.
 - Gastos por categoría en el motor, hoy solo agregados.
 - Números de página en el PDF impreso.
 

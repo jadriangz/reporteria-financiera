@@ -24,7 +24,8 @@ import {
   nuevaCaptura,
   siguienteFila,
 } from "../lib/captura";
-import { libroDeDataset } from "../lib/exportar";
+import { excelDeDataset } from "../lib/exportar";
+import { cargarPlantilla, descargarArchivo } from "../lib/exportar/descarga";
 import { cargarSheetJS, readWorkbook, validate } from "../lib/parse";
 import type { ParametroSustituido } from "../lib/parse/parametros";
 import type { NombreHoja, RawSheets } from "../lib/parse/tipos";
@@ -357,10 +358,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const { dataset, parametros } = get();
     if (dataset === null) return;
     // Mismo chunk dinamico que la lectura: SheetJS no entra al bundle inicial.
-    const xlsx = await cargarSheetJS();
+    const [xlsx, plantilla] = await Promise.all([cargarSheetJS(), cargarPlantilla()]);
     // Con los parametros que el usuario ajusto: el archivo reproduce el reporte.
-    const libro = libroDeDataset(xlsx, conParametrosDeUsuario(dataset, parametros));
-    xlsx.writeFile(libro, nombre, { compression: true });
+    descargarArchivo(excelDeDataset(xlsx, plantilla, conParametrosDeUsuario(dataset, parametros)), nombre);
   },
 
   limpiar() {

@@ -112,7 +112,8 @@ En pesos, excluyendo la fila Demo (V-006), al corte 2026-09-09. La fuente es
 que se leen a simple vista en el PDF.
 
 ```
-operaciones             =        24
+operaciones             =        22   // folios; hasta la 1.1.5, 24 filas
+ticket_promedio         =   204_405   // por folio, como se pinta; hasta la 1.1.5, 187_371
 venta_total             = 4_496_900
 utilidad_bruta          = 1_218_900
 margen                  =    0.2711
@@ -183,6 +184,27 @@ entregado el 20/08/2026, para ver un folio con el saldo en dos tramos.
 - **«AX-100 + 1 más» ocupa dos renglones en la columna Modelo de Cobranza** (hoja 9, V-015): se
   parte antes del signo, «AX-100» arriba y «+ 1 más» abajo. «AX-55 + 1 más» cabe en uno. El aviso
   no se parte por dentro, que es lo que se cuidó.
+
+**Cuarta corrida, 2026-10-12, cierre de la v1.2.0 (pie «v1.2.0»).** Dos PDF, los dos sin
+encabezados del navegador: el demo y la copia con el accesorio de V-008 entregado el 20/08/2026
+(paso B.5 de `verificar.md`). Mismo método y mismos tres límites que la tercera corrida: Chrome 154
+de Windows sin ventana, `Page.printToPDF` desde el tema oscuro («Skia/PDF m154»), ninguna hoja
+vista como imagen.
+
+- **La paginación no se movió**: 15 hojas con el mismo reparto por módulo en los dos, y la misma
+  primera y última línea de contenido en cada hoja. La hoja 9 de la copia trae dos líneas más, las
+  de los dos tramos de V-008.
+- **Lo que cambió, y es lo esperado:** la portada y el pie de cada hoja dicen «v1.2.0». Las
+  «Operaciones» del Resumen son 22 y el ticket promedio $204,405 desde la tercera corrida; la
+  tabla de cifras de este manifiesto seguía diciendo 24 y se corrigió aquí. La decisión es la del
+  fixture de la 1.2.0 (`docs/decisiones.md`, 2026-09-14): la métrica cambió de unidad, no la cifra.
+- **Invariantes:** ninguna hoja trae el relleno `#121212` y el color más oscuro es el del texto
+  (`#111827`); el texto termina en 578.2 pt (758.2 apaisada); la hoja 13 lista los 12 modelos; el
+  `/Title` es `Reporte_2026-01-01-a-2026-12-31_2026-09-09`; no aparecen `localhost`, «Módulos no
+  incluidos» ni «Parámetros que no se pudieron leer»; ninguna imagen rasterizada.
+- **El folio en dos tramos, en papel:** en la hoja 9 de la copia, V-008 lista «61 a 90 días
+  $141,000» y «0 a 30 días $24,000», y su tabla de partidas debajo. La antigüedad de la portada
+  del módulo pasa a $707,000 y $366,000 en esos dos tramos, y suma lo mismo.
 
 - [x] **Total de páginas** del reporte completo: **15**. Vertical, 612 × 792 pt, salvo las
   cuatro del Estado de resultados, apaisadas a 792 × 612 pt.

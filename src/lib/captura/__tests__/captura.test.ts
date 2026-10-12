@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
 
 import { ARCHIVO_FIXTURE, bufferFixture, cargarFixture } from "../../calc/__tests__/fixture";
-import { libroDeDataset } from "../../exportar";
+import { exportar, idaYVuelta } from "../../exportar/__tests__/plantilla";
 import { readWorkbookFromBuffer } from "../../parse/readWorkbook";
 import type { RawSheets } from "../../parse/tipos";
 import { validate } from "../../parse/validate";
@@ -103,8 +103,44 @@ describe("una sola representacion: la captura entra al mismo dataset que el arch
   it("lo capturado se exporta a Excel y vuelve igual, junto con el archivo", () => {
     const capturas: Capturas = { ...SIN_CAPTURAS, ventas: [venta("c1", 28, VENTA_OK)] };
     const { dataset } = validate(combinar(archivo, capturas));
-    const datos = XLSX.write(libroDeDataset(XLSX, dataset), { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-    expect(validate(readWorkbookFromBuffer(datos, "x.xlsx", XLSX)).dataset).toEqual(dataset);
+    expect(idaYVuelta(dataset).dataset).toEqual(dataset);
+  });
+
+  it("una venta de varias partidas capturada a mano se exporta y vuelve igual", () => {
+    // Dos partidas nuevas del mismo folio, la segunda sin cabecera, y una
+    // tercera que se suma a un folio del archivo (V-001, en la fila 3).
+    const capturas: Capturas = {
+      ...SIN_CAPTURAS,
+      ventas: [
+        venta("c1", 28, { ...VENTA_OK, condicion: "Credito", vendedor: "Vendedor Uno" }),
+        venta("c2", 29, { folio: "V-100", fecha: "2026-09-20", linea: "Accesorios", modelo: "BATERIA", costo_unitario: "5,000", precio_venta: "10,000" }),
+        venta("c3", 30, { folio: "V-001", fecha: "2026-09-21", linea: "Accesorios", modelo: "HELICE", costo_unitario: "200", precio_venta: "500" }),
+      ],
+      cobranza: [nuevaCaptura("c4", 33, "cobranza", { ...entradasVacias("cobranza"), folio_pago: "P-100", folio_venta: "V-100", fecha_pago: "2026-09-25", monto: "150,000" })],
+    };
+    const { dataset, hallazgos } = validate(combinar(archivo, capturas));
+    expect(hallazgos.filter((h) => h.severidad === "error")).toEqual([]);
+    const capturadas = dataset.ventas.filter((v) => v.folio === "V-100");
+    expect(capturadas.map((v) => [v.modelo, v.cliente, v.dias_credito, v.condicion, v.vendedor])).toEqual([
+      ["AX-55", "Cliente Nuevo", 90, "Credito", "Vendedor Uno"],
+      ["BATERIA", "Cliente Nuevo", 90, "Credito", "Vendedor Uno"],
+    ]);
+
+    const vuelta = idaYVuelta(dataset);
+    expect(vuelta.dataset).toEqual(dataset);
+    expect(vuelta.hallazgos.filter((h) => h.severidad === "error")).toEqual([]);
+
+    // En el archivo, la partida capturada queda como la deja la plantilla v2:
+    // la cabecera copiada por formula en la fila que repite el folio de arriba,
+    // y escrita en la que se sumo a un folio que esta lejos.
+    const ws = XLSX.read(exportar(dataset), { cellFormula: true }).Sheets["ventas"] ?? {};
+    const en = (ref: string) => ws[ref] as XLSX.CellObject | undefined;
+    expect([en("A28")?.v, en("A29")?.v, en("A30")?.v]).toEqual(["V-100", "V-100", "V-001"]);
+    expect(en("D28")?.f).toBeUndefined();
+    expect(en("D29")).toMatchObject({ f: 'IF(AND($A29<>"",$A29=$A28),D28,"")', v: "Cliente Nuevo" });
+    expect(en("K29")).toMatchObject({ f: 'IF(AND($A29<>"",$A29=$A28),K28,"")', v: 90 });
+    expect(en("D30")).toMatchObject({ v: "Agricola San Lorenzo" });
+    expect(en("D30")?.f).toBeUndefined();
   });
 
   it("el archivo cargado sin capturas no cambia en nada", () => {
