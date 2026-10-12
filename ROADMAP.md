@@ -106,8 +106,7 @@ generales desde el cierre de la fase: «Folios y partidas», «Validación» y �
 **Entrada:** producción en 1.1.4. Cumplida: producción está en 1.1.5 desde el 2026-09-14.
 **Salida:** un archivo con varias partidas por folio carga sin rechazar el folio repetido, y la
 suma de tramos, cobrado más saldo y la utilidad por partida cuadran contra sus totales.
-**Cumplida el 2026-10-12**, con la versión 1.2.0 cerrada en su rama; falta fusionarla y verificar
-lo que sirve producción.
+**Cumplida el 2026-10-12**, con la versión 1.2.0 en producción desde ese día (GOBERNANZA.md §2).
 
 ### v1.3 — Plantilla en Google Sheets
 

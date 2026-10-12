@@ -34,11 +34,22 @@ modifica la cifra esperada para que pase la prueba.
 
 ## 2. Estado actual
 
-**v1.1.5, en producción desde el 2026-09-14.** Verificado comparando por SHA-256 los archivos que
-sirve `reporteria-financiera.vercel.app` contra el build local del commit fusionado —8 de 8
-idénticos—, y no con el estado del despliegue. El método está en la sección 5, paso 6. Hasta la
-fusión del PR #1, producción servía 1.1.0 aunque la serie 1.1.1–1.1.4 ya estaba terminada: el
-trabajo sin commit no llega al cliente. Qué cambió en cada versión, para quien ya usaba la
+**v1.2.0, en producción desde el 2026-10-12.** Verificado ese día comparando por SHA-256 los
+archivos que sirve `reporteria-financiera.vercel.app` contra el build local del commit fusionado
+(`54c4e66`, merge del PR #10) —8 de 8 idénticos: `index.html`, los seis de `dist/assets/` y el
+favicon—, y no con el estado del despliegue. El build local salió de una copia limpia de ese commit,
+con el mismo árbol que se revisó antes de fusionar (`0163565`), y el bundle servido dice «v1.2.0».
+El método está en la sección 5, paso 6. **El estado del despliegue en Vercel no se observó**: el
+proyecto no era visible para la sesión que verificó, y GitHub no tenía registro de despliegue para
+ese commit. Lo que prueba qué se sirve son los bytes.
+
+Hasta la fusión del PR #1, producción servía 1.1.0 aunque la serie 1.1.1–1.1.4 ya estaba terminada:
+el trabajo sin commit no llega al cliente. **Y lo fusionado llega aunque la versión no haya
+cerrado:** según los registros de despliegue de GitHub, las fusiones de los PR #7 y #8 —el motor y
+la interfaz de partidas— se desplegaron a Production el 2026-10-10, con el pie todavía en «v1.1.5».
+Mientras este manual decía «producción sigue en 1.1.5», producción servía código de la 1.2.0 a
+medias con la etiqueta de la anterior. No se comprobó por bytes en su momento. Queda como pregunta
+abierta en la sección 11. Qué cambió en cada versión, para quien ya usaba la
 aplicación, y si sus cifras pueden moverse: `docs/notas-version.md`.
 
 **v1.0 — MVP.** Seis módulos de reporte, carga de Excel/CSV, captura manual, exportación a
@@ -81,9 +92,9 @@ enciman ni se cortan, los marcos del PDF se ven cerrados y la plantilla deja de 
 que no trae. Desplegada en producción el 2026-09-14, con el PR #3 y la etiqueta `v1.1.5`. Detalle
 en `docs/notas-version.md`.
 
-**v1.2.0 — varias partidas por venta.** MENOR (sección 3). **Cerrada el 2026-10-12 en la rama
-`feat/partidas-cierre`; producción sigue en 1.1.5 hasta que se fusione y se verifique lo servido**
-(sección 5, paso 6). Quien haga esa verificación actualiza el encabezado de esta sección.
+**v1.2.0 — varias partidas por venta.** MENOR (sección 3). Desplegada en producción el 2026-10-12,
+con el PR #10 y la etiqueta `v1.2.0` sobre `45d9cc7`, el commit de documentación que cierra la
+versión, y no sobre `2d6d766`, el que sube el número.
 
 - **El folio agrupa partidas**: repetirlo deja de ser error y es como se captura una venta con
   varios productos. Cobro, saldo y antigüedad son del folio; utilidad, margen y producto, de la
@@ -664,6 +675,27 @@ Priorizado. Lo de arriba entra primero.
   las mantiene iguales. Falta decidir cómo: una prueba que lea las tablas de los documentos y las
   compare contra el fixture —como la que regenera `docs/contraste.md`—, o que los documentos dejen
   de repetirlas y apunten a la fuente.
+- **Una fase de varias fusiones llega a producción por partes, con el número de la versión
+  anterior.** Observado el 2026-10-12 en los registros de despliegue de GitHub: cada fusión a `main`
+  se despliega a Production, así que las de los PR #7 y #8 pusieron en producción el motor y la
+  interfaz de partidas el 2026-10-10, dos días antes de que la versión cambiara de 1.1.5 a 1.2.0.
+  En ese lapso un reporte impreso decía «v1.1.5» y contaba operaciones por folio: la versión del pie
+  dejó de identificar el código que lo generó, que es para lo que existe (sección 3). **El pie del
+  reporte y la documentación mintieron durante dos días, cada uno a su manera:** el pie decía
+  1.1.5 sobre cifras calculadas con otro criterio, y este manual y las notas de versión decían que
+  en producción no había cambiado nada. **Sin decidir.** Dos salidas posibles, para quien la
+  resuelva:
+  1. **Fusionar la fase completa de una vez.** Las sesiones trabajan sobre una rama de integración
+     y `main` recibe una sola fusión, con el número nuevo. El pie nunca miente; a cambio, la rama
+     vive más de la semana que la sección 4 pone como límite, y la vista previa es lo único que se
+     revisa hasta el final.
+  2. **Que cada parte suba el número, aunque la fase no cierre.** Cada fusión a `main` lleva su
+     propia versión y su nota. Producción siempre dice lo que sirve; a cambio, hay versiones
+     intermedias que el cliente ve y que nadie planeó anunciar, y hay que decidir qué incremento
+     les toca según la sección 3.
+
+  Queda fuera de las dos, y también resolvería el síntoma, que `main` no se despliegue sola a
+  producción.
 - Gastos por categoría en el motor, hoy solo agregados.
 - Números de página en el PDF impreso.
 
