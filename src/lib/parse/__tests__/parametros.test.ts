@@ -179,13 +179,13 @@ describe("la hoja parametros: ningun valor capturado se descarta sin un hallazgo
 
   it("el demo ficticio y la plantilla no producen ningun aviso de parametros", () => {
     const plantilla = readFileSync(
-      fileURLToPath(new URL("../../../../docs/Plantilla_Captura_Reporteria_v1.xlsx", import.meta.url)),
+      fileURLToPath(new URL("../../../../docs/Plantilla_Captura_Reporteria_v2.xlsx", import.meta.url)),
     );
     const demo = validate(readWorkbookFromBuffer(bufferFixture(), ARCHIVO_FIXTURE, XLSX));
     const vacia = validate(
       readWorkbookFromBuffer(
         plantilla.buffer.slice(plantilla.byteOffset, plantilla.byteOffset + plantilla.byteLength) as ArrayBuffer,
-        "Plantilla_Captura_Reporteria_v1.xlsx",
+        "Plantilla_Captura_Reporteria_v2.xlsx",
         XLSX,
       ),
     );

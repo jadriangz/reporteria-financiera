@@ -28,7 +28,7 @@ function construirLibro(hojas: Readonly<Record<string, unknown[][]>>): ArrayBuff
 }
 
 describe("degradacion elegante", () => {
-  it("sin la hoja gastos deshabilita el estado de resultados e informa, sin lanzar", () => {
+  it("sin la hoja gastos deshabilita el estado de resultados y lo ADVIERTE, sin lanzar", () => {
     const datos = construirLibro({ ventas: VENTAS, cobranza: COBRANZA });
 
     const raw = readWorkbookFromBuffer(datos, "sin-gastos.xlsx", XLSX);
@@ -44,9 +44,12 @@ describe("degradacion elegante", () => {
     expect(cap.cobranza).toBe(true);
     expect(cap.flujo).toBe(true);
 
-    const aviso = res.hallazgos.find((h) => h.hoja === "gastos" && h.severidad === "info");
-    expect(aviso).toBeDefined();
-    expect(aviso?.mensaje).toContain("no trae la hoja gastos");
+    // Advertencia, no informativo: que se apague un modulo cambia lo que el
+    // usuario va a ver. Hasta la 1.1.5 se anunciaba al nivel de «se ignoraron
+    // 274 filas vacias».
+    const aviso = res.hallazgos.find((h) => h.hoja === "gastos");
+    expect(aviso?.severidad).toBe("advertencia");
+    expect(aviso?.mensaje).toBe("El archivo no trae la hoja gastos: se deshabilita el estado de resultados.");
     expect(aviso?.accion).toBeTruthy();
 
     // Degradar no es fallar: ningun error y ninguna excepcion.
@@ -60,7 +63,18 @@ describe("degradacion elegante", () => {
     expect(res.dataset.parametros.moneda_base).toBe("MXN");
     expect(res.dataset.parametros.tasa_iva).toBe(0.16);
     expect(res.dataset.parametros.importes_incluyen_iva).toBeNull();
-    expect(res.hallazgos.some((h) => h.hoja === "parametros")).toBe(true);
+    // Sin parametros no se apaga nada: se calcula con los valores por omision.
+    // Eso es lo que la aplicacion hizo al leer, y sigue siendo informativo.
+    expect(res.hallazgos.filter((h) => h.hoja === "parametros").map((h) => h.severidad)).toEqual(["info"]);
+  });
+
+  it("cada hoja de datos que falta se advierte con lo que deja de verse", () => {
+    const raw = readWorkbookFromBuffer(construirLibro({ ventas: VENTAS }), "solo-ventas.xlsx", XLSX);
+    const ausentes = validate(raw).hallazgos.filter((h) => h.mensaje.includes("no trae la hoja") && h.hoja !== "parametros");
+    expect(ausentes.map((h) => [h.hoja, h.severidad, h.mensaje])).toEqual([
+      ["cobranza", "advertencia", "El archivo no trae la hoja cobranza: se deshabilitan los modulos de cobranza y flujo."],
+      ["gastos", "advertencia", "El archivo no trae la hoja gastos: se deshabilita el estado de resultados."],
+    ]);
   });
 
   it("un archivo sin ninguna hoja conocida no truena: todo queda deshabilitado", () => {

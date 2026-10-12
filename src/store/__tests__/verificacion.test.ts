@@ -33,9 +33,11 @@ describe("recorrido de la app", () => {
     const { hallazgos } = useAppStore.getState();
     const cuenta = (sev: string) => hallazgos.filter((h) => h.severidad === sev).length;
     expect(cuenta("error")).toBe(0);
-    // 15 partidas sin dias_credito, 1 sin fecha, el sobrecobro de V-018 y la
-    // condicion en conflicto dentro del folio V-015.
-    expect(cuenta("advertencia")).toBe(18);
+    // Ocho, y cada una pide algo: 5 ventas con saldo y sin dias_credito, 1 partida
+    // sin fecha, el sobrecobro de V-018 y la condicion en conflicto del folio V-015.
+    // Hasta la 1.1.5 eran 18: diez mas por ventas de contado ya liquidadas, a las
+    // que no les faltaba nada.
+    expect(cuenta("advertencia")).toBe(8);
     // 3 filas de ejemplo, 3 avisos de filas vacias y la fila Demo.
     expect(cuenta("info")).toBe(7);
     expect(hallazgos.some((h) => h.hoja === "cobranza" && h.mensaje.includes("V-018"))).toBe(true);

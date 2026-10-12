@@ -151,7 +151,7 @@ describe("en ejecucion, la bandera no puede pedir otra cosa", () => {
     "?fixture=../CLAUDE.md",
     "?fixture=/etc/passwd",
     "?fixture=http://ajeno.example/x.xlsx",
-    "?fixture=docs/Plantilla_Captura_Reporteria_v1.xlsx",
+    "?fixture=docs/Plantilla_Captura_Reporteria_v2.xlsx",
     "?archivo=docs/DEMO_Agrodrones_Bajio_FICTICIO.xlsx",
     "?fixture=demo&archivo=/etc/passwd",
   ];

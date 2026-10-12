@@ -81,7 +81,8 @@ describe("repetir el folio es capturar una venta con varias partidas", () => {
 
   it("un folio por fila sigue siendo valido y se lee igual que antes", () => {
     const { dataset, hallazgos } = leer([EQUIPO, OTRA]);
-    expect(hallazgos.filter((h) => h.severidad !== "info")).toEqual([]);
+    // De la hoja ventas: este libro no trae cobranza ni gastos, y eso se avisa aparte.
+    expect(hallazgos.filter((h) => h.hoja === "ventas" && h.severidad !== "info")).toEqual([]);
     expect(dataset.ventas.map((v) => [v.folio, v.cliente, v.dias_credito])).toEqual([
       ["V-001", "Cliente A", 90],
       ["V-002", "Cliente B", 90],
@@ -119,10 +120,30 @@ describe("cabecera heredada", () => {
     expect(de(hallazgos, "advertencia")).toEqual([]);
   });
 
-  it("si ninguna partida trae dias de credito, el folio queda sin ellos y se avisa como siempre", () => {
+  it("si ninguna partida trae dias de credito y el folio debe, se avisa UNA vez, en su primera partida", () => {
+    // Los dias de credito son de la venta, no de cada producto: un aviso por folio.
     const { dataset, hallazgos } = leer([{ ...EQUIPO, dias_credito: "" }, ACCESORIO]);
     expect(dataset.ventas.map((v) => v.dias_credito)).toEqual([null, null]);
-    expect(de(hallazgos, "advertencia", "dias_credito").map((h) => h.fila)).toEqual([2, 3]);
+    const avisos = de(hallazgos, "advertencia", "dias_credito");
+    expect(avisos.map((h) => h.fila)).toEqual([2]);
+    // Sin abonos, el saldo es el precio del folio completo: $100,000 + $10,000.
+    expect(avisos[0]?.mensaje).toContain("con $110,000 por cobrar");
+  });
+
+  it("un folio sin dias de credito que ya esta pagado no se avisa: no hay antiguedad que medir", () => {
+    const pagado: Fila[] = [{ folio_pago: "P-001", folio_venta: "V-001", fecha_pago: "20/01/2026", monto: 110000 }];
+    const { hallazgos } = leer([{ ...EQUIPO, dias_credito: "" }, ACCESORIO], pagado);
+    expect(de(hallazgos, "advertencia", "dias_credito")).toEqual([]);
+    // Ni si esta sobrecobrado: tampoco debe.
+    const deMas: Fila[] = [{ folio_pago: "P-001", folio_venta: "V-001", fecha_pago: "20/01/2026", monto: 110001 }];
+    expect(de(leer([{ ...EQUIPO, dias_credito: "" }, ACCESORIO], deMas).hallazgos, "advertencia", "dias_credito")).toEqual([]);
+  });
+
+  it("con un peso pendiente, si se avisa", () => {
+    const casi: Fila[] = [{ folio_pago: "P-001", folio_venta: "V-001", fecha_pago: "20/01/2026", monto: 109999 }];
+    const avisos = de(leer([{ ...EQUIPO, dias_credito: "" }, ACCESORIO], casi).hallazgos, "advertencia", "dias_credito");
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]?.mensaje).toContain("con $1 por cobrar");
   });
 
   it("no hereda nada de otro folio", () => {

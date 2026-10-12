@@ -1,3 +1,4 @@
+import { DOMParser } from "@xmldom/xmldom";
 import * as XLSX from "xlsx";
 
 /**
@@ -116,4 +117,87 @@ export function fallaXml(xml: string): string | null {
 
   if (pila.length > 0) return `sin cerrar al terminar: <${pila.join("> <")}>`;
   return hayRaiz ? null : "sin elemento raiz";
+}
+
+/**
+ * Lo que un PARSER XML REAL objeta de una parte: vacio si la lee sin quejarse.
+ *
+ * `fallaXml` es un verificador hecho a mano, de cuando no habia parser en las
+ * dependencias. Se conserva —detecta la fila sin cerrar que ya se colo una
+ * vez—, pero una edicion de miles de celdas no se da por buena con un
+ * verificador propio: se le pregunta a `@xmldom/xmldom`, que es el mismo lector
+ * con el que se hacen las afirmaciones sobre el contenido del archivo.
+ */
+export function erroresXml(xml: string): string[] {
+  const errores: string[] = [];
+  try {
+    new DOMParser({ onError: (nivel, mensaje) => errores.push(`${nivel}: ${mensaje}`) }).parseFromString(xml, "text/xml");
+  } catch (e) {
+    errores.push(`fatal: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  return errores;
+}
+
+// --------------------------- Lectura con el parser real ---------------------------
+
+interface NodoXml {
+  getAttribute(nombre: string): string | null;
+  getElementsByTagName(nombre: string): { readonly length: number; item(i: number): NodoXml | null };
+  readonly textContent: string | null;
+}
+
+function hijos(raiz: Pick<NodoXml, "getElementsByTagName">, etiqueta: string): NodoXml[] {
+  const lista = raiz.getElementsByTagName(etiqueta);
+  return Array.from({ length: lista.length }, (_, i) => lista.item(i)).filter((n): n is NodoXml => n !== null);
+}
+
+function documentoXml(xml: string): Pick<NodoXml, "getElementsByTagName"> {
+  return new DOMParser().parseFromString(xml, "text/xml") as unknown as Pick<NodoXml, "getElementsByTagName">;
+}
+
+export interface CeldaXml {
+  readonly ref: string;
+  readonly columna: string;
+  readonly fila: number;
+  /** Indice en `cellXfs` de styles.xml. */
+  readonly estilo: number;
+  readonly formula: string | null;
+}
+
+/** Las celdas de una hoja, tal como estan en su XML. */
+export function celdasXml(xmlHoja: string): CeldaXml[] {
+  return hijos(documentoXml(xmlHoja), "c").map((c): CeldaXml => {
+    const ref = c.getAttribute("r") ?? "";
+    const columna = ref.replace(/\d+$/, "");
+    return {
+      ref,
+      columna,
+      fila: Number(ref.slice(columna.length)),
+      estilo: Number(c.getAttribute("s") ?? 0),
+      formula: hijos(c, "f")[0]?.textContent ?? null,
+    };
+  });
+}
+
+/** Por cada estilo de celda (`cellXfs`), el color de su letra: "FF0000FF" es el azul de captura. */
+export function colorDeLetraPorEstilo(xmlEstilos: string): (string | null)[] {
+  const doc = documentoXml(xmlEstilos);
+  const fuentes = hijos(hijos(doc, "fonts")[0] ?? doc, "font").map((f) => hijos(f, "color")[0]?.getAttribute("rgb") ?? null);
+  return hijos(hijos(doc, "cellXfs")[0] ?? doc, "xf").map((xf) => fuentes[Number(xf.getAttribute("fontId") ?? 0)] ?? null);
+}
+
+/** Un atributo del primer elemento con esa etiqueta, o null. */
+export function atributoXml(xml: string, etiqueta: string, atributo: string): string | null {
+  return hijos(documentoXml(xml), etiqueta)[0]?.getAttribute(atributo) ?? null;
+}
+
+/** El texto de todas las celdas de una hoja, resolviendo las cadenas compartidas. */
+export function textosXml(xmlHoja: string, xmlCadenas: string): string[] {
+  const cadenas = hijos(documentoXml(xmlCadenas), "si").map((si) => hijos(si, "t").map((t) => t.textContent ?? "").join(""));
+  return hijos(documentoXml(xmlHoja), "c").flatMap((c) => {
+    const enLinea = hijos(c, "is")[0]?.textContent;
+    if (enLinea !== undefined && enLinea !== null) return [enLinea];
+    const v = hijos(c, "v")[0]?.textContent;
+    return c.getAttribute("t") === "s" && v !== undefined && v !== null ? [cadenas[Number(v)] ?? ""] : [];
+  });
 }

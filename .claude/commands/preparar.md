@@ -35,7 +35,7 @@ qué hace distinto la aplicación—:
 | Cubeta | Rutas |
 |---|---|
 | **Motor de cálculo** | `src/lib/calc/` |
-| **Contrato de datos** | `src/lib/schema.ts`, `docs/Plantilla_Captura_Reporteria_v1.xlsx` |
+| **Contrato de datos** | `src/lib/schema.ts`, `docs/Plantilla_Captura_Reporteria_v2.xlsx` |
 | **Parseo y validación** | `src/lib/parse/` |
 | **Tema** | `src/lib/tema/`, `src/index.css`, `src/components/SelectorTema.tsx`, `src/store/useTema.ts` |
 | **Preferencias** | `src/lib/preferencias/` |

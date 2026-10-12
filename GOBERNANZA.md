@@ -312,7 +312,7 @@ delegan.
 ## 7. El contrato de datos
 
 El acoplamiento más frágil del proyecto: `src/lib/schema.ts` y
-`docs/Plantilla_Captura_Reporteria_v1.xlsx` deben coincidir campo por campo. Si divergen,
+`docs/Plantilla_Captura_Reporteria_v2.xlsx` deben coincidir campo por campo. Si divergen,
 la aplicación lee mal el archivo del cliente y nadie se entera hasta que un número sale
 raro.
 
@@ -449,9 +449,9 @@ Priorizado. Lo de arriba entra primero.
   y el renglón de nota que el lector tiene que descartar. Hasta el 2026-10-10 este punto se
   llamaba «plantilla v2»; ese nombre es ahora de la plantilla de partidas de la v1.2.0
   (`docs/decisiones.md`, 2026-09-14), que conserva las hojas como están. Las fórmulas de las columnas calculadas
-  (`utilidad_bruta`, `margen_pct`, `cobrado`, `saldo`) hoy solo están en la fila de ejemplo,
-  desde v1.0.0: se escriben en v1.2, ya a nivel de folio, con el rango `cobranza!$B$3:$B$1000`
-  de la fila de ejemplo y del demo, y desaparecen con Google Sheets en v1.3 (ROADMAP.md §3).
+  (`utilidad_bruta`, `margen_pct`, `cobrado`, `saldo`) ya están en cada fila de captura desde la
+  plantilla v2, a nivel de folio, con el rango `cobranza!$B$3:$B$1000`,
+  y desaparecen con Google Sheets en v1.3 (ROADMAP.md §3).
   Ese rediseño hay que hacerlo igual, y es el momento de decidir con qué herramienta se genera la plantilla, que hoy se
   edita a mano (sección 7). Opciones evaluadas el 2026-09-13:
   1. **SheetJS más un inyector de XML** que agregue estilos, listas y paneles. No compensa hoy:
@@ -535,6 +535,48 @@ Priorizado. Lo de arriba entra primero.
   v1.2.0 (`clientes.ventaCruzadaFolio`; con el demo, 2 de 13), pero ningún módulo la pinta ni hay
   hallazgo que la juzgue: su umbral y su texto siguen sin decidir (CLAUDE.md, «Partidas por
   folio»). Mientras tanto es una cifra calculada que nadie ve.
+- **Tres avisos que piden un dato sin comprobar que haga falta.** Observado el 2026-10-10 al
+  corregir el de días de crédito, que tenía ese defecto: avisaba de ventas de contado ya
+  liquidadas. Los tres vistos **leyendo el código, no ejecutándolos**:
+  - **«Falta fecha» en una partida Demo.** La regla `fila-sin-fecha` recorre todas las filas de
+    `ventas`. Una Demo no entra al análisis mensual ni a la cartera, así que su fecha no hace
+    falta, y el aviso dice que «la fila queda fuera del análisis mensual» de una fila que ya
+    estaba fuera.
+  - **«Días de crédito pactados» en el Alcance de la portada.** `alcanceDelReporte`
+    (`src/modules/resumen/selectores.ts`) lo lista entre lo que el reporte no incluye cuando ninguna
+    venta trae plazo, aunque ninguna tenga saldo. Es el mismo criterio que se acaba de corregir en
+    el panel, escrito aparte en el papel.
+  - **El aviso de días de crédito sin hoja `cobranza`. Es el peor de los tres.** Sin abonos, toda
+    venta «debe» su precio completo, así que el aviso sale en todas: **el archivo más incompleto
+    es el que más ruido genera**. Y mientras tanto el módulo de Cobranza está deshabilitado y no
+    hay antigüedad que mostrar. Desde el 2026-10-11 la hoja ausente ya es una advertencia propia,
+    que dice lo importante una vez; falta que este aviso calle cuando no hay cobranza.
+- **El panel de validación debe mostrar la columna `notas` junto al hallazgo de su fila.**
+  Propuesto y aprobado el 2026-10-11; va en su propia sesión, con recorrido visual. `notas` es una
+  columna del contrato que el panel no lee. Quien sabe por qué una fila es rara lo anota una vez en
+  su archivo, y el aviso deja de parecer un descuido cada vez que lo carga: el hallazgo se conserva
+  y llega acompañado de la explicación de quien capturó. Resuelve además que las advertencias
+  deliberadas del demo no parezcan defectos del archivo **sin ninguna rama que detecte «este es el
+  demo»**, que es lo que no se quiere. El demo ya trae la nota en V-006 («Unidad demostrativa,
+  excluida del analisis de venta») y en el abono de V-018 («Sobrecobro deliberado para prueba»);
+  faltan la de V-025 (venta sin fecha) y la de la partida de V-015 que dice «Contado». Al editarlas,
+  el LEEME del demo y su prueba (`demo.test.ts`) siguen valiendo.
+- **Los informativos no deben contar en el encabezado del panel.** Propuesto y aprobado el
+  2026-10-11; misma sesión que el anterior. Hoy «18 advertencias · 7 informativos» suma cosas que
+  no son incidencias: «se descartó la fila de ejemplo» es la aplicación contando que leyó bien.
+  Diseño acordado: **el encabezado cuenta solo errores y advertencias**; los informativos dejan de
+  llamarse así y pasan a una sola línea tenue debajo —«Lectura del archivo: 274 filas vacías
+  ignoradas, 3 filas de ejemplo descartadas, 1 fila Demo listada aparte»—, que se despliega para ver
+  el detalle. Con un archivo correcto el encabezado dice «Sin incidencias» y la línea de lectura.
+  No desaparecen: que la aplicación diga cuántas filas ignoró es lo que evita que alguien crea que
+  perdió datos. El criterio es que quien carga un archivo correcto no sienta que algo está mal. La
+  severidad de la hoja ausente ya se corrigió aparte, para que no quede en esa línea.
+- **Una hoja presente pero sin filas deshabilita módulos sin ningún hallazgo.** Observado el
+  2026-10-11 leyendo el código: `capacidades()` decide por número de filas, y `hoja-ausente` solo
+  mira si la hoja existe. Un archivo con la hoja `cobranza` vacía apaga Cobranza y Flujo igual que
+  uno sin la hoja, y el panel no dice nada; lo dice solo el módulo al abrirlo. No se sube a
+  advertencia sin decidirlo: la plantilla recién descargada es exactamente ese caso, y hoy carga
+  sin advertencias a propósito.
 - **Los días de una partida que aún no vence se muestran en negativo.** Observado el 2026-10-10
   en Cobranza: un accesorio entregado el 20/08 con 90 días de crédito aparece con «-70» al corte del
   09/09. Es correcto —faltan 70 días para que venza— y los renglones de folio usan el mismo

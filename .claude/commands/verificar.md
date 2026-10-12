@@ -156,7 +156,7 @@ Tres cosas que hay que saber para no reportar ruido:
   `dist/` no debe aparecer `fixtureDesarrollo`, ni `activarFixtureDesarrollo`, ni la bandera
   `fixture=demo`, ni un chunk de `src/dev`. **Cuidado con el falso positivo:** `dist/assets/`
   **sí** contiene `DEMO_Agrodrones_Bajio_FICTICIO-<hash>.xlsx` y
-  `Plantilla_Captura_Reporteria_v1-<hash>.xlsx`, y es correcto: `ZonaCarga` los ofrece como
+  `Plantilla_Captura_Reporteria_v2-<hash>.xlsx`, y es correcto: `ZonaCarga` los ofrece como
   descarga. Lo que no debe estar es el código ni la bandera, no el archivo.
 
 ---
