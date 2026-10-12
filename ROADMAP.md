@@ -90,7 +90,8 @@ Decidido el 2026-09-14.
   entrega.
 - Los pagos se aplican a las partidas en orden de entrega: lo que queda sin pagar es lo último
   entregado.
-- Anticipos como información, y su proporción de la cobranza como métrica nueva.
+- Anticipos como información, y su proporción de la cobranza como métrica nueva. **No entró en la
+  1.2.0**: faltan su umbral y su base, que son decisión de negocio (GOBERNANZA.md §11).
 - Cobro, saldo, antigüedad y ticket por folio; utilidad, margen y producto por partida.
 - Venta cruzada por folio como métrica nueva. El attach rate por cliente se conserva.
 
@@ -99,11 +100,14 @@ Decidido el 2026-09-14.
 
 Las viñetas son el resumen. El alcance completo —cabecera y partida, casos límite, niveles de
 cálculo, fixture y por qué la versión es MENOR— está en `docs/decisiones.md` (entradas del
-2026-09-14, serie de partidas) y la especificación en `CLAUDE.md`, «Partidas por folio (v1.2.0)».
+2026-09-14, serie de partidas) y la especificación en `CLAUDE.md`, integrada en sus secciones
+generales desde el cierre de la fase: «Folios y partidas», «Validación» y «Definiciones de cálculo».
 
 **Entrada:** producción en 1.1.4. Cumplida: producción está en 1.1.5 desde el 2026-09-14.
 **Salida:** un archivo con varias partidas por folio carga sin rechazar el folio repetido, y la
 suma de tramos, cobrado más saldo y la utilidad por partida cuadran contra sus totales.
+**Cumplida el 2026-10-12**, con la versión 1.2.0 cerrada en su rama; falta fusionarla y verificar
+lo que sirve producción.
 
 ### v1.3 — Plantilla en Google Sheets
 

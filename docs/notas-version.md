@@ -11,11 +11,10 @@ La más reciente va arriba. El razonamiento de cada decisión está en `docs/dec
 
 ---
 
-## 1.2.0 — MENOR — en preparación, sin publicar
+## 1.2.0 — MENOR — 2026-10-12
 
-**Borrador.** Producción sigue en 1.1.5 y nada de esto ha cambiado todavía. Se escribe antes para
-que lo decidido no dependa de la memoria de nadie (GOBERNANZA.md, sección 9); la sesión que
-implemente la versión lo completa y le pone fecha.
+Una venta con varios productos ya se puede capturar como lo que es: un folio con varias filas.
+**Si cada folio de su archivo ocupa una sola fila, ninguna cifra suya cambia.**
 
 ### Qué estaba mal
 
@@ -24,31 +23,61 @@ distinto por fila. Si repetía el folio para anotar un equipo y sus accesorios, 
 «El folio ya se usó» como error, **pero las filas se calculaban igual, y mal**: cada fila restaba
 todo lo cobrado del folio, así que ese cobro se contaba una vez por fila.
 
-Ejemplo con datos inventados, tal como lo calcula la 1.1.5: un folio con dos filas, de $100,000 y
+Ejemplo con datos inventados, tal como lo calculaba la 1.1.5: un folio con dos filas, de $100,000 y
 $10,000, y un solo abono de $60,000.
 
-| | La 1.1.5 mostraba | Lo correcto |
+| | La 1.1.5 mostraba | Lo correcto, y lo que muestra la 1.2.0 |
 |---|---|---|
 | Cobrado | $120,000 | $60,000 |
 | Saldo | −$10,000 | $50,000 |
 
 Si su archivo tenía folios repetidos, **las cifras que vio no solo estaban marcadas con un error:
-estaban mal calculadas.** Cuando cambien con esta versión, las nuevas son las correctas.
+estaban mal calculadas.** Las que ve ahora son las correctas.
+
+### Cuatro medidas que cambian de unidad
+
+Con un folio por fila, las tres primeras dan el mismo número que antes. Cambian solo donde hay
+ventas de varias filas.
+
+| Medida | Qué medía antes | Qué mide ahora |
+|---|---|---|
+| **Operaciones** (Resumen, Clientes) | Filas de la hoja `ventas` | Ventas: folios distintos. Una venta con un equipo y dos accesorios es una operación |
+| **Ticket promedio** | Venta total entre el número de filas | Venta total entre el número de folios: lo que vale una venta completa, no un renglón |
+| **Unidades**, en el total de Rendimiento por producto | El número de operaciones, que coincidía con las filas solo porque cada venta ocupaba una | Productos vendidos: cada fila de `ventas` es una unidad, y el total suma lo mismo que sus líneas y sus modelos |
+| **Venta cruzada** | Solo por cliente (attach rate): de los clientes con equipo, cuántos compraron algún accesorio, en la misma venta o en otra | Además, por folio: de las ventas con equipo, cuántas llevaron accesorio **en la misma operación** |
+
+Con el archivo de demostración, que ahora trae dos ventas de dos filas: las operaciones pasan de 24
+a 22, el ticket promedio de $187,370.83 a $204,404.55, las unidades siguen en 24, y la venta
+cruzada por folio es 2 de 13. La venta total, el costo, la utilidad, lo cobrado, el saldo y la
+antigüedad de la cartera no se mueven.
+
+Tres precisiones:
+
+- **El total de unidades puede ser mayor que las operaciones del Resumen, y es lo correcto**: una
+  venta con un equipo y dos accesorios es una operación y tres unidades.
+- **El attach rate por cliente no cambia.** La venta cruzada por folio es una medida aparte, y solo
+  tiene sentido si su archivo trae algún folio con varias partidas: en un archivo de una fila por
+  producto daría cero contra todos, y eso no sería un dato.
+- **La venta cruzada por folio todavía no aparece en pantalla.** La aplicación ya la calcula, pero
+  falta decidir a partir de qué valor amerita un aviso. Llegará en una versión posterior.
 
 ### Qué cambia si ya usaba la aplicación
 
 - **Repetir el folio es la forma correcta de capturar una venta con varios productos.** Cada fila
   es una partida, con su producto, su precio y su fecha de entrega. Ya no es un error.
-- **«Operaciones» cuenta ventas, no filas.** Antes contaba filas de la hoja `ventas`; ahora
-  cuenta folios. Con un folio por fila es el mismo número.
-- **El ticket promedio es por venta.** Antes era la venta total entre el número de filas; ahora,
-  entre el número de folios. Con un folio por fila es el mismo número.
-- **Las «unidades» de Rendimiento por producto cuentan productos vendidos, también en el total.**
-  Cada fila de `ventas` es una unidad. Antes, el renglón de total tomaba el número de operaciones,
-  que coincidía con las filas solo porque cada venta ocupaba una. Ahora suma lo mismo que sus
-  líneas y sus modelos. Con un folio por fila es el mismo número; con ventas de varias partidas, el
-  total de unidades es mayor que las «Operaciones» del Resumen, y es lo correcto: una venta con un
-  equipo y dos accesorios es una operación y tres unidades.
+- **El cliente, los días de crédito, la condición y el vendedor son de la venta completa.** Basta
+  escribirlos en una fila del folio; las demás los toman de ahí. Si dos filas del mismo folio
+  traen clientes distintos, es un error y esa venta completa queda fuera del reporte, con un
+  mensaje que dice qué filas son y cuánto abonado queda sin aplicar. Si lo distinto son los días
+  de crédito, la condición o el vendedor, es una advertencia: se aplica el primero capturado.
+- **Los pagos de una venta se aplican a sus productos en el orden en que se entregaron.** Lo que
+  queda por cobrar es lo último entregado, y su antigüedad se cuenta desde esa entrega. Por eso
+  el saldo de una misma venta puede aparecer en dos tramos de antigüedad.
+- **Cobranza lista ventas, no filas.** Cada renglón es un folio; al desplegarlo se ven sus
+  productos y sus abonos.
+- **Ventas y flujo cuenta entregas por mes.** Una venta entregada en dos meses aparece en los dos,
+  así que la suma de los meses puede ser mayor que las operaciones del periodo. Una nota bajo la
+  tabla lo explica cuando pasa.
 - **Plantilla de captura v2.** Mismas columnas que la anterior: su archivo actual se sigue leyendo
   igual y no tiene que volver a capturarlo. Lo que cambia en la plantilla nueva:
   - Las columnas de letra negra (utilidad, margen, cobrado y saldo) ya se calculan solas en cada
@@ -59,6 +88,14 @@ estaban mal calculadas.** Cuando cambien con esta versión, las nuevas son las c
     vendedor se copian solos.
   - Las celdas donde se escribe ya van todas en letra azul, como dicen las instrucciones. En la
     plantilla anterior solo lo estaba la fila de ejemplo.
+- **El Excel que descarga es la plantilla, con sus datos puestos.** Antes era un libro sin colores,
+  sin listas desplegables y sin instrucciones. Ahora trae todo lo de la plantilla v2, y puede
+  seguir capturando en él. Pesa más que antes —unos 250 kB con el archivo de demostración— porque
+  incluye las filas libres de la plantilla. Si su archivo traía dos filas de una venta con la
+  condición o el vendedor distintos, el Excel descargado trae el que se aplicó, no los dos.
+- **La columna `cobrado` de la hoja y el «Efectivo cobrado» del reporte pueden no coincidir, y los
+  dos están bien.** La hoja suma todos los abonos; el reporte no cuenta los abonados contra una
+  unidad Demo, porque una Demo no es una venta.
 - **Menos advertencias, y todas piden algo.** El aviso «sin días de crédito» ya solo aparece en las
   ventas que tienen saldo por cobrar, una vez por venta, y dice cuánto se debe. Antes aparecía
   también en las ventas de contado ya liquidadas, donde no faltaba nada. Si recarga su archivo
@@ -66,9 +103,6 @@ estaban mal calculadas.** Cuando cambien con esta versión, las nuevas son las c
 - **Si a su archivo le falta una hoja, ahora es una advertencia.** Que no venga `cobranza` o
   `gastos` deshabilita módulos del reporte, y antes se anunciaba como una nota informativa más,
   junto a las filas vacías ignoradas. El mensaje dice qué módulos se apagan.
-- **Venta cruzada por folio**, métrica nueva: de las ventas con equipo, cuántas llevaron
-  accesorio en la misma operación. Solo aparece si su archivo tiene algún folio con varias
-  partidas. El attach rate por cliente no cambia.
 
 ### ¿Pueden moverse sus cifras?
 

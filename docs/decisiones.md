@@ -1478,3 +1478,35 @@ vuelve al mismo dataset. Sus fórmulas, evaluadas con HyperFormula fuera del rep
 suma $2,836,100 y `saldo` $1,660,800 —las cifras de CLAUDE.md para la hoja—, con la flecha en la
 segunda partida de V-008 y de V-015, y cada valor guardado igual al calculado. **Abrirlo en Excel y
 en Google Sheets lo valida una persona**, igual que la plantilla.
+
+---
+
+## 2026-10-12 — Cierre de la fase de partidas: lo decidido que no se implementó sale de las definiciones
+
+**Contexto.** La especificación de la v1.2.0 vivió en una sección marcada de `CLAUDE.md`,
+«Partidas por folio», con la regla de que mandaba sobre las generales mientras la fase estuviera en
+curso. Cerrar la fase era integrarla en «Contrato de datos», «Validación», «Definiciones de
+cálculo» y la tabla de cifras. La sección traía, entre las definiciones de cálculo, `anticipos_pct`,
+y en su validación el anticipo como informativo: decididos el 2026-09-14, marcados «sin implementar
+todavía», y con su umbral y su base sin decidir.
+
+**Decisión.** Al integrar, **los anticipos no pasan a las definiciones**. No hay nada de ellos en
+el código, y «Definiciones de cálculo (exactas, no reinterpretar)» no puede listar una métrica que
+el motor no calcula. Van al backlog (GOBERNANZA.md §11) con lo que falta decidir; la decisión de
+negocio se conserva en la entrada del 2026-09-14. La venta cruzada por folio sí pasa, porque el
+motor la calcula, y la definición dice que todavía no se pinta ni tiene hallazgo. La versión se
+cierra en 1.2.0 sin ellos.
+
+**Alternativa descartada.** Integrar la sección completa y dejar el anticipo con la nota «sin
+implementar». Es lo que la sección marcada ya hacía, y se sostenía porque la marca avisaba que todo
+ahí era provisional. Sin la marca, la nota queda enterrada en una lista de definiciones exactas.
+
+**Consecuencia.** Habría sido **el cuarto caso de la especificación prometiendo lo que el código no
+hace**: INSTRUCCIONES decía que las columnas de letra negra se calculan solas cuando solo la fila de
+ejemplo traía fórmula (corregido en la 1.1.5); `CLAUDE.md` define Error como lo que «bloquea el
+módulo afectado» y ningún error bloquea nada (GOBERNANZA.md §11, abierto); «solo escriba en las
+celdas de letra azul» no era cierto en las filas de captura (corregido con la plantilla v2). Queda
+como práctica en GOBERNANZA.md §5, paso 3: **al integrar una sección «decidida, pendiente de
+implementar» se comprueba qué de lo decidido no se implementó, buscándolo en el código, y se saca
+de las definiciones.** El borrador de las notas de versión tenía el mismo defecto en pequeño —decía
+que la venta cruzada por folio «aparece»— y se corrigió a «todavía no aparece en pantalla».

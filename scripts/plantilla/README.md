@@ -56,4 +56,4 @@ El demo de partida para `calcular_demo.mjs` y `aplicar_demo.py` es el del commit
 - No se corren sin leerlos. Parten de la v1 tal como está en `docs/`; contra otro archivo, o contra
   una v1 modificada, se detienen.
 - Que la plantilla abra sin pedir reparación en Excel no lo comprueba ningún guion: lo valida una
-  persona (CLAUDE.md, «Partidas por folio»).
+  persona (GOBERNANZA.md §11).
